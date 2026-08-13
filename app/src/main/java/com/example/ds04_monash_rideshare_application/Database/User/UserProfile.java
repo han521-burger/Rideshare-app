@@ -5,8 +5,6 @@ import androidx.room.Entity;
 import androidx.room.ForeignKey;
 import androidx.room.PrimaryKey;
 
-import com.example.ds04_monash_rideshare_application.Database.UserAccount;
-
 //onDelete = ForeignKey.Cascade takes into account the primary key ; if PK is deleted ; would be deleted here as well
 @Entity(
         tableName = "user_profile",

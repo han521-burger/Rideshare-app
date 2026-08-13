@@ -1,4 +1,4 @@
-package com.example.ds04_monash_rideshare_application.Database;
+package com.example.ds04_monash_rideshare_application.Database.User;
 import androidx.annotation.NonNull;
 import androidx.room.Entity;
 import androidx.room.Index;
