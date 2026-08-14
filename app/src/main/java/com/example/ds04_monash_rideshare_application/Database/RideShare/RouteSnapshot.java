@@ -2,13 +2,27 @@ package com.example.ds04_monash_rideshare_application.Database.RideShare;
 
 import androidx.annotation.NonNull;
 import androidx.room.Entity;
+import androidx.room.ForeignKey;
+import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
-@Entity(tableName = "route_snapshot")
+@Entity(
+        tableName = "route_snapshot",
+        foreignKeys = @ForeignKey(
+                entity = RideOffer.class,
+                parentColumns = "rideId",
+                childColumns = "rideId",
+                onDelete = ForeignKey.CASCADE
+        ),
+        indices = @Index("rideId")
+)
 public class RouteSnapshot {
     @PrimaryKey
     @NonNull
     private String routeId;
+
+    @NonNull
+    private String rideId;
 
     private String originLatLng;
     private String destinationLatLng;
@@ -17,9 +31,11 @@ public class RouteSnapshot {
     private String routeVendor;
     private long calculatedAt;
 
-    public RouteSnapshot(@NonNull String routeId, String originLatLng, String destinationLatLng,
-                         long distanceM, long durationS, String routeVendor, long calculatedAt) {
+    public RouteSnapshot(@NonNull String routeId, @NonNull String rideId, String originLatLng,
+                         String destinationLatLng, long distanceM, long durationS,
+                         String routeVendor, long calculatedAt) {
         this.routeId = routeId;
+        this.rideId = rideId;
         this.originLatLng = originLatLng;
         this.destinationLatLng = destinationLatLng;
         this.distanceM = distanceM;
@@ -30,6 +46,8 @@ public class RouteSnapshot {
 
     @NonNull public String getRouteId() {
         return routeId; }
+    @NonNull public String getRideId() {
+        return rideId; }
     public String getOriginLatLng() {
         return originLatLng; }
     public String getDestinationLatLng() {
