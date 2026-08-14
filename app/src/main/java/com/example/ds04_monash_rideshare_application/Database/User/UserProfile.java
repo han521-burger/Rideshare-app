@@ -47,6 +47,12 @@ public class UserProfile {
     public void setDisplayName(String displayName){
         this.displayName = displayName;
     }
+    public String getPreferredName(){
+        return preferredName;
+    }
+    public void setPreferredName(String preferredName){
+        this.preferredName = preferredName;
+    }
     @Nullable
     public String getPhoneNumber(){
         return phoneNumber;
