@@ -10,6 +10,7 @@ kotlin = "2.0.20"
 composeBom = "2024.09.00"
 roomCommon = "2.6.1"
 yandexMapkit = "4.13.0-full"
+navigationCompose = "2.8.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -28,6 +29,7 @@ androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-te
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3" }
 androidx-room-common = { group = "androidx.room", name = "room-common", version.ref = "roomCommon" }
 yandex-mapkit = { group = "com.yandex.android", name = "maps.mobile", version.ref = "yandexMapkit" }
+androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

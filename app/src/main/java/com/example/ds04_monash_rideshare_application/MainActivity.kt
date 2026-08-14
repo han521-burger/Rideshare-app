@@ -4,14 +4,7 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
-import com.example.ds04_monash_rideshare_application.ui.MapScreen
+import com.example.ds04_monash_rideshare_application.ui.RootNavHost
 import com.example.ds04_monash_rideshare_application.ui.theme.Ds04_monash_rideshare_applicationTheme
 
 class MainActivity : ComponentActivity() {
@@ -20,26 +13,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             Ds04_monash_rideshare_applicationTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    MapScreen(modifier = Modifier.padding(innerPadding))
-                }
+                RootNavHost()
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    Ds04_monash_rideshare_applicationTheme {
-        Greeting("Android")
     }
 }
