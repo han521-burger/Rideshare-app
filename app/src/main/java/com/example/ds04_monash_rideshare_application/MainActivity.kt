@@ -11,6 +11,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import com.example.ds04_monash_rideshare_application.ui.MapScreen
 import com.example.ds04_monash_rideshare_application.ui.theme.Ds04_monash_rideshare_applicationTheme
 
 class MainActivity : ComponentActivity() {
@@ -20,10 +21,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             Ds04_monash_rideshare_applicationTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                    MapScreen(modifier = Modifier.padding(innerPadding))
                 }
             }
         }
