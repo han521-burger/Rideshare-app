@@ -1,0 +1,61 @@
+# CI pipeline for Monash Rideshare (ds04_monash_rideshare_application).
+
+stages:
+  - secret-scan
+  - build
+  - test
+
+secret-scan:
+  stage: secret-scan
+  image: alpine:3
+  script:
+    - apk add --no-cache grep >/dev/null
+    - |
+      set -e
+      # Common credential/token shapes. Extend this list as new services are integrated.
+      PATTERN='(AKIA[0-9A-Z]{16}|glpat-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{36}|-----BEGIN [A-Z ]*PRIVATE KEY-----|AIzaSy[A-Za-z0-9_-]{33})'
+      if grep -RInE "$PATTERN" --exclude-dir=.git --exclude-dir=.gradle --exclude-dir=build . ; then
+        echo "Potential secret found above — remove it and rotate the credential before merging."
+        exit 1
+      fi
+      echo "No known secret patterns found."
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == "main"'
+
+android-build:
+  stage: build
+  image: mingc/android-build-box:latest
+  script:
+    - chmod +x ./gradlew
+    - ./gradlew assembleDebug --stacktrace
+  artifacts:
+    paths:
+      - app/build/outputs/apk/debug/
+    expire_in: 1 week
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == "main"'
+
+android-unit-test:
+  stage: test
+  image: mingc/android-build-box:latest
+  script:
+    - chmod +x ./gradlew
+    - ./gradlew testDebugUnitTest --stacktrace
+  artifacts:
+    when: always
+    reports:
+      junit: app/build/test-results/testDebugUnitTest/TEST-*.xml
+    paths:
+      - app/build/reports/tests/
+    expire_in: 1 week
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event" || $CI_COMMIT_BRANCH == "main"'
+
+# Notes:
+# - YANDEX_MAPKIT_API_KEY comes from local.properties, which is gitignored and won't exist in
+#   CI. build.gradle already defaults it to an empty string, so the build won't fail — it just
+#   won't have a working map key. That's fine for compiling/unit tests; map-dependent
+#   instrumented/UI tests would need the key injected as a CI variable instead.
+# - mingc/android-build-box bundles the Android SDK + common API levels + build-tools, which is
+#   why it's used here instead of a bare JDK image. Swap it if the team standardises on
+#   something else (e.g. a pinned android/ndk image) — just keep an SDK-capable image.
