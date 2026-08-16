@@ -21,6 +21,15 @@ class RideshareViewModelTest {
     }
 
     @Test
+    fun `sign in keeps the entered Monash email address`() {
+        val viewModel = RideshareViewModel()
+
+        viewModel.signIn("student.name@monash.edu")
+
+        assertEquals("student.name@monash.edu", viewModel.uiState.email)
+    }
+
+    @Test
     fun `role and profile can change within the current session`() {
         val viewModel = RideshareViewModel()
         viewModel.signIn()

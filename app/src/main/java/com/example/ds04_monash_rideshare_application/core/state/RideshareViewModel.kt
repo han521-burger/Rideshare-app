@@ -31,7 +31,7 @@ class RideshareViewModel : ViewModel() {
     var uiState by mutableStateOf(RideshareUiState())
         private set
 
-    fun signIn(onSuccess: () -> Unit = {}) {
+    fun signIn(email: String? = null, onSuccess: () -> Unit = {}) {
         if (uiState.isSigningIn) return
 
         uiState = uiState.copy(isSigningIn = true, errorMessage = null)
@@ -40,7 +40,7 @@ class RideshareViewModel : ViewModel() {
                 uiState = uiState.copy(
                     isSigningIn = false,
                     userId = user.userId,
-                    email = user.emailAccount,
+                    email = email?.trim()?.takeIf { it.isNotBlank() } ?: user.emailAccount,
                     displayName = user.displayName,
                     preferredName = user.displayName,
                     activeRole = null

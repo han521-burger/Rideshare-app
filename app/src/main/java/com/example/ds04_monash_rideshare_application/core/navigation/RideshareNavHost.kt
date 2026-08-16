@@ -74,8 +74,8 @@ fun RideshareNavHost(
 
         AppDestination.Login -> LoginScreen(
             uiState = uiState,
-            onSignIn = {
-                viewModel.signIn {
+            onSignIn = { email ->
+                viewModel.signIn(email) {
                     replaceStack(AppDestination.RoleSelection)
                 }
             },

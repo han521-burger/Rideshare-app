@@ -20,36 +20,38 @@ sealed class AppDestination(val route: String, val title: String) {
     data object Map : AppDestination("map", "Route Map")
 
     companion object {
-        val sprintOneDestinations = listOf(
-            Splash,
-            Login,
-            RoleSelection,
-            PassengerHome,
-            DriverHome,
-            Profile,
-            CreateRide,
-            FindRide,
-            RideDetails,
-            RideRequests,
-            ConfirmedRide,
-            Messages,
-            TripHistory,
-            SustainabilityDashboard,
-            Settings,
-            Map
-        )
+        val sprintOneDestinations: List<AppDestination>
+            get() = listOf(
+                Splash,
+                Login,
+                RoleSelection,
+                PassengerHome,
+                DriverHome,
+                Profile,
+                CreateRide,
+                FindRide,
+                RideDetails,
+                RideRequests,
+                ConfirmedRide,
+                Messages,
+                TripHistory,
+                SustainabilityDashboard,
+                Settings,
+                Map
+            )
 
-        val placeholders = listOf(
-            CreateRide,
-            FindRide,
-            RideDetails,
-            RideRequests,
-            ConfirmedRide,
-            Messages,
-            TripHistory,
-            SustainabilityDashboard,
-            Settings
-        )
+        val placeholders: List<AppDestination>
+            get() = listOf(
+                CreateRide,
+                FindRide,
+                RideDetails,
+                RideRequests,
+                ConfirmedRide,
+                Messages,
+                TripHistory,
+                SustainabilityDashboard,
+                Settings
+            )
 
         fun fromRoute(route: String?): AppDestination? =
             sprintOneDestinations.firstOrNull { it.route == route }
