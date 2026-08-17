@@ -279,7 +279,33 @@
   <footer class="note" id="statusLine"></footer>
 </div>
 
-<script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-database.js";
+
+// --- Firebase setup ---------------------------------------------------
+// 1. Go to https://console.firebase.google.com -> create a free project.
+// 2. Build > Realtime Database > Create Database (start in "test mode" for now).
+// 3. Project settings > General > "Your apps" > Web app (</>) > copy the config below.
+// 4. Paste your real values here, save, and push this file so every teammate has it.
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDrPPP5DoAaMUk802g7sJsHSKwhASgqnI8",
+  authDomain: "rideshare-kanban.firebaseapp.com",
+  databaseURL: "https://rideshare-kanban-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "rideshare-kanban",
+  storageBucket: "rideshare-kanban.firebasestorage.app",
+  messagingSenderId: "903744399390",
+  appId: "1:903744399390:web:f31a4be118fa2f266a260f"
+};
+const FIREBASE_CONFIGURED = FIREBASE_CONFIG.apiKey !== "REPLACE_ME";
+
+let boardRef = null;
+if (FIREBASE_CONFIGURED) {
+  const app = initializeApp(FIREBASE_CONFIG);
+  const db = getDatabase(app);
+  boardRef = ref(db, "kanban/state");
+}
+
 const COLUMNS = [
   { id: "backlog", name: "Backlog" },
   { id: "ready", name: "Ready" },
@@ -376,25 +402,16 @@ const DEFAULT_TASKS = [
 
 let state = null;
 let storageOk = true;
-const STORAGE_KEY = "rideshare-kanban-state";
-
-async function loadState() {
-  try {
-    const res = await window.storage.get(STORAGE_KEY, true);
-    if (res && res.value) {
-      state = JSON.parse(res.value);
-      return;
-    }
-  } catch (e) {
-    storageOk = true;
-  }
-  state = { tasks: DEFAULT_TASKS.map(t => ({...t})) };
-  await saveState();
-}
 
 async function saveState() {
+  if (!boardRef) {
+    storageOk = false;
+    updateStatusLine();
+    return;
+  }
   try {
-    await window.storage.set(STORAGE_KEY, JSON.stringify(state), true);
+    await set(boardRef, state);
+    storageOk = true;
   } catch (e) {
     storageOk = false;
   }
@@ -403,9 +420,13 @@ async function saveState() {
 
 function updateStatusLine() {
   const el = document.getElementById("statusLine");
-  el.textContent = storageOk
-    ? "This is a shared board — changes save for everyone with this file."
-    : "Could not save changes — your edits will reset if you leave this page.";
+  if (!FIREBASE_CONFIGURED) {
+    el.textContent = "Firebase isn't set up yet — edit FIREBASE_CONFIG near the top of this file's <script> so the board syncs live for everyone. Right now changes only live in this browser tab.";
+  } else {
+    el.textContent = storageOk
+      ? "Shared team board — connected. Changes sync live for everyone with this file."
+      : "Lost connection to Firebase — edits may not save until it reconnects.";
+  }
 }
 
 function populateWeekFilter() {
@@ -532,11 +553,35 @@ document.getElementById("addBtn").addEventListener("click", async () => {
   render();
 });
 
-(async function init() {
-  await loadState();
-  populateWeekFilter();
-  render();
-})();
+function init() {
+  if (!boardRef) {
+    state = { tasks: DEFAULT_TASKS.map(t => ({...t})) };
+    populateWeekFilter();
+    updateStatusLine();
+    render();
+    return;
+  }
+
+  onValue(boardRef, snapshot => {
+    const val = snapshot.val();
+    const firstLoad = state === null;
+    if (val && val.tasks) {
+      state = val;
+    } else {
+      state = { tasks: DEFAULT_TASKS.map(t => ({...t})) };
+      set(boardRef, state);
+    }
+    storageOk = true;
+    if (firstLoad) populateWeekFilter();
+    updateStatusLine();
+    render();
+  }, () => {
+    storageOk = false;
+    updateStatusLine();
+  });
+}
+
+init();
 </script>
 </body>
 </html>
