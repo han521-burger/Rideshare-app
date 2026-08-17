@@ -4,6 +4,7 @@
 // Postgres by changing only Database.kt once that decision is made.
 plugins {
     alias(libs.plugins.kotlin.jvm)
+    alias(libs.plugins.kotlin.serialization)
     id 'application'
 }
 
