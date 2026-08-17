@@ -12,7 +12,16 @@ fun ResultRow.toUserDto() = UserDto(
     photoRef = this[Users.photoRef],
     accountStatus = this[Users.accountStatus],
     passengerEnabled = this[Users.passengerEnabled],
+    emergencyContactName = this[Users.emergencyContactName],
+    emergencyContactPhone = this[Users.emergencyContactPhone],
     createdAt = this[Users.createdAt]
+)
+
+fun ResultRow.toUserSummaryDto() = UserSummaryDto(
+    userId = this[Users.userId],
+    displayName = this[Users.displayName],
+    photoRef = this[Users.photoRef],
+    phoneNumber = this[Users.phoneNumber]
 )
 
 fun ResultRow.toVehicleDto() = VehicleDto(
@@ -27,7 +36,22 @@ fun ResultRow.toVehicleDto() = VehicleDto(
     fuelType = this[Vehicles.fuelType]
 )
 
-fun ResultRow.toRideDto(matchScore: MatchScoreDto? = null) = RideDto(
+fun ResultRow.toRideStopDto() = RideStopDto(
+    stopId = this[RideStops.stopId],
+    sequence = this[RideStops.sequence],
+    lat = this[RideStops.lat],
+    lng = this[RideStops.lng],
+    label = this[RideStops.label]
+)
+
+// driver/vehicle/stops are optional enrichment - callers that already batch-loaded them (to
+// avoid N+1 queries) pass them in; callers that don't care just get the bare ride.
+fun ResultRow.toRideDto(
+    matchScore: MatchScoreDto? = null,
+    driver: UserSummaryDto? = null,
+    vehicle: VehicleDto? = null,
+    stops: List<RideStopDto> = emptyList()
+) = RideDto(
     rideId = this[Rides.rideId],
     driverId = this[Rides.driverId],
     vehicleId = this[Rides.vehicleId],
@@ -43,6 +67,11 @@ fun ResultRow.toRideDto(matchScore: MatchScoreDto? = null) = RideDto(
     notes = this[Rides.notes],
     status = this[Rides.status],
     createdAt = this[Rides.createdAt],
+    driverEnRoute = this[Rides.driverEnRoute],
+    recurringGroupId = this[Rides.recurringGroupId],
+    stops = stops,
+    driver = driver,
+    vehicle = vehicle,
     matchScore = matchScore
 )
 
@@ -52,6 +81,7 @@ fun ResultRow.toRideRequestDto() = RideRequestDto(
     passengerId = this[RideRequests.passengerId],
     seatsRequested = this[RideRequests.seatsRequested],
     status = this[RideRequests.status],
+    note = this[RideRequests.note],
     createdAt = this[RideRequests.createdAt],
     respondedAt = this[RideRequests.respondedAt]
 )
@@ -62,4 +92,15 @@ fun ResultRow.toMessageDto() = MessageDto(
     senderId = this[Messages.senderId],
     body = this[Messages.body],
     sentAt = this[Messages.sentAt]
+)
+
+fun ResultRow.toRatingDto() = RatingDto(
+    ratingId = this[Ratings.ratingId],
+    rideId = this[Ratings.rideId],
+    raterId = this[Ratings.raterId],
+    ratedUserId = this[Ratings.ratedUserId],
+    stars = this[Ratings.stars],
+    tags = this[Ratings.tags]?.split(",")?.filter { it.isNotBlank() } ?: emptyList(),
+    comment = this[Ratings.comment],
+    createdAt = this[Ratings.createdAt]
 )

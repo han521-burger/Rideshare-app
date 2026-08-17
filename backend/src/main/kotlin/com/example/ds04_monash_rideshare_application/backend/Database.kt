@@ -11,7 +11,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 fun initDatabase(jdbcUrl: String = "jdbc:sqlite:./rideshare-backend.db") {
     Database.connect(jdbcUrl, driver = "org.sqlite.JDBC")
     transaction {
-        SchemaUtils.create(Users, Vehicles, Rides, RideRequests, Messages)
+        SchemaUtils.create(Users, Vehicles, Rides, RideStops, RideRequests, Messages, Ratings, FavoriteDrivers)
         seedDemoDataIfEmpty()
     }
 }

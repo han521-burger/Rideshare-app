@@ -6,7 +6,6 @@ import com.example.ds04_monash_rideshare_application.backend.Rides
 import com.example.ds04_monash_rideshare_application.backend.UpdateProfileRequest
 import com.example.ds04_monash_rideshare_application.backend.Users
 import com.example.ds04_monash_rideshare_application.backend.requireUserId
-import com.example.ds04_monash_rideshare_application.backend.toRideDto
 import com.example.ds04_monash_rideshare_application.backend.toUserDto
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
@@ -41,6 +40,8 @@ fun Route.userRoutes() {
                 it[phoneNumber] = body.phoneNumber
                 it[photoRef] = body.photoRef
                 it[passengerEnabled] = body.passengerEnabled
+                it[emergencyContactName] = body.emergencyContactName
+                it[emergencyContactPhone] = body.emergencyContactPhone
             }
         }
         val dto = transaction {
@@ -57,9 +58,7 @@ fun Route.userRoutes() {
         if (callerId != targetId) throw ForbiddenException("You can only view your own ride history")
 
         val rides = transaction {
-            Rides.selectAll()
-                .where { Rides.driverId eq targetId }
-                .map { it.toRideDto() }
+            enrichRideDtos(Rides.selectAll().where { Rides.driverId eq targetId }.toList())
         }
         call.respond(rides)
     }

@@ -1,8 +1,10 @@
 package com.example.ds04_monash_rideshare_application.backend
 
 import com.example.ds04_monash_rideshare_application.backend.routes.dashboardRoutes
+import com.example.ds04_monash_rideshare_application.backend.routes.favoriteRoutes
 import com.example.ds04_monash_rideshare_application.backend.routes.healthRoutes
 import com.example.ds04_monash_rideshare_application.backend.routes.messageRoutes
+import com.example.ds04_monash_rideshare_application.backend.routes.ratingRoutes
 import com.example.ds04_monash_rideshare_application.backend.routes.rideRequestRoutes
 import com.example.ds04_monash_rideshare_application.backend.routes.rideRoutes
 import com.example.ds04_monash_rideshare_application.backend.routes.userRoutes
@@ -42,5 +44,7 @@ fun Application.module() {
         rideRequestRoutes()
         messageRoutes()
         dashboardRoutes()
+        ratingRoutes()
+        favoriteRoutes()
     }
 }

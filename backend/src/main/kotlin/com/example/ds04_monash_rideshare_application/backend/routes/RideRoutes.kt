@@ -2,14 +2,18 @@ package com.example.ds04_monash_rideshare_application.backend.routes
 
 import com.example.ds04_monash_rideshare_application.backend.ConflictException
 import com.example.ds04_monash_rideshare_application.backend.CreateRideRequest
+import com.example.ds04_monash_rideshare_application.backend.CreateStopInput
 import com.example.ds04_monash_rideshare_application.backend.ForbiddenException
 import com.example.ds04_monash_rideshare_application.backend.MatchSearchResponse
 import com.example.ds04_monash_rideshare_application.backend.NotFoundException
+import com.example.ds04_monash_rideshare_application.backend.RideDto
 import com.example.ds04_monash_rideshare_application.backend.RideRequestStatus
 import com.example.ds04_monash_rideshare_application.backend.RideRequests
 import com.example.ds04_monash_rideshare_application.backend.RideStatus
+import com.example.ds04_monash_rideshare_application.backend.RideStops
 import com.example.ds04_monash_rideshare_application.backend.Rides
 import com.example.ds04_monash_rideshare_application.backend.UpdateRideRequest
+import com.example.ds04_monash_rideshare_application.backend.Users
 import com.example.ds04_monash_rideshare_application.backend.ValidationException
 import com.example.ds04_monash_rideshare_application.backend.Vehicles
 import com.example.ds04_monash_rideshare_application.backend.matching.MatchingEngine
@@ -17,6 +21,9 @@ import com.example.ds04_monash_rideshare_application.backend.matching.RideCandid
 import com.example.ds04_monash_rideshare_application.backend.matching.SearchCriteria
 import com.example.ds04_monash_rideshare_application.backend.requireUserId
 import com.example.ds04_monash_rideshare_application.backend.toRideDto
+import com.example.ds04_monash_rideshare_application.backend.toRideStopDto
+import com.example.ds04_monash_rideshare_application.backend.toUserSummaryDto
+import com.example.ds04_monash_rideshare_application.backend.toVehicleDto
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -25,6 +32,7 @@ import io.ktor.server.routing.delete
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.server.routing.put
+import org.jetbrains.exposed.sql.ResultRow
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
@@ -32,6 +40,8 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
+import java.time.Instant
+import java.time.ZoneId
 import java.util.UUID
 
 fun Route.rideRoutes() {
@@ -48,9 +58,8 @@ fun Route.rideRoutes() {
         val radiusMeters = call.request.queryParameters["radiusMeters"]?.toDoubleOrNull() ?: 5_000.0
 
         val rides = transaction {
-            Rides.selectAll()
-                .where { Rides.status eq RideStatus.OPEN }
-                .map { it.toRideDto() }
+            val rows = Rides.selectAll().where { Rides.status eq RideStatus.OPEN }.toList()
+            enrichRideDtos(rows)
         }.filter { ride ->
             // A ride you drive isn't a ride you can join - exclude it from browse/search rather
             // than showing it and relying on the passenger-request endpoint's rejection.
@@ -101,7 +110,7 @@ fun Route.rideRoutes() {
                     seatsAvailable = it[Rides.seatsAvailable]
                 )
             }
-            candidates to rows.associate { it[Rides.rideId] to it.toRideDto() }
+            candidates to enrichRideDtos(rows).associateBy { it.rideId }
         }
 
         var results = MatchingEngine.rank(criteria, candidates)
@@ -135,26 +144,40 @@ fun Route.rideRoutes() {
 
         val rideId = "ride-${UUID.randomUUID()}"
         val now = System.currentTimeMillis()
+        val groupId = if (body.repeatDaysOfWeek.isNotEmpty()) "recur-${UUID.randomUUID()}" else null
+
         transaction {
-            Rides.insert {
-                it[Rides.rideId] = rideId
-                it[Rides.driverId] = driverId
-                it[Rides.vehicleId] = body.vehicleId
-                it[originLat] = body.originLat
-                it[originLng] = body.originLng
-                it[destinationLat] = body.destinationLat
-                it[destinationLng] = body.destinationLng
-                it[distanceMeters] = body.distanceMeters
-                it[estimatedDurationSeconds] = body.estimatedDurationSeconds
-                it[departureTime] = body.departureTime
-                it[seatsTotal] = body.seatsTotal
-                it[seatsAvailable] = body.seatsTotal
-                it[notes] = body.notes
-                it[status] = RideStatus.OPEN
-                it[createdAt] = now
+            insertRide(rideId, driverId, body, groupId, now)
+            insertStops(rideId, body.stops)
+
+            // "Repeat this route every Mon/Wed" - generate concrete sibling rides for the next
+            // repeatWeeks weeks. No scheduler in this trial, so this is a bounded, one-time
+            // generation rather than an ongoing rule (see docs/RTM.md).
+            if (groupId != null) {
+                val zone = ZoneId.systemDefault()
+                val startInstant = Instant.ofEpochMilli(body.departureTime).atZone(zone)
+                val startDate = startInstant.toLocalDate()
+                val timeOfDay = startInstant.toLocalTime()
+                val weeks = body.repeatWeeks.coerceIn(1, 12)
+                val endDate = startDate.plusWeeks(weeks.toLong())
+
+                var date = startDate.plusDays(1)
+                while (date.isBefore(endDate)) {
+                    if (date.dayOfWeek.value in body.repeatDaysOfWeek) {
+                        val siblingDeparture = date.atTime(timeOfDay).atZone(zone).toInstant().toEpochMilli()
+                        if (siblingDeparture > System.currentTimeMillis()) {
+                            val siblingId = "ride-${UUID.randomUUID()}"
+                            insertRide(siblingId, driverId, body, groupId, now, departureOverride = siblingDeparture)
+                            insertStops(siblingId, body.stops)
+                        }
+                    }
+                    date = date.plusDays(1)
+                }
             }
         }
-        val dto = transaction { Rides.selectAll().where { Rides.rideId eq rideId }.map { it.toRideDto() }.first() }
+        val dto = transaction {
+            enrichRideDtos(Rides.selectAll().where { Rides.rideId eq rideId }.toList()).first()
+        }
         call.respond(dto)
     }
 
@@ -162,7 +185,7 @@ fun Route.rideRoutes() {
         call.requireUserId()
         val rideId = call.parameters["id"] ?: throw NotFoundException()
         val dto = transaction {
-            Rides.selectAll().where { Rides.rideId eq rideId }.map { it.toRideDto() }.firstOrNull()
+            enrichRideDtos(Rides.selectAll().where { Rides.rideId eq rideId }.toList()).firstOrNull()
         } ?: throw NotFoundException("Ride not found")
         call.respond(dto)
     }
@@ -186,9 +209,14 @@ fun Route.rideRoutes() {
                 }
                 body.notes?.let { stmt[notes] = it }
                 body.status?.let { stmt[status] = it }
+                // "I'm coming" (item: driver home / ride detail) - just a status flag in this
+                // trial, no live position behind it. See Tables.kt's comment on this column.
+                body.driverEnRoute?.let { stmt[driverEnRoute] = it }
             }
         }
-        val dto = transaction { Rides.selectAll().where { Rides.rideId eq rideId }.map { it.toRideDto() }.first() }
+        val dto = transaction {
+            enrichRideDtos(Rides.selectAll().where { Rides.rideId eq rideId }.toList()).first()
+        }
         call.respond(dto)
     }
 
@@ -211,10 +239,80 @@ fun Route.rideRoutes() {
                 throw ConflictException("This ride has accepted passengers - cancel it instead of deleting")
             }
 
+            RideStops.deleteWhere { RideStops.rideId eq rideId }
             RideRequests.deleteWhere { RideRequests.rideId eq rideId }
             Rides.deleteWhere { Rides.rideId eq rideId }
         }
         call.respond(mapOf("deleted" to true))
+    }
+}
+
+// Batch-loads driver/vehicle/stops for a set of ride rows so listing endpoints don't do an N+1
+// query per ride. Must be called from inside an already-open transaction.
+internal fun enrichRideDtos(rows: List<ResultRow>): List<RideDto> {
+    if (rows.isEmpty()) return emptyList()
+    val driverIds = rows.map { it[Rides.driverId] }.toSet()
+    val vehicleIds = rows.mapNotNull { it[Rides.vehicleId] }.toSet()
+    val rideIds = rows.map { it[Rides.rideId] }.toSet()
+
+    val driversById = Users.selectAll().where { Users.userId inList driverIds }
+        .associate { it[Users.userId] to it.toUserSummaryDto() }
+    val vehiclesById = if (vehicleIds.isEmpty()) emptyMap() else {
+        Vehicles.selectAll().where { Vehicles.vehicleId inList vehicleIds }
+            .associate { it[Vehicles.vehicleId] to it.toVehicleDto() }
+    }
+    val stopsByRideId = RideStops.selectAll().where { RideStops.rideId inList rideIds }
+        .map { it[RideStops.rideId] to it.toRideStopDto() }
+        .groupBy({ it.first }, { it.second })
+        .mapValues { (_, stops) -> stops.sortedBy { it.sequence } }
+
+    return rows.map { row ->
+        row.toRideDto(
+            driver = driversById[row[Rides.driverId]],
+            vehicle = row[Rides.vehicleId]?.let { vehiclesById[it] },
+            stops = stopsByRideId[row[Rides.rideId]].orEmpty()
+        )
+    }
+}
+
+private fun insertRide(
+    rideId: String,
+    driverId: String,
+    body: CreateRideRequest,
+    groupId: String?,
+    createdAt: Long,
+    departureOverride: Long? = null
+) {
+    Rides.insert {
+        it[Rides.rideId] = rideId
+        it[Rides.driverId] = driverId
+        it[Rides.vehicleId] = body.vehicleId
+        it[originLat] = body.originLat
+        it[originLng] = body.originLng
+        it[destinationLat] = body.destinationLat
+        it[destinationLng] = body.destinationLng
+        it[distanceMeters] = body.distanceMeters
+        it[estimatedDurationSeconds] = body.estimatedDurationSeconds
+        it[departureTime] = departureOverride ?: body.departureTime
+        it[seatsTotal] = body.seatsTotal
+        it[seatsAvailable] = body.seatsTotal
+        it[notes] = body.notes
+        it[status] = RideStatus.OPEN
+        it[recurringGroupId] = groupId
+        it[Rides.createdAt] = createdAt
+    }
+}
+
+private fun insertStops(rideId: String, stops: List<CreateStopInput>) {
+    stops.forEachIndexed { index, stop ->
+        RideStops.insert {
+            it[stopId] = "stop-${UUID.randomUUID()}"
+            it[RideStops.rideId] = rideId
+            it[sequence] = index
+            it[lat] = stop.lat
+            it[lng] = stop.lng
+            it[label] = stop.label
+        }
     }
 }
 

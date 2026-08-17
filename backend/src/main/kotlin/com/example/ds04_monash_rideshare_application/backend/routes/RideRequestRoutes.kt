@@ -9,9 +9,11 @@ import com.example.ds04_monash_rideshare_application.backend.RideRequests
 import com.example.ds04_monash_rideshare_application.backend.RideStatus
 import com.example.ds04_monash_rideshare_application.backend.Rides
 import com.example.ds04_monash_rideshare_application.backend.UpdateRideRequestStatusBody
+import com.example.ds04_monash_rideshare_application.backend.Users
 import com.example.ds04_monash_rideshare_application.backend.ValidationException
 import com.example.ds04_monash_rideshare_application.backend.requireUserId
 import com.example.ds04_monash_rideshare_application.backend.toRideRequestDto
+import com.example.ds04_monash_rideshare_application.backend.toUserSummaryDto
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
 import io.ktor.server.response.respond
@@ -28,46 +30,65 @@ import org.jetbrains.exposed.sql.update
 import java.util.UUID
 
 fun Route.rideRequestRoutes() {
-    // Passenger requests a seat.
+    // Passenger requests a seat. If applyToRecurringGroup is set and the ride belongs to a
+    // "repeat this route" group (see RideRoutes.kt's POST /rides), also requests a seat on every
+    // other OPEN sibling in that group in the same call.
     post("/rides/{rideId}/requests") {
         val passengerId = call.requireUserId()
         val rideId = call.parameters["rideId"] ?: throw NotFoundException()
         val body = call.receive<CreateRideRequestBody>()
         if (body.seatsRequested <= 0) throw ValidationException("seatsRequested must be positive")
 
-        val requestId = "req-${UUID.randomUUID()}"
+        val createdIds = mutableListOf<String>()
         val now = System.currentTimeMillis()
         transaction {
             val ride = Rides.selectAll().where { Rides.rideId eq rideId }.firstOrNull()
                 ?: throw NotFoundException("Ride not found")
-            if (ride[Rides.driverId] == passengerId) {
-                throw ValidationException("You can't request a seat on your own ride")
-            }
-            if (ride[Rides.status] != RideStatus.OPEN) throw ConflictException("This ride isn't open for requests")
-            if (ride[Rides.seatsAvailable] < body.seatsRequested) {
-                throw ConflictException("Not enough seats available")
-            }
-            val alreadyRequested = RideRequests.selectAll()
-                .where {
-                    (RideRequests.rideId eq rideId) and
-                        (RideRequests.passengerId eq passengerId) and
-                        (RideRequests.status eq RideRequestStatus.PENDING)
-                }.count() > 0
-            if (alreadyRequested) throw ConflictException("You already have a pending request for this ride")
 
-            RideRequests.insert {
-                it[RideRequests.requestId] = requestId
-                it[RideRequests.rideId] = rideId
-                it[RideRequests.passengerId] = passengerId
-                it[seatsRequested] = body.seatsRequested
-                it[status] = RideRequestStatus.PENDING
-                it[createdAt] = now
+            val targetRides = if (body.applyToRecurringGroup && ride[Rides.recurringGroupId] != null) {
+                Rides.selectAll().where {
+                    (Rides.recurringGroupId eq ride[Rides.recurringGroupId]) and (Rides.status eq RideStatus.OPEN)
+                }.toList()
+            } else {
+                listOf(ride)
+            }
+
+            for (target in targetRides) {
+                val targetRideId = target[Rides.rideId]
+                if (target[Rides.driverId] == passengerId) continue // skip your own ride silently
+                if (target[Rides.status] != RideStatus.OPEN) continue
+                if (target[Rides.seatsAvailable] < body.seatsRequested) continue
+                val alreadyRequested = RideRequests.selectAll()
+                    .where {
+                        (RideRequests.rideId eq targetRideId) and
+                            (RideRequests.passengerId eq passengerId) and
+                            (RideRequests.status eq RideRequestStatus.PENDING)
+                    }.count() > 0
+                if (alreadyRequested) continue
+
+                val requestId = "req-${UUID.randomUUID()}"
+                RideRequests.insert {
+                    it[RideRequests.requestId] = requestId
+                    it[RideRequests.rideId] = targetRideId
+                    it[RideRequests.passengerId] = passengerId
+                    it[seatsRequested] = body.seatsRequested
+                    it[status] = RideRequestStatus.PENDING
+                    it[note] = body.note
+                    it[createdAt] = now
+                }
+                createdIds += requestId
+            }
+            if (createdIds.isEmpty()) {
+                throw ConflictException("Couldn't request a seat - this ride isn't open, is your own, or you already have a pending request")
             }
         }
-        val dto = transaction {
-            RideRequests.selectAll().where { RideRequests.requestId eq requestId }.map { it.toRideRequestDto() }.first()
+        val dtos = transaction {
+            RideRequests.selectAll().where { RideRequests.requestId inList createdIds }.map { it.toRideRequestDto() }
         }
-        call.respond(dto)
+        // Always a list, even for the single-ride case (createdIds.size == 1 unless
+        // applyToRecurringGroup fanned out to siblings) - a response whose static type varies at
+        // runtime (single DTO vs list) isn't serializable, so this can't branch on body.applyToRecurringGroup.
+        call.respond(dtos)
     }
 
     // Driver views all requests across their rides, or just one ride's requests via ?rideId=.
@@ -75,14 +96,24 @@ fun Route.rideRequestRoutes() {
         val driverId = call.requireUserId()
         val rideIdFilter = call.request.queryParameters["rideId"]
         val requests = transaction {
-            val ownRides = Rides.selectAll().where { Rides.driverId eq driverId }.associateBy { it[Rides.rideId] }
-            RideRequests.selectAll()
-                .mapNotNull { row ->
-                    val rideId = row[RideRequests.rideId]
-                    val ride = ownRides[rideId] ?: return@mapNotNull null
-                    if (rideIdFilter != null && rideId != rideIdFilter) return@mapNotNull null
-                    row.toRideRequestDto().copy(ride = ride.toRideDto())
-                }
+            val ownRides = Rides.selectAll().where { Rides.driverId eq driverId }.toList()
+            val ownRideDtos = enrichRideDtos(ownRides).associateBy { it.rideId }
+            val passengerIds = mutableSetOf<String>()
+            val rows = RideRequests.selectAll().toList().filter { row ->
+                val rideId = row[RideRequests.rideId]
+                ownRideDtos.containsKey(rideId) && (rideIdFilter == null || rideId == rideIdFilter)
+            }
+            rows.forEach { passengerIds += it[RideRequests.passengerId] }
+            val passengersById = if (passengerIds.isEmpty()) emptyMap() else {
+                Users.selectAll().where { Users.userId inList passengerIds }
+                    .associate { it[Users.userId] to it.toUserSummaryDto() }
+            }
+            rows.map { row ->
+                row.toRideRequestDto().copy(
+                    ride = ownRideDtos[row[RideRequests.rideId]],
+                    passenger = passengersById[row[RideRequests.passengerId]]
+                )
+            }
         }
         call.respond(requests)
     }
@@ -94,10 +125,10 @@ fun Route.rideRequestRoutes() {
             val rows = RideRequests.selectAll().where { RideRequests.passengerId eq passengerId }.toList()
             val rideIds = rows.map { it[RideRequests.rideId] }.toSet()
             val ridesById = if (rideIds.isEmpty()) emptyMap() else {
-                Rides.selectAll().where { Rides.rideId inList rideIds }.associateBy { it[Rides.rideId] }
+                enrichRideDtos(Rides.selectAll().where { Rides.rideId inList rideIds }.toList()).associateBy { it.rideId }
             }
             rows.map { row ->
-                row.toRideRequestDto().copy(ride = ridesById[row[RideRequests.rideId]]?.toRideDto())
+                row.toRideRequestDto().copy(ride = ridesById[row[RideRequests.rideId]])
             }
         }
         call.respond(requests)
