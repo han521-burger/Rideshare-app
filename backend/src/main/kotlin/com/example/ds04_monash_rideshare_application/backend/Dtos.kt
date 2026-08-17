@@ -60,6 +60,12 @@ data class RideDto(
 )
 
 @Serializable
+data class MatchSearchResponse(
+    val usedFallback: Boolean,
+    val rides: List<RideDto>
+)
+
+@Serializable
 data class CreateRideRequest(
     val vehicleId: String? = null,
     val originLat: Double,

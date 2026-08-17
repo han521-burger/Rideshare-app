@@ -3,6 +3,7 @@ package com.example.ds04_monash_rideshare_application.backend.routes
 import com.example.ds04_monash_rideshare_application.backend.ConflictException
 import com.example.ds04_monash_rideshare_application.backend.CreateRideRequest
 import com.example.ds04_monash_rideshare_application.backend.ForbiddenException
+import com.example.ds04_monash_rideshare_application.backend.MatchSearchResponse
 import com.example.ds04_monash_rideshare_application.backend.NotFoundException
 import com.example.ds04_monash_rideshare_application.backend.RideRequestStatus
 import com.example.ds04_monash_rideshare_application.backend.RideRequests
@@ -109,7 +110,7 @@ fun Route.rideRoutes() {
         val ranked = results.mapNotNull { result ->
             ridesByRideId[result.ride.rideId]?.let { ride -> ride.copy(matchScore = result.score) }
         }
-        call.respond(mapOf("usedFallback" to usedFallback, "rides" to ranked))
+        call.respond(MatchSearchResponse(usedFallback, ranked))
     }
 
     post("/rides") {
