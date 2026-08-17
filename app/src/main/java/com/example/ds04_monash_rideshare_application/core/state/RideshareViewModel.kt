@@ -112,7 +112,7 @@ class RideshareViewModel : ViewModel() {
     val incomingPendingRequests: List<RideRequestSummary>
         get() = incomingRequests.data.orEmpty().filter { it.status == RequestStatus.PENDING }
 
-    fun setActiveMode(mode: AppMode) {
+    fun updateActiveMode(mode: AppMode) {
         activeMode = mode
     }
 

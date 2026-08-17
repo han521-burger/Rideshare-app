@@ -106,7 +106,7 @@ fun RideshareNavHost(
     if (currentDestination in AppDestination.tabDestinations) {
         BottomNavScaffold(
             activeMode = viewModel.activeMode,
-            onModeChange = viewModel::setActiveMode,
+            onModeChange = viewModel::updateActiveMode,
             currentTab = currentTab,
             onTabSelected = ::switchTab,
             requestsBadgeCount = viewModel.myPendingRequests.size + viewModel.incomingPendingRequests.size,
