@@ -1,11 +1,16 @@
 package com.example.ds04_monash_rideshare_application.ui
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -42,7 +47,18 @@ import kotlinx.coroutines.delay
 
 private val MELBOURNE_CBD = Point(-37.8136, 144.9631)
 private const val MELBOURNE_ZOOM = 11.0f
+private const val JUMP_ZOOM = 14.5f
 private const val ROUTE_REQUEST_TIMEOUT_MS = 15_000L
+
+// Same locations used by the backend's seed data (backend/Database.kt) - jumping straight to one
+// of these is far more reliable than trying to eyeball it from a city-wide zoom level.
+private val NAMED_LOCATIONS = listOf(
+    "Melbourne CBD" to MELBOURNE_CBD,
+    "Oakleigh" to Point(-37.8988, 145.0906),
+    "Chadstone" to Point(-37.8862, 145.0733),
+    "Glen Waverley" to Point(-37.8811, 145.1628),
+    "Monash Clayton" to Point(-37.9105, 145.1362)
+)
 
 //Result of an origin -> Yandex -> destination routing request (proposal Member C: Yandex first implementation).
 data class RouteQueryResult(
@@ -197,6 +213,25 @@ fun MapScreen(
 
     Box(modifier = modifier.fillMaxSize()) {
         AndroidView(modifier = Modifier.fillMaxSize(), factory = { mapView })
+
+        Column(
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp)
+        ) {
+            FilledTonalButton(onClick = {
+                val current = mapView.map.cameraPosition
+                mapView.map.move(CameraPosition(current.target, current.zoom + 1f, current.azimuth, current.tilt))
+            }) { Text("+") }
+            FilledTonalButton(
+                onClick = {
+                    val current = mapView.map.cameraPosition
+                    mapView.map.move(CameraPosition(current.target, (current.zoom - 1f).coerceAtLeast(1f), current.azimuth, current.tilt))
+                },
+                modifier = Modifier.padding(top = 8.dp)
+            ) { Text("-") }
+        }
+
         Surface(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -206,6 +241,24 @@ fun MapScreen(
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
                 Text(text = statusMessage)
+
+                Text(
+                    text = "Jump to:",
+                    modifier = Modifier.padding(top = 8.dp)
+                )
+                LazyRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.padding(top = 4.dp)
+                ) {
+                    items(NAMED_LOCATIONS, key = { it.first }) { (name, point) ->
+                        OutlinedButton(onClick = {
+                            mapView.map.move(CameraPosition(point, JUMP_ZOOM, 0.0f, 0.0f))
+                        }) {
+                            Text(name)
+                        }
+                    }
+                }
+
                 val result = routeResult
                 if (result != null && onRouteConfirmed != null) {
                     Button(
