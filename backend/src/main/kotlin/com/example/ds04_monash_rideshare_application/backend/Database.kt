@@ -11,7 +11,10 @@ import org.jetbrains.exposed.sql.transactions.transaction
 fun initDatabase(jdbcUrl: String = "jdbc:sqlite:./rideshare-backend.db") {
     Database.connect(jdbcUrl, driver = "org.sqlite.JDBC")
     transaction {
-        SchemaUtils.create(Users, Vehicles, Rides, RideStops, RideRequests, Messages, Ratings, FavoriteDrivers)
+        // createMissingTablesAndColumns (not create) so a local dev DB from before a schema
+        // change - a new nullable/defaulted column, a new table - gets migrated in place via
+        // ALTER TABLE instead of silently keeping the old shape and erroring at query time.
+        SchemaUtils.createMissingTablesAndColumns(Users, Vehicles, Rides, RideStops, RideRequests, Messages, Ratings, FavoriteDrivers)
         seedDemoDataIfEmpty()
     }
 }
