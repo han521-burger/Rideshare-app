@@ -3,6 +3,7 @@ package com.example.ds04_monash_rideshare_application.feature.rides
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -12,7 +13,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -23,72 +24,188 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.ds04_monash_rideshare_application.Database.RideShare.RideOffer
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RankedRide
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSearchCriteria
 import com.example.ds04_monash_rideshare_application.core.state.Resource
+import com.example.ds04_monash_rideshare_application.core.ui.DatePickerField
 import com.example.ds04_monash_rideshare_application.core.ui.RideshareScaffold
+import com.example.ds04_monash_rideshare_application.core.ui.TimePickerField
+import com.example.ds04_monash_rideshare_application.core.ui.combineDateAndTime
 import com.example.ds04_monash_rideshare_application.ui.MapScreen
 import com.example.ds04_monash_rideshare_application.ui.RouteQueryResult
+import com.example.ds04_monash_rideshare_application.ui.describeLocation
 import java.text.SimpleDateFormat
+import java.time.LocalDate
+import java.time.LocalTime
 import java.util.Locale
 
-// Item 5/6: passenger search form, ranked by the backend's matching pipeline (FR-04).
+// Item 5/6: primary flow is a plain browsable list of every OPEN ride (GET /rides, no filters) -
+// tap one and you're done. "Search by route & time" is an optional, secondary flow for narrowing
+// results by the matching pipeline (FR-04) when the plain list is too long to scan.
 @Composable
 fun FindRideScreen(
-    results: Resource<List<RankedRide>>,
+    openRides: Resource<List<RideOffer>>,
+    searchResults: Resource<List<RankedRide>>,
     onSearch: (RideSearchCriteria) -> Unit,
     onOpenRide: (String) -> Unit,
+    onRefreshOpenRides: () -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    var route by remember { mutableStateOf<RouteQueryResult?>(null) }
-    var timeText by remember { mutableStateOf("") }
+    var showRouteSearch by remember { mutableStateOf(false) }
 
     RideshareScaffold(
         title = "Find Ride",
         canNavigateBack = true,
         onNavigateBack = onNavigateBack,
+        actionLabel = if (showRouteSearch) null else "Refresh",
+        onAction = onRefreshOpenRides,
         modifier = modifier
     ) { contentPadding ->
-        val selectedRoute = route
-        if (selectedRoute == null) {
-            Column(modifier = Modifier.padding(contentPadding).fillMaxSize()) {
-                Text(
-                    "Tap the map to choose where you're travelling from and to.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    modifier = Modifier.padding(16.dp)
-                )
-                MapScreen(modifier = Modifier.fillMaxSize(), onRouteConfirmed = { route = it })
-            }
+        if (showRouteSearch) {
+            RouteSearchFlow(
+                results = searchResults,
+                onSearch = onSearch,
+                onOpenRide = onOpenRide,
+                onBackToList = { showRouteSearch = false },
+                contentPadding = contentPadding
+            )
         } else {
-            SearchAndResults(
-                route = selectedRoute,
-                timeText = timeText,
-                onTimeTextChange = { timeText = it },
-                results = results,
-                contentPadding = contentPadding,
-                onChooseDifferentRoute = { route = null },
-                onSearch = {
-                    val departureMillis = parseTimeToday(timeText) ?: (System.currentTimeMillis() + 60 * 60_000)
-                    onSearch(
-                        RideSearchCriteria(
-                            selectedRoute.originLat, selectedRoute.originLng,
-                            selectedRoute.destinationLat, selectedRoute.destinationLng,
-                            departureMillis, 1
-                        )
-                    )
-                },
-                onOpenRide = onOpenRide
+            OpenRideList(
+                openRides = openRides,
+                onOpenRide = onOpenRide,
+                onSearchByRoute = { showRouteSearch = true },
+                contentPadding = contentPadding
             )
         }
     }
 }
 
 @Composable
+private fun OpenRideList(
+    openRides: Resource<List<RideOffer>>,
+    onOpenRide: (String) -> Unit,
+    onSearchByRoute: () -> Unit,
+    contentPadding: PaddingValues
+) {
+    Column(modifier = Modifier.padding(contentPadding).fillMaxSize()) {
+        OutlinedButton(
+            onClick = onSearchByRoute,
+            modifier = Modifier.fillMaxWidth().padding(16.dp)
+        ) {
+            Text("Search by specific route & time instead")
+        }
+
+        when {
+            openRides.isLoading -> Column(
+                modifier = Modifier.fillMaxSize(),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) { CircularProgressIndicator() }
+
+            openRides.errorMessage != null -> Text(
+                openRides.errorMessage,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(16.dp)
+            )
+
+            else -> {
+                val rides = openRides.data.orEmpty()
+                if (rides.isEmpty()) {
+                    Text("No open rides right now.", modifier = Modifier.padding(16.dp))
+                } else {
+                    LazyColumn(
+                        contentPadding = PaddingValues(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        items(rides, key = { it.rideId }) { ride ->
+                            OpenRideCard(ride, onClick = { onOpenRide(ride.rideId) })
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun OpenRideCard(ride: RideOffer, onClick: () -> Unit) {
+    Card(onClick = onClick, modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(
+                SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault()).format(ride.departureTime),
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                "${describeLocation(ride.originLat, ride.originLng)} -> ${describeLocation(ride.destinationLat, ride.destinationLng)}",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Text("${ride.seatsAvailable} seat(s) available", style = MaterialTheme.typography.bodySmall)
+        }
+    }
+}
+
+@Composable
+private fun RouteSearchFlow(
+    results: Resource<List<RankedRide>>,
+    onSearch: (RideSearchCriteria) -> Unit,
+    onOpenRide: (String) -> Unit,
+    onBackToList: () -> Unit,
+    contentPadding: PaddingValues
+) {
+    var route by remember { mutableStateOf<RouteQueryResult?>(null) }
+    var date by remember { mutableStateOf<LocalDate?>(null) }
+    var time by remember { mutableStateOf<LocalTime?>(null) }
+
+    val selectedRoute = route
+    if (selectedRoute == null) {
+        Column(modifier = Modifier.padding(contentPadding).fillMaxSize()) {
+            Row {
+                OutlinedButton(onClick = onBackToList, modifier = Modifier.padding(16.dp)) {
+                    Text("Back to ride list")
+                }
+            }
+            Text(
+                "Tap the map to choose where you're travelling from and to.",
+                style = MaterialTheme.typography.bodyMedium,
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+            MapScreen(modifier = Modifier.fillMaxSize(), onRouteConfirmed = { route = it })
+        }
+    } else {
+        SearchAndResults(
+            route = selectedRoute,
+            date = date,
+            onDateChange = { date = it },
+            time = time,
+            onTimeChange = { time = it },
+            results = results,
+            contentPadding = contentPadding,
+            onChooseDifferentRoute = { route = null },
+            onSearch = {
+                val departureMillis = combineDateAndTime(date, time) ?: (System.currentTimeMillis() + 60 * 60_000)
+                onSearch(
+                    RideSearchCriteria(
+                        selectedRoute.originLat, selectedRoute.originLng,
+                        selectedRoute.destinationLat, selectedRoute.destinationLng,
+                        departureMillis, 1
+                    )
+                )
+            },
+            onOpenRide = onOpenRide
+        )
+    }
+}
+
+@Composable
 private fun SearchAndResults(
     route: RouteQueryResult,
-    timeText: String,
-    onTimeTextChange: (String) -> Unit,
+    date: LocalDate?,
+    onDateChange: (LocalDate) -> Unit,
+    time: LocalTime?,
+    onTimeChange: (LocalTime) -> Unit,
     results: Resource<List<RankedRide>>,
     contentPadding: PaddingValues,
     onChooseDifferentRoute: () -> Unit,
@@ -102,13 +219,8 @@ private fun SearchAndResults(
                 style = MaterialTheme.typography.bodyLarge
             )
             Button(onClick = onChooseDifferentRoute) { Text("Choose a different route") }
-            OutlinedTextField(
-                value = timeText,
-                onValueChange = onTimeTextChange,
-                label = { Text("Preferred departure time, 24h (HH:mm)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
+            DatePickerField(label = "Preferred departure date", selectedDate = date, onDateSelected = onDateChange)
+            TimePickerField(label = "Preferred departure time", selectedTime = time, onTimeSelected = onTimeChange)
             Button(onClick = onSearch, modifier = Modifier.fillMaxWidth()) { Text("Search rides") }
         }
 
@@ -128,7 +240,7 @@ private fun SearchAndResults(
             results.data != null -> {
                 if (results.data.isEmpty()) {
                     Text(
-                        "No matching rides yet. Try a wider time window.",
+                        "No matching rides yet. Try a wider time window or a different date.",
                         modifier = Modifier.padding(16.dp)
                     )
                 } else {
@@ -155,6 +267,10 @@ private fun RankedRideCard(ranked: RankedRide, onClick: () -> Unit) {
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
+            Text(
+                "${describeLocation(ranked.ride.originLat, ranked.ride.originLng)} -> ${describeLocation(ranked.ride.destinationLat, ranked.ride.destinationLng)}",
+                style = MaterialTheme.typography.bodySmall
+            )
             Text("${ranked.ride.seatsAvailable} seat(s) available", style = MaterialTheme.typography.bodyMedium)
             Text(
                 "Match score: %.0f%%%s".format(
@@ -165,20 +281,5 @@ private fun RankedRideCard(ranked: RankedRide, onClick: () -> Unit) {
                 color = MaterialTheme.colorScheme.primary
             )
         }
-    }
-}
-
-private fun parseTimeToday(time: String): Long? {
-    if (time.isBlank()) return null
-    return try {
-        val parts = time.split(":")
-        val calendar = java.util.Calendar.getInstance()
-        calendar.set(java.util.Calendar.HOUR_OF_DAY, parts[0].toInt())
-        calendar.set(java.util.Calendar.MINUTE, parts[1].toInt())
-        calendar.set(java.util.Calendar.SECOND, 0)
-        calendar.set(java.util.Calendar.MILLISECOND, 0)
-        calendar.timeInMillis
-    } catch (e: Exception) {
-        null
     }
 }

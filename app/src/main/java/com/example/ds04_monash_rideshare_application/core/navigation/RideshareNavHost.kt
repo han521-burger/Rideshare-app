@@ -87,6 +87,7 @@ fun RideshareNavHost(
                 viewModel.loadDriverRides()
                 viewModel.loadMyRequests()
             }
+            AppDestination.FindRide -> viewModel.loadOpenRides()
             AppDestination.RideRequests -> viewModel.loadIncomingRequests()
             AppDestination.TripHistory -> viewModel.loadTripHistory()
             AppDestination.SustainabilityDashboard -> viewModel.loadDashboard()
@@ -205,12 +206,14 @@ fun RideshareNavHost(
         )
 
         AppDestination.FindRide -> FindRideScreen(
-            results = viewModel.searchResults,
+            openRides = viewModel.openRides,
+            searchResults = viewModel.searchResults,
             onSearch = viewModel::searchRides,
             onOpenRide = { rideId ->
                 viewModel.selectedRideId = rideId
                 navigate(AppDestination.RideDetails)
             },
+            onRefreshOpenRides = viewModel::loadOpenRides,
             onNavigateBack = ::navigateUp,
             modifier = modifier
         )

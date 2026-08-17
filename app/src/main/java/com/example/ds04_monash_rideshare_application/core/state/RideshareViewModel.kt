@@ -67,6 +67,8 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
 
     var selectedRideId: String? by mutableStateOf(null)
 
+    var openRides by mutableStateOf(Resource<List<RideOffer>>())
+        private set
     var searchResults by mutableStateOf(Resource<List<RankedRide>>())
         private set
     var rideDetails by mutableStateOf(Resource<RideOffer>())
@@ -167,6 +169,7 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
             override fun onSuccess(user: AuthenticatedUser?) {
                 AuthSession.currentUserId = null
                 uiState = RideshareUiState()
+                openRides = Resource()
                 searchResults = Resource()
                 driverRides = Resource()
                 incomingRequests = Resource()
@@ -179,6 +182,19 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
 
             override fun onFailure(error: Exception) {
                 uiState = uiState.copy(errorMessage = error.message ?: "Sign out was unsuccessful. Please try again.")
+            }
+        })
+    }
+
+    fun loadOpenRides() {
+        openRides = Resource(isLoading = true)
+        apiService.fetchRides(object : RideApiService.Callback<List<RideOffer>> {
+            override fun onSuccess(result: List<RideOffer>) {
+                openRides = Resource(data = result)
+            }
+
+            override fun onFailure(error: Exception) {
+                openRides = Resource(errorMessage = error.message)
             }
         })
     }
