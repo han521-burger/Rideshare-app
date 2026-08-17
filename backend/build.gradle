@@ -3,7 +3,7 @@
 // `./gradlew :backend:run` — while the team decides on real hosting. Swap SQLite for a hosted
 // Postgres by changing only Database.kt once that decision is made.
 plugins {
-    id 'org.jetbrains.kotlin.jvm' version '2.0.20'
+    alias(libs.plugins.kotlin.jvm)
     id 'application'
 }
 
