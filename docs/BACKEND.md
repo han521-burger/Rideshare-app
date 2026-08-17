@@ -1,0 +1,64 @@
+# Backend (trial)
+
+Owner: whoever picks this up next. Kotlin + Ktor + Exposed + SQLite, in the `backend/` Gradle
+module. Chosen so the team could unblock FR-08 ("central DB technology not yet chosen in-repo")
+without a hosting decision - it runs locally with zero setup, and only `Database.kt` needs to
+change to point at a real hosted Postgres later.
+
+## Running it
+
+```
+./gradlew :backend:run
+```
+
+Starts on `http://localhost:8080`, using a SQLite file at `backend/rideshare-backend.db`
+(gitignored, recreated automatically). On first run it seeds:
+- `fake-user-001` - matches `FakeAuthenticationProvider`'s fixed demo user, so signing in on
+  Android and hitting the backend "just works" out of the box.
+- `demo-driver-001` with one vehicle (`demo-vehicle-001`), so there's something to search/match
+  against immediately.
+
+From an Android emulator, the backend is reachable at `http://10.0.2.2:8080`.
+
+## Auth (trial-only, read this before assuming it's secure)
+
+There's no real Monash SSO yet (RTM FR-01 - blocked on Gate G1, SAML metadata from Monash IT).
+Every request must send `Authorization: Bearer <userId>`, and the backend trusts that userId as
+given if it exists in the `users` table. This is a stand-in for real auth, the same way
+`FakeAuthenticationProvider` stands in on the Android side. **Do not deploy this anywhere public
+as-is** - swap `Auth.kt`'s `requireUserId()` for real OIDC/JWT verification once Monash SSO access
+is granted.
+
+## Endpoints
+
+- `GET /health` -> `"API online"`
+- `GET/PUT /users/me`, `GET /users/{id}/rides` (self only)
+- `GET /rides` (filter: `date`, `originLat/Lng`, `destinationLat/Lng`, `radiusMeters`, `availableOnly`)
+- `GET /rides/match` (ranked search - see Matching below)
+- `POST /rides`, `GET/PUT/DELETE /rides/{id}`
+- `POST /rides/{rideId}/requests`, `GET /requests` (driver, own rides), `GET /requests/mine`
+  (passenger), `PUT /requests/{requestId}` (accept/reject/cancel)
+- `GET/POST /rides/{rideId}/messages` (driver + accepted passengers only)
+- `GET /users/me/dashboard`, `GET /users/me/trip-history`
+
+## Matching (FR-04)
+
+Rule-based only, no ML, per the weekly plan (Week 5). `matching/MatchingEngine.kt`:
+1. Hard gates: enough seats, same day, within a 45-minute window, same rough direction, pickup
+   within 3 km.
+2. Survivors get a weighted score: route similarity 40%, time compatibility 30%, pickup proximity
+   20%, detour cost 10%.
+3. If nothing survives the gates, `GET /rides/match` falls back to just direction + time window
+   (the "simple fallback" called out in the spec).
+
+The driver still makes the final accept/reject call - this only ranks candidates, it never
+auto-books.
+
+## Known limitations (be honest about these before demoing)
+
+- SQLite + a plain `transaction {}` block for the seat-decrement race condition is fine for one
+  local server process, but isn't real row-locking - a Postgres port would need `SELECT ... FOR
+  UPDATE` to keep the same guarantee under concurrent writers.
+- CORS is wide open (`anyHost()`) for local dev convenience. Tighten before any real deployment.
+- No HTTPS - this only runs on localhost/emulator right now. TLS termination is a hosting decision
+  the team hasn't made yet.
