@@ -47,6 +47,7 @@ import java.util.Locale
 fun FindRideScreen(
     openRides: Resource<List<RideOffer>>,
     searchResults: Resource<List<RankedRide>>,
+    currentUserId: String?,
     onSearch: (RideSearchCriteria) -> Unit,
     onOpenRide: (String) -> Unit,
     onRefreshOpenRides: () -> Unit,
@@ -74,6 +75,7 @@ fun FindRideScreen(
         } else {
             OpenRideList(
                 openRides = openRides,
+                currentUserId = currentUserId,
                 onOpenRide = onOpenRide,
                 onSearchByRoute = { showRouteSearch = true },
                 contentPadding = contentPadding
@@ -85,6 +87,7 @@ fun FindRideScreen(
 @Composable
 private fun OpenRideList(
     openRides: Resource<List<RideOffer>>,
+    currentUserId: String?,
     onOpenRide: (String) -> Unit,
     onSearchByRoute: () -> Unit,
     contentPadding: PaddingValues
@@ -111,7 +114,7 @@ private fun OpenRideList(
             )
 
             else -> {
-                val rides = openRides.data.orEmpty()
+                val rides = openRides.data.orEmpty().filter { it.driverId != currentUserId }
                 if (rides.isEmpty()) {
                     Text("No open rides right now.", modifier = Modifier.padding(16.dp))
                 } else {

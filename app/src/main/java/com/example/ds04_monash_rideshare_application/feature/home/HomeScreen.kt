@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -26,6 +27,12 @@ private data class HomeAction(
     val description: String
 )
 
+// Role only ever changes ONE thing meaningfully: whether the primary call-to-action is "find a
+// ride" or "create a ride" - the data underneath (your rides, your requests, trip history,
+// dashboard) isn't actually partitioned by role at all (a single account can be driving one ride
+// and riding another at the same time, see MyRidesScreen). Two near-identical action lists per
+// role used to duplicate every one of those shared items; now there's one shared list, and role
+// only changes the highlighted primary action.
 @Composable
 fun HomeScreen(
     role: SessionRole,
@@ -35,7 +42,11 @@ fun HomeScreen(
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val actions = if (role == SessionRole.PASSENGER) passengerActions else driverActions
+    val primaryAction = if (role == SessionRole.PASSENGER) {
+        HomeAction(AppDestination.FindRide, "Search by route, date, and preferred travel time.")
+    } else {
+        HomeAction(AppDestination.CreateRide, "Offer seats for an upcoming campus journey.")
+    }
 
     RideshareScaffold(
         title = "${role.displayName} Home",
@@ -77,6 +88,12 @@ fun HomeScreen(
                             },
                             style = MaterialTheme.typography.bodyLarge
                         )
+                        Button(
+                            onClick = { onNavigate(primaryAction.destination) },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(primaryAction.destination.title)
+                        }
                         OutlinedButton(onClick = onChangeRole) {
                             Text("Change role")
                         }
@@ -86,14 +103,14 @@ fun HomeScreen(
 
             item {
                 Text(
-                    text = "Quick actions",
+                    text = "Everything else",
                     style = MaterialTheme.typography.titleLarge,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.padding(top = 8.dp)
                 )
             }
 
-            items(actions, key = { it.destination.route }) { action ->
+            items(sharedActions, key = { it.destination.route }) { action ->
                 Card(
                     onClick = { onNavigate(action.destination) },
                     modifier = Modifier.fillMaxWidth(),
@@ -120,20 +137,10 @@ fun HomeScreen(
     }
 }
 
-private val passengerActions = listOf(
-    HomeAction(AppDestination.FindRide, "Search by route, date, and preferred travel time."),
-    HomeAction(AppDestination.MyRides, "See rides you've requested, at every stage - including messages."),
-    HomeAction(AppDestination.Map, "Explore the current Yandex route-selection prototype."),
-    HomeAction(AppDestination.TripHistory, "Review completed and cancelled trips."),
-    HomeAction(AppDestination.SustainabilityDashboard, "See rides and estimated CO2 savings."),
-    HomeAction(AppDestination.Profile, "Update your name and view your account."),
-    HomeAction(AppDestination.Settings, "Manage app and notification preferences.")
-)
-
-private val driverActions = listOf(
-    HomeAction(AppDestination.CreateRide, "Offer seats for an upcoming campus journey."),
-    HomeAction(AppDestination.RideRequests, "Review passenger requests for your rides."),
-    HomeAction(AppDestination.MyRides, "See rides you're driving, at every stage - including messages."),
+// Same regardless of role - not partitioned by driver/passenger data, see comment above.
+private val sharedActions = listOf(
+    HomeAction(AppDestination.MyRides, "Rides you're driving or riding in, at every stage."),
+    HomeAction(AppDestination.RideRequests, "Accept or reject requests for rides you're driving."),
     HomeAction(AppDestination.Map, "Explore the current Yandex route-selection prototype."),
     HomeAction(AppDestination.TripHistory, "Review completed and cancelled trips."),
     HomeAction(AppDestination.SustainabilityDashboard, "See rides and estimated CO2 savings."),

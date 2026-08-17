@@ -208,6 +208,7 @@ fun RideshareNavHost(
         AppDestination.FindRide -> FindRideScreen(
             openRides = viewModel.openRides,
             searchResults = viewModel.searchResults,
+            currentUserId = uiState.userId,
             onSearch = viewModel::searchRides,
             onOpenRide = { rideId ->
                 viewModel.selectedRideId = rideId

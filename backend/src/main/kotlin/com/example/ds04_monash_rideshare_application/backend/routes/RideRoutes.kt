@@ -38,7 +38,7 @@ fun Route.rideRoutes() {
     // GET /rides?date=&originLat=&originLng=&destinationLat=&destinationLng=&availableOnly=
     // Plain filtered browse - no ranking. Use /rides/match for a ranked passenger search.
     get("/rides") {
-        call.requireUserId()
+        val callerId = call.requireUserId()
         val dateParam = call.request.queryParameters["date"]
         val availableOnly = call.request.queryParameters["availableOnly"]?.toBoolean() ?: true
         val originLat = call.request.queryParameters["originLat"]?.toDoubleOrNull()
@@ -52,6 +52,9 @@ fun Route.rideRoutes() {
                 .where { Rides.status eq RideStatus.OPEN }
                 .map { it.toRideDto() }
         }.filter { ride ->
+            // A ride you drive isn't a ride you can join - exclude it from browse/search rather
+            // than showing it and relying on the passenger-request endpoint's rejection.
+            if (ride.driverId == callerId) return@filter false
             if (availableOnly && ride.seatsAvailable <= 0) return@filter false
             if (dateParam != null && !isSameCalendarDay(ride.departureTime, dateParam)) return@filter false
             if (originLat != null && originLng != null) {
@@ -69,7 +72,7 @@ fun Route.rideRoutes() {
 
     // GET /rides/match - ranked search using the weighted matching pipeline (FR-04).
     get("/rides/match") {
-        call.requireUserId()
+        val callerId = call.requireUserId()
         val originLat = call.request.queryParameters["originLat"]?.toDoubleOrNull()
             ?: throw ValidationException("originLat is required")
         val originLng = call.request.queryParameters["originLng"]?.toDoubleOrNull()
@@ -85,7 +88,8 @@ fun Route.rideRoutes() {
         val criteria = SearchCriteria(originLat, originLng, destinationLat, destinationLng, departureTime, seatsNeeded)
 
         val (candidates, ridesByRideId) = transaction {
-            val rows = Rides.selectAll().where { Rides.status eq RideStatus.OPEN }.toList()
+            val rows = Rides.selectAll().where { Rides.status eq RideStatus.OPEN }
+                .filter { it[Rides.driverId] != callerId }
             val candidates = rows.map {
                 RideCandidate(
                     rideId = it[Rides.rideId],
