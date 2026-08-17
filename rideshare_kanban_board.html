@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Monash Rideshare — Team Kanban Board</title>
+<style>
+  :root {
+    --asphalt-0: #14171b;
+    --asphalt-1: #1b1f24;
+    --asphalt-2: #21262d;
+    --asphalt-3: #2a3038;
+    --line: #343b44;
+    --line-strong: #454e59;
+    --lane: #f2c14e;
+    --lane-dim: #7a6427;
+    --text-hi: #edecea;
+    --text-mid: #a9afba;
+    --text-low: #6f7683;
+    --member-a: #5eb3f6;
+    --member-b: #7ee787;
+    --member-c: #f2c14e;
+    --member-d: #f78166;
+    --member-team: #c9a7ff;
+    --danger: #f76a6a;
+    --ok: #57d38c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--asphalt-0);
+    color: var(--text-hi);
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1500px; margin: 0 auto; padding: 22px 22px 60px; }
+
+  header.top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: 0.2px;
+  }
+  h1 span.route-dot {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--lane);
+    margin-right: 9px;
+    vertical-align: 1px;
+  }
+  .sub {
+    color: var(--text-mid);
+    font-size: 12.5px;
+    margin: 4px 0 0;
+  }
+
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .toolbar button, .toolbar select {
+    background: var(--asphalt-2);
+    border: 1px solid var(--line);
+    color: var(--text-hi);
+    font-size: 12.5px;
+    padding: 7px 11px;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .toolbar button:hover { border-color: var(--line-strong); }
+  .toolbar select { cursor: pointer; }
+  .toolbar button.primary {
+    background: var(--lane);
+    color: #2a2005;
+    border-color: var(--lane);
+    font-weight: 600;
+  }
+
+  .legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 14px 0 18px;
+    padding: 10px 14px;
+    background: var(--asphalt-1);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    font-size: 12px;
+    color: var(--text-mid);
+  }
+  .legend .item { display: flex; align-items: center; gap: 6px; }
+  .legend .swatch { width: 9px; height: 9px; border-radius: 2px; }
+
+  .progress-rail {
+    display: flex;
+    align-items: center;
+    margin: 16px 0 20px;
+    padding: 0 4px;
+  }
+  .progress-rail .seg {
+    flex: 1;
+    height: 3px;
+    background: var(--line);
+    position: relative;
+  }
+  .progress-rail .seg.filled { background: var(--lane); }
+  .progress-rail .stop {
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: var(--asphalt-2);
+    border: 2px solid var(--line-strong);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+  .progress-rail .stop.filled { background: var(--lane); border-color: var(--lane); }
+  .progress-rail .stop-label {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: var(--text-low);
+    white-space: nowrap;
+  }
+  .progress-rail .stop-wrap { position: relative; display:flex; flex-direction:column; align-items:center; }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(220px, 1fr));
+    gap: 12px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+  }
+  .col {
+    background: var(--asphalt-1);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    min-height: 200px;
+  }
+  .col-head {
+    padding: 11px 12px 9px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .col-head .name {
+    font-size: 12.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-hi);
+  }
+  .col-head .count {
+    font-size: 11px;
+    color: var(--text-low);
+    background: var(--asphalt-3);
+    padding: 1px 7px;
+    border-radius: 20px;
+  }
+  .col-body {
+    flex: 1;
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-height: 120px;
+    transition: background 0.12s;
+  }
+  .col-body.dragover { background: rgba(242,193,78,0.06); }
+  .col[data-col="blocked"] .col-head .name { color: var(--danger); }
+  .col[data-col="done"] .col-head .name { color: var(--ok); }
+
+  .card {
+    background: var(--asphalt-2);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--member-team);
+    border-radius: 7px;
+    padding: 9px 10px 8px;
+    cursor: grab;
+    font-size: 12.5px;
+    line-height: 1.4;
+  }
+  .card:active { cursor: grabbing; }
+  .card.dragging { opacity: 0.4; }
+  .card .title { color: var(--text-hi); margin: 0 0 6px; }
+  .card .meta {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .tag {
+    font-size: 10px;
+    padding: 1.5px 6px;
+    border-radius: 4px;
+    background: var(--asphalt-3);
+    color: var(--text-mid);
+    white-space: nowrap;
+  }
+  .tag.week { color: var(--text-low); }
+  .tag.req { color: var(--lane); background: rgba(242,193,78,0.1); }
+  .member-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 4px;
+  }
+  .card .owner-line {
+    display: flex;
+    align-items: center;
+    font-size: 10.5px;
+    color: var(--text-mid);
+    margin-top: 5px;
+  }
+  .empty-hint {
+    font-size: 11px;
+    color: var(--text-low);
+    text-align: center;
+    padding: 18px 6px;
+  }
+
+  .hidden { display: none !important; }
+  footer.note {
+    margin-top: 18px;
+    font-size: 11.5px;
+    color: var(--text-low);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1><span class="route-dot"></span>Monash Rideshare — Team Build Board</h1>
+      <p class="sub">Shared team board — drag cards between stations as work moves. Changes are visible to everyone with this file.</p>
+    </div>
+    <div class="toolbar">
+      <select id="memberFilter">
+        <option value="all">All members</option>
+        <option value="team">Team</option>
+        <option value="a">Member A — Android/UI</option>
+        <option value="b">Member B — Backend/DB</option>
+        <option value="c">Member C — Integration</option>
+        <option value="d">Member D — QA/Security</option>
+      </select>
+      <select id="weekFilter">
+        <option value="all">All weeks</option>
+      </select>
+      <button id="resetBtn">Reset board</button>
+      <button id="addBtn" class="primary">+ Add ticket</button>
+    </div>
+  </header>
+
+  <div class="legend">
+    <span class="item"><span class="swatch" style="background:var(--member-team)"></span>Team</span>
+    <span class="item"><span class="swatch" style="background:var(--member-a)"></span>Member A · Android/UI</span>
+    <span class="item"><span class="swatch" style="background:var(--member-b)"></span>Member B · Backend/DB</span>
+    <span class="item"><span class="swatch" style="background:var(--member-c)"></span>Member C · Integration</span>
+    <span class="item"><span class="swatch" style="background:var(--member-d)"></span>Member D · QA/Security</span>
+  </div>
+
+  <div class="board" id="board"></div>
+
+  <footer class="note" id="statusLine"></footer>
+</div>
+
+<script>
+const COLUMNS = [
+  { id: "backlog", name: "Backlog" },
+  { id: "ready", name: "Ready" },
+  { id: "inprogress", name: "In progress" },
+  { id: "pr", name: "Pull request" },
+  { id: "testing", name: "Testing" },
+  { id: "done", name: "Done" },
+  { id: "blocked", name: "Blocked" }
+];
+
+const MEMBER_INFO = {
+  team: { label: "Team", color: "var(--member-team)" },
+  a: { label: "Member A", color: "var(--member-a)" },
+  b: { label: "Member B", color: "var(--member-b)" },
+  c: { label: "Member C", color: "var(--member-c)" },
+  d: { label: "Member D", color: "var(--member-d)" }
+};
+
+const DEFAULT_TASKS = [
+  { id: "t1", title: "Confirm backend technology stack", week: "Week 1", owner: "team", req: "", col: "backlog" },
+  { id: "t2", title: "Confirm central database technology", week: "Week 1", owner: "team", req: "FR-08", col: "backlog" },
+  { id: "t3", title: "Create GitHub Kanban board + workflow", week: "Week 1", owner: "team", req: "", col: "backlog" },
+  { id: "t4", title: "Confirm package architecture (core/feature)", week: "Week 1", owner: "team", req: "", col: "backlog" },
+  { id: "t5", title: "Agree branch/PR rules", week: "Week 1", owner: "team", req: "", col: "backlog" },
+  { id: "t6", title: "Mark Monash SSO as external dependency until confirmed", week: "Week 1", owner: "team", req: "FR-01", col: "backlog" },
+
+  { id: "t7", title: "Create/clean up Android Studio project (Kotlin, Compose, MVVM)", week: "Week 1", owner: "a", req: "", col: "backlog" },
+  { id: "t8", title: "Build navigation skeleton (Splash → Login → Role → Home)", week: "Week 1", owner: "a", req: "", col: "backlog" },
+  { id: "t9", title: "Add placeholder screens (Profile, Create Ride, Find Ride, etc.)", week: "Week 1", owner: "a", req: "", col: "backlog" },
+  { id: "t10", title: "Login UI + Role selection UI", week: "Week 1", owner: "a", req: "FR-01", col: "backlog" },
+  { id: "t11", title: "Passenger Home + Driver Home placeholders", week: "Week 1", owner: "a", req: "", col: "backlog" },
+
+  { id: "t12", title: "Create backend repository, decide stack", week: "Week 1", owner: "b", req: "", col: "backlog" },
+  { id: "t13", title: "GET /health returns \"API online\"", week: "Week 1", owner: "b", req: "", col: "backlog" },
+  { id: "t14", title: "Database connection established", week: "Week 1", owner: "b", req: "FR-08", col: "backlog" },
+  { id: "t15", title: "Initial User + Ride models", week: "Week 1", owner: "b", req: "", col: "backlog" },
+  { id: "t16", title: "Stub /users/me and /rides endpoints", week: "Week 1", owner: "b", req: "", col: "backlog" },
+
+  { id: "t17", title: "Investigate Monash SSO (OAuth/OIDC, redirect URI, approval)", week: "Week 1", owner: "c", req: "FR-01", col: "backlog" },
+  { id: "t18", title: "Build FakeAuthenticationProvider interface", week: "Week 1", owner: "c", req: "FR-01", col: "backlog" },
+  { id: "t19", title: "Yandex MapKit feasibility spike — map loads, shows Melbourne", week: "Week 1", owner: "c", req: "", col: "backlog" },
+  { id: "t20", title: "GreenVehicleGuide / emissions dataset feasibility research", week: "Week 1", owner: "c", req: "", col: "backlog" },
+
+  { id: "t21", title: "Set up GitHub board columns + PR template", week: "Week 1", owner: "d", req: "", col: "backlog" },
+  { id: "t22", title: "Create issue template with acceptance criteria fields", week: "Week 1", owner: "d", req: "", col: "backlog" },
+  { id: "t23", title: "Write first unit test conventions", week: "Week 1", owner: "d", req: "", col: "backlog" },
+  { id: "t24", title: "Draft security checklist (NFR-01 basis)", week: "Week 1", owner: "d", req: "NFR-01", col: "backlog" },
+
+  { id: "t25", title: "Profile screen: name, Monash email, preferred name, role, photo", week: "Week 2", owner: "a", req: "", col: "backlog" },
+  { id: "t26", title: "Driver \"Create Ride\" form (origin, destination, seats, time)", week: "Week 2", owner: "a", req: "", col: "backlog" },
+  { id: "t27", title: "Passenger \"Find Ride\" search form", week: "Week 2", owner: "a", req: "", col: "backlog" },
+  { id: "t28", title: "Design central DB schema: users, vehicles, rides, ride_requests, messages", week: "Week 2", owner: "b", req: "FR-08", col: "backlog" },
+  { id: "t29", title: "Implement User / Ride / RideRequest tables", week: "Week 2", owner: "b", req: "FR-08", col: "backlog" },
+  { id: "t30", title: "Yandex: select origin → destination, compute distance + duration", week: "Week 2", owner: "c", req: "", col: "backlog" },
+  { id: "t31", title: "Store lat/lng, distanceMeters, estimatedDurationSeconds", week: "Week 2", owner: "c", req: "", col: "backlog" },
+  { id: "t32", title: "Confirm two devices can see the same backend data", week: "Week 2", owner: "d", req: "", col: "backlog" },
+
+  { id: "t33", title: "Map-based ride creation flow (origin → map/search → destination → route → publish)", week: "Week 3", owner: "a", req: "", col: "backlog" },
+  { id: "t34", title: "POST/GET /rides, GET /rides/{id}, GET /users/{id}/rides", week: "Week 3", owner: "b", req: "", col: "backlog" },
+  { id: "t35", title: "Ride filtering by date, origin, destination, availability", week: "Week 3", owner: "b", req: "", col: "backlog" },
+  { id: "t36", title: "Room local cache via repository pattern (never expose DAO to UI)", week: "Week 3", owner: "c", req: "", col: "backlog" },
+  { id: "t37", title: "Cache user profile, ride list, confirmed rides, trip history", week: "Week 3", owner: "c", req: "", col: "backlog" },
+  { id: "t38", title: "NFR-01 security review: HTTPS, no committed secrets, auth on endpoints", week: "Week 3", owner: "d", req: "NFR-01", col: "backlog" },
+  { id: "t39", title: "Emissions prototype: CO2 = distance × emission factor (label as estimate)", week: "Week 3", owner: "d", req: "", col: "backlog" },
+
+  { id: "t40", title: "Passenger search/request UI", week: "Week 4", owner: "a", req: "FR-02", col: "backlog" },
+  { id: "t41", title: "Ride-request endpoints + status state machine", week: "Week 4", owner: "b", req: "FR-03", col: "backlog" },
+  { id: "t42", title: "Search filters + coordinate/pickup-zone handling", week: "Week 4", owner: "c", req: "FR-02", col: "backlog" },
+  { id: "t43", title: "Test every valid/invalid status transition (PENDING→ACCEPTED etc.)", week: "Week 4", owner: "d", req: "", col: "backlog" },
+
+  { id: "t44", title: "Matching pipeline: date, seats>0, direction, time, pickup, route", week: "Week 5", owner: "b", req: "FR-04", col: "backlog" },
+  { id: "t45", title: "Weighted match score (route 40%, time 30%, pickup 20%, detour 10%)", week: "Week 5", owner: "b", req: "FR-04", col: "backlog" },
+  { id: "t46", title: "Display match % — driver retains final accept/reject", week: "Week 5", owner: "a", req: "FR-04", col: "backlog" },
+  { id: "t47", title: "Implement Version 1 fallback: station + time + direction only", week: "Week 5", owner: "c", req: "", col: "backlog" },
+
+  { id: "t48", title: "Atomic seat decrement on the backend (prevent overbooking)", week: "Week 6", owner: "b", req: "", col: "backlog" },
+  { id: "t49", title: "Minimum messaging: text, timestamp, sender, conversation ID", week: "Week 6", owner: "a", req: "", col: "backlog" },
+  { id: "t50", title: "Trip history storage on ride completion", week: "Week 6", owner: "b", req: "FR-07", col: "backlog" },
+  { id: "t51", title: "Safety prototype: report user/ride, safety info, disclaimer", week: "Week 6", owner: "d", req: "", col: "backlog" },
+  { id: "t52", title: "Milestone 3 two-phone demo: create ride → search → request → accept → seats update", week: "Week 6", owner: "team", req: "", col: "backlog" },
+
+  { id: "t53", title: "Build RTM testing column, trace FR-01 to FR-09 + NFRs", week: "Week 7", owner: "d", req: "", col: "backlog" },
+  { id: "t54", title: "Cross-test: A tests B, B tests C, C tests D, D tests A", week: "Week 7", owner: "team", req: "", col: "backlog" },
+
+  { id: "t55", title: "Sustainability dashboard: CO2 avoided, monthly trips, totals", week: "Week 8", owner: "a", req: "FR-07", col: "backlog" },
+  { id: "t56", title: "Measure NFR-02 performance (search, matching, request times)", week: "Week 8", owner: "d", req: "NFR-02", col: "backlog" },
+  { id: "t57", title: "Handle NFR-03 failure states with friendly retry messaging", week: "Week 8", owner: "b", req: "NFR-03", col: "backlog" },
+
+  { id: "t58", title: "Run UAT with non-team testers, record time/errors/confusion", week: "Week 9", owner: "team", req: "", col: "backlog" },
+  { id: "t59", title: "Triage issues P0–P3, fix P0/P1 before cosmetic P3", week: "Week 9", owner: "team", req: "", col: "backlog" },
+  { id: "t60", title: "Cut release candidate v1.0.0-rc1, run full test suite", week: "Week 9", owner: "d", req: "", col: "backlog" },
+  { id: "t61", title: "Prepare final APK, README, architecture diagram, RTM, risk register, Gantt", week: "Week 9", owner: "team", req: "", col: "backlog" }
+];
+
+let state = null;
+let storageOk = true;
+const STORAGE_KEY = "rideshare-kanban-state";
+
+async function loadState() {
+  try {
+    const res = await window.storage.get(STORAGE_KEY, true);
+    if (res && res.value) {
+      state = JSON.parse(res.value);
+      return;
+    }
+  } catch (e) {
+    storageOk = true;
+  }
+  state = { tasks: DEFAULT_TASKS.map(t => ({...t})) };
+  await saveState();
+}
+
+async function saveState() {
+  try {
+    await window.storage.set(STORAGE_KEY, JSON.stringify(state), true);
+  } catch (e) {
+    storageOk = false;
+  }
+  updateStatusLine();
+}
+
+function updateStatusLine() {
+  const el = document.getElementById("statusLine");
+  el.textContent = storageOk
+    ? "This is a shared board — changes save for everyone with this file."
+    : "Could not save changes — your edits will reset if you leave this page.";
+}
+
+function populateWeekFilter() {
+  const weeks = [...new Set(state.tasks.map(t => t.week))].sort();
+  const sel = document.getElementById("weekFilter");
+  weeks.forEach(w => {
+    const opt = document.createElement("option");
+    opt.value = w;
+    opt.textContent = w;
+    sel.appendChild(opt);
+  });
+}
+
+function renderRail() {
+  const doneCount = state.tasks.filter(t => t.col === "done").length;
+  const total = state.tasks.length;
+}
+
+function render() {
+  const memberVal = document.getElementById("memberFilter").value;
+  const weekVal = document.getElementById("weekFilter").value;
+  const board = document.getElementById("board");
+  board.innerHTML = "";
+
+  COLUMNS.forEach(col => {
+    const colEl = document.createElement("div");
+    colEl.className = "col";
+    colEl.dataset.col = col.id;
+
+    const tasksHere = state.tasks.filter(t => {
+      if (t.col !== col.id) return false;
+      if (memberVal !== "all" && t.owner !== memberVal) return false;
+      if (weekVal !== "all" && t.week !== weekVal) return false;
+      return true;
+    });
+
+    colEl.innerHTML = `
+      <div class="col-head">
+        <span class="name">${col.name}</span>
+        <span class="count">${tasksHere.length}</span>
+      </div>
+      <div class="col-body" data-col="${col.id}"></div>
+    `;
+    board.appendChild(colEl);
+
+    const body = colEl.querySelector(".col-body");
+    if (tasksHere.length === 0) {
+      body.innerHTML = '<div class="empty-hint">No tickets here</div>';
+    } else {
+      tasksHere.forEach(t => body.appendChild(renderCard(t)));
+    }
+
+    body.addEventListener("dragover", e => {
+      e.preventDefault();
+      body.classList.add("dragover");
+    });
+    body.addEventListener("dragleave", () => body.classList.remove("dragover"));
+    body.addEventListener("drop", async e => {
+      e.preventDefault();
+      body.classList.remove("dragover");
+      const id = e.dataTransfer.getData("text/plain");
+      const task = state.tasks.find(t => t.id === id);
+      if (task) {
+        task.col = col.id;
+        await saveState();
+        render();
+      }
+    });
+  });
+}
+
+function renderCard(t) {
+  const card = document.createElement("div");
+  card.className = "card";
+  card.draggable = true;
+  card.dataset.id = t.id;
+  const m = MEMBER_INFO[t.owner] || MEMBER_INFO.team;
+  card.style.borderLeftColor = m.color;
+  card.innerHTML = `
+    <p class="title">${escapeHtml(t.title)}</p>
+    <div class="meta">
+      <span class="tag week">${escapeHtml(t.week)}</span>
+      ${t.req ? `<span class="tag req">${escapeHtml(t.req)}</span>` : ""}
+    </div>
+    <div class="owner-line"><span class="member-dot" style="background:${m.color}"></span>${m.label}</div>
+  `;
+  card.addEventListener("dragstart", e => {
+    e.dataTransfer.setData("text/plain", t.id);
+    card.classList.add("dragging");
+  });
+  card.addEventListener("dragend", () => card.classList.remove("dragging"));
+  return card;
+}
+
+function escapeHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+document.getElementById("memberFilter").addEventListener("change", render);
+document.getElementById("weekFilter").addEventListener("change", render);
+
+document.getElementById("resetBtn").addEventListener("click", async () => {
+  if (!confirm("This resets the board for everyone on the team, not just you. Continue?")) return;
+  state = { tasks: DEFAULT_TASKS.map(t => ({...t})) };
+  await saveState();
+  render();
+});
+
+document.getElementById("addBtn").addEventListener("click", async () => {
+  const title = prompt("Ticket title:");
+  if (!title || !title.trim()) return;
+  const week = prompt("Week label (e.g. Week 3):", "Week 1") || "Week 1";
+  const owner = (prompt("Owner: team / a / b / c / d", "team") || "team").trim().toLowerCase();
+  const req = prompt("Requirement ID (optional, e.g. FR-04):", "") || "";
+  const id = "t" + Date.now();
+  state.tasks.push({
+    id, title: title.trim(), week: week.trim(),
+    owner: MEMBER_INFO[owner] ? owner : "team",
+    req: req.trim(), col: "backlog"
+  });
+  await saveState();
+  render();
+});
+
+(async function init() {
+  await loadState();
+  populateWeekFilter();
+  render();
+})();
+</script>
+</body>
+</html>
