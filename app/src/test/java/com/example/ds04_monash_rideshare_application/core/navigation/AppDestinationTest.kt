@@ -14,13 +14,9 @@ class AppDestinationTest {
     }
 
     @Test
-    fun `only Settings remains a placeholder screen`() {
-        // create-ride, find-ride, ride-details, ride-requests, confirmed-ride, messages,
-        // trip-history, and sustainability-dashboard all got real implementations - see
-        // RideshareNavHost. Settings is the only one still pending.
-        val expectedRoutes = setOf("settings")
-
-        assertEquals(expectedRoutes, AppDestination.placeholders.map { it.route }.toSet())
+    fun `no destinations remain as placeholders`() {
+        // Settings was the last one - see RideshareNavHost and feature/settings/SettingsScreen.
+        assertEquals(emptyList<AppDestination>(), AppDestination.placeholders)
     }
 
     @Test

@@ -29,6 +29,7 @@ import com.example.ds04_monash_rideshare_application.core.ui.RideshareScaffold
 fun RideRequestsScreen(
     requests: Resource<List<SeatRequest>>,
     onRespond: (requestId: String, newStatus: String) -> Unit,
+    onRefresh: () -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -36,6 +37,8 @@ fun RideRequestsScreen(
         title = "Ride Requests",
         canNavigateBack = true,
         onNavigateBack = onNavigateBack,
+        actionLabel = "Refresh",
+        onAction = onRefresh,
         modifier = modifier
     ) { contentPadding ->
         when {

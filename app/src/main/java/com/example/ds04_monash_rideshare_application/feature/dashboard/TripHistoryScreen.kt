@@ -26,6 +26,7 @@ import java.util.Locale
 @Composable
 fun TripHistoryScreen(
     trips: Resource<List<RideOffer>>,
+    onRefresh: () -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -33,6 +34,8 @@ fun TripHistoryScreen(
         title = "Trip History",
         canNavigateBack = true,
         onNavigateBack = onNavigateBack,
+        actionLabel = "Refresh",
+        onAction = onRefresh,
         modifier = modifier
     ) { contentPadding ->
         when {

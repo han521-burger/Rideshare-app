@@ -35,6 +35,7 @@ fun MessagesScreen(
     messages: Resource<List<Message>>,
     currentUserId: String?,
     onSend: (String, onDone: (String?) -> Unit) -> Unit,
+    onRefresh: () -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -45,6 +46,8 @@ fun MessagesScreen(
         title = "Messages",
         canNavigateBack = true,
         onNavigateBack = onNavigateBack,
+        actionLabel = "Refresh",
+        onAction = onRefresh,
         modifier = modifier
     ) { contentPadding ->
         Column(modifier = Modifier.padding(contentPadding).fillMaxSize()) {

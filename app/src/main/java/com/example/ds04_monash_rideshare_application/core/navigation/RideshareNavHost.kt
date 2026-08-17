@@ -25,7 +25,7 @@ import com.example.ds04_monash_rideshare_application.feature.rides.FindRideScree
 import com.example.ds04_monash_rideshare_application.feature.rides.RideDetailsScreen
 import com.example.ds04_monash_rideshare_application.feature.rides.RideRequestsScreen
 import com.example.ds04_monash_rideshare_application.feature.role.RoleSelectionScreen
-import com.example.ds04_monash_rideshare_application.feature.shared.PlaceholderScreen
+import com.example.ds04_monash_rideshare_application.feature.settings.SettingsScreen
 import com.example.ds04_monash_rideshare_application.ui.MapScreen
 
 @Composable
@@ -198,6 +198,7 @@ fun RideshareNavHost(
                 }
                 viewModel.respondToRequest(requestId, status)
             },
+            onRefresh = viewModel::loadIncomingRequests,
             onNavigateBack = ::navigateUp,
             modifier = modifier
         )
@@ -216,24 +217,32 @@ fun RideshareNavHost(
                 viewModel.selectedRideId?.let { rideId -> viewModel.sendMessage(rideId, body, onDone) }
                     ?: onDone("No ride selected")
             },
+            onRefresh = {
+                viewModel.selectedRideId?.let { viewModel.loadMessages(it) }
+            },
             onNavigateBack = ::navigateUp,
             modifier = modifier
         )
 
         AppDestination.TripHistory -> TripHistoryScreen(
             trips = viewModel.tripHistory,
+            onRefresh = viewModel::loadTripHistory,
             onNavigateBack = ::navigateUp,
             modifier = modifier
         )
 
         AppDestination.SustainabilityDashboard -> SustainabilityDashboardScreen(
             dashboard = viewModel.dashboard,
+            onRefresh = viewModel::loadDashboard,
             onNavigateBack = ::navigateUp,
             modifier = modifier
         )
 
-        AppDestination.Settings -> PlaceholderScreen(
-            destination = currentDestination,
+        AppDestination.Settings -> SettingsScreen(
+            uiState = uiState,
+            onPassengerEnabledChange = viewModel::updatePassengerEnabled,
+            onClearLocalCache = viewModel::clearLocalCache,
+            onSignOut = ::returnToLogin,
             onNavigateBack = ::navigateUp,
             modifier = modifier
         )

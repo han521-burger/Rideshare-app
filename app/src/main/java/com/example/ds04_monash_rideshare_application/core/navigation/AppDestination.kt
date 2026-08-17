@@ -40,8 +40,9 @@ sealed class AppDestination(val route: String, val title: String) {
                 Map
             )
 
+        // Nothing left as a placeholder - every Sprint 1 destination has a real screen now.
         val placeholders: List<AppDestination>
-            get() = listOf(Settings)
+            get() = emptyList()
 
         fun fromRoute(route: String?): AppDestination? =
             sprintOneDestinations.firstOrNull { it.route == route }

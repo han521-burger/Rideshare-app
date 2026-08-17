@@ -33,6 +33,7 @@ data class RideshareUiState(
     val displayName: String = "",
     val preferredName: String = "",
     val activeRole: SessionRole? = null,
+    val passengerEnabled: Boolean = true,
     val errorMessage: String? = null
 ) {
     val isSignedIn: Boolean
@@ -130,6 +131,26 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
                 uiState = uiState.copy(errorMessage = error.message)
             }
         })
+    }
+
+    fun updatePassengerEnabled(enabled: Boolean) {
+        val userId = uiState.userId ?: return
+        uiState = uiState.copy(passengerEnabled = enabled)
+        apiService.updateUserProfile(userId, uiState.displayName, uiState.preferredName, enabled, object : RideApiService.Callback<UserProfile> {
+            override fun onSuccess(result: UserProfile) {
+                ioExecutor.execute { appDatabase.userProfileDao().upsert(result) }
+            }
+
+            override fun onFailure(error: Exception) {
+                uiState = uiState.copy(errorMessage = error.message)
+            }
+        })
+    }
+
+    // Wipes the Room cache only - the backend is still the source of truth, so this just forces
+    // the next screen visit to fetch fresh data instead of showing whatever was cached locally.
+    fun clearLocalCache() {
+        ioExecutor.execute { appDatabase.clearAllTables() }
     }
 
     fun signOut(onComplete: () -> Unit = {}) {

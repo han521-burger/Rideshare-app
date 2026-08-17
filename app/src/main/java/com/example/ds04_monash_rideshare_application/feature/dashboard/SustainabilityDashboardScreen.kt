@@ -25,6 +25,7 @@ import com.example.ds04_monash_rideshare_application.core.ui.RideshareScaffold
 @Composable
 fun SustainabilityDashboardScreen(
     dashboard: Resource<DashboardSummary>,
+    onRefresh: () -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -32,6 +33,8 @@ fun SustainabilityDashboardScreen(
         title = "Sustainability Dashboard",
         canNavigateBack = true,
         onNavigateBack = onNavigateBack,
+        actionLabel = "Refresh",
+        onAction = onRefresh,
         modifier = modifier
     ) { contentPadding ->
         when {
