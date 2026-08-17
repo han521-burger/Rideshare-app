@@ -7,6 +7,7 @@ sealed class AppDestination(val route: String, val title: String) {
     data object PassengerHome : AppDestination("passenger-home", "Passenger Home")
     data object DriverHome : AppDestination("driver-home", "Driver Home")
     data object Profile : AppDestination("profile", "Profile")
+    data object MyRides : AppDestination("my-rides", "My Rides")
     data object CreateRide : AppDestination("create-ride", "Create Ride")
     data object FindRide : AppDestination("find-ride", "Find Ride")
     data object RideDetails : AppDestination("ride-details", "Ride Details")
@@ -28,6 +29,7 @@ sealed class AppDestination(val route: String, val title: String) {
                 PassengerHome,
                 DriverHome,
                 Profile,
+                MyRides,
                 CreateRide,
                 FindRide,
                 RideDetails,

@@ -122,9 +122,8 @@ fun HomeScreen(
 
 private val passengerActions = listOf(
     HomeAction(AppDestination.FindRide, "Search by route, date, and preferred travel time."),
-    HomeAction(AppDestination.ConfirmedRide, "Review your upcoming shared trips."),
+    HomeAction(AppDestination.MyRides, "See rides you've requested, at every stage - including messages."),
     HomeAction(AppDestination.Map, "Explore the current Yandex route-selection prototype."),
-    HomeAction(AppDestination.Messages, "Open conversations for confirmed rides."),
     HomeAction(AppDestination.TripHistory, "Review completed and cancelled trips."),
     HomeAction(AppDestination.SustainabilityDashboard, "See rides and estimated CO2 savings."),
     HomeAction(AppDestination.Profile, "Update your name and view your account."),
@@ -134,9 +133,8 @@ private val passengerActions = listOf(
 private val driverActions = listOf(
     HomeAction(AppDestination.CreateRide, "Offer seats for an upcoming campus journey."),
     HomeAction(AppDestination.RideRequests, "Review passenger requests for your rides."),
-    HomeAction(AppDestination.ConfirmedRide, "Review your upcoming shared trips."),
+    HomeAction(AppDestination.MyRides, "See rides you're driving, at every stage - including messages."),
     HomeAction(AppDestination.Map, "Explore the current Yandex route-selection prototype."),
-    HomeAction(AppDestination.Messages, "Open conversations for confirmed rides."),
     HomeAction(AppDestination.TripHistory, "Review completed and cancelled trips."),
     HomeAction(AppDestination.SustainabilityDashboard, "See rides and estimated CO2 savings."),
     HomeAction(AppDestination.Profile, "Update your name and view your account."),

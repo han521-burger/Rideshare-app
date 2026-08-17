@@ -19,9 +19,11 @@ import com.example.ds04_monash_rideshare_application.feature.dashboard.TripHisto
 import com.example.ds04_monash_rideshare_application.feature.home.HomeScreen
 import com.example.ds04_monash_rideshare_application.feature.messages.MessagesScreen
 import com.example.ds04_monash_rideshare_application.feature.profile.ProfileScreen
+import com.example.ds04_monash_rideshare_application.Database.RideShare.RideOffer
 import com.example.ds04_monash_rideshare_application.feature.rides.ConfirmedRideScreen
 import com.example.ds04_monash_rideshare_application.feature.rides.CreateRideScreen
 import com.example.ds04_monash_rideshare_application.feature.rides.FindRideScreen
+import com.example.ds04_monash_rideshare_application.feature.rides.MyRidesScreen
 import com.example.ds04_monash_rideshare_application.feature.rides.RideDetailsScreen
 import com.example.ds04_monash_rideshare_application.feature.rides.RideRequestsScreen
 import com.example.ds04_monash_rideshare_application.feature.role.RoleSelectionScreen
@@ -81,6 +83,10 @@ fun RideshareNavHost(
     // each caller having to remember to trigger the right load itself.
     LaunchedEffect(currentDestination, viewModel.selectedRideId) {
         when (currentDestination) {
+            AppDestination.MyRides -> {
+                viewModel.loadDriverRides()
+                viewModel.loadMyRequests()
+            }
             AppDestination.RideRequests -> viewModel.loadIncomingRequests()
             AppDestination.TripHistory -> viewModel.loadTripHistory()
             AppDestination.SustainabilityDashboard -> viewModel.loadDashboard()
@@ -156,6 +162,37 @@ fun RideshareNavHost(
         ) { contentPadding ->
             MapScreen(modifier = Modifier.padding(contentPadding))
         }
+
+        AppDestination.MyRides -> MyRidesScreen(
+            driverRides = viewModel.driverRides,
+            myRequests = viewModel.myRequests,
+            onOpenDriverRide = { ride ->
+                viewModel.selectedRideId = ride.rideId
+                navigate(
+                    if (ride.status == RideOffer.STATUS_CONFIRMED || ride.status == RideOffer.STATUS_COMPLETED) {
+                        AppDestination.ConfirmedRide
+                    } else {
+                        AppDestination.RideDetails
+                    }
+                )
+            },
+            onOpenRequest = { request ->
+                viewModel.selectedRideId = request.rideId
+                navigate(
+                    if (request.status == "ACCEPTED" || request.status == "COMPLETED") {
+                        AppDestination.ConfirmedRide
+                    } else {
+                        AppDestination.RideDetails
+                    }
+                )
+            },
+            onRefresh = {
+                viewModel.loadDriverRides()
+                viewModel.loadMyRequests()
+            },
+            onNavigateBack = ::navigateUp,
+            modifier = modifier
+        )
 
         AppDestination.CreateRide -> CreateRideScreen(
             isPublishing = viewModel.actionInFlight,
