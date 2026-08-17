@@ -9,8 +9,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -18,16 +20,20 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateRideDraft
+import com.example.ds04_monash_rideshare_application.core.ui.DatePickerField
 import com.example.ds04_monash_rideshare_application.core.ui.RideshareScaffold
+import com.example.ds04_monash_rideshare_application.core.ui.TimePickerField
+import com.example.ds04_monash_rideshare_application.core.ui.combineDateAndTime
 import com.example.ds04_monash_rideshare_application.ui.MapScreen
 import com.example.ds04_monash_rideshare_application.ui.RouteQueryResult
-import java.text.SimpleDateFormat
-import java.util.Locale
-import java.util.TimeZone
+import java.time.LocalDate
+import java.time.LocalTime
 
 // Item 5: "Map-based ride creation flow (select origin/destination -> route -> summary ->
 // publish)". Step 1 reuses the existing Yandex MapScreen for the route pick; step 2 is the
@@ -87,9 +93,9 @@ private fun RideDetailsForm(
     onChooseDifferentRoute: () -> Unit,
     onPublish: (CreateRideDraft) -> Unit
 ) {
-    var date by remember { mutableStateOf("") }
-    var time by remember { mutableStateOf("") }
-    var seats by remember { mutableStateOf("1") }
+    var date by remember { mutableStateOf<LocalDate?>(null) }
+    var time by remember { mutableStateOf<LocalTime?>(null) }
+    var seats by remember { mutableStateOf(1) }
     var notes by remember { mutableStateOf("") }
     var validationError by remember { mutableStateOf<String?>(null) }
 
@@ -108,27 +114,36 @@ private fun RideDetailsForm(
         )
         Button(onClick = onChooseDifferentRoute) { Text("Choose a different route") }
 
-        OutlinedTextField(
-            value = date,
-            onValueChange = { date = it; validationError = null },
-            label = { Text("Departure date (YYYY-MM-DD)") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+        DatePickerField(
+            label = "Departure date",
+            selectedDate = date,
+            onDateSelected = { date = it; validationError = null }
         )
-        OutlinedTextField(
-            value = time,
-            onValueChange = { time = it; validationError = null },
-            label = { Text("Departure time, 24h (HH:mm)") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
+        TimePickerField(
+            label = "Departure time",
+            selectedTime = time,
+            onTimeSelected = { time = it; validationError = null }
         )
-        OutlinedTextField(
-            value = seats,
-            onValueChange = { seats = it.filter(Char::isDigit); validationError = null },
-            label = { Text("Seats available") },
-            singleLine = true,
-            modifier = Modifier.fillMaxWidth()
-        )
+        Text("Seats available", style = MaterialTheme.typography.bodyMedium)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            OutlinedButton(
+                onClick = { if (seats > 1) { seats--; validationError = null } },
+                enabled = seats > 1
+            ) { Text("-") }
+            Text(
+                "$seats",
+                style = MaterialTheme.typography.headlineSmall,
+                modifier = Modifier.widthIn(min = 32.dp),
+                textAlign = TextAlign.Center
+            )
+            OutlinedButton(
+                onClick = { if (seats < 8) { seats++; validationError = null } },
+                enabled = seats < 8
+            ) { Text("+") }
+        }
         OutlinedTextField(
             value = notes,
             onValueChange = { notes = it },
@@ -144,19 +159,17 @@ private fun RideDetailsForm(
             Button(
                 enabled = !isPublishing,
                 onClick = {
-                    val departureMillis = parseDepartureMillis(date, time)
-                    val seatCount = seats.toIntOrNull() ?: 0
+                    val departureMillis = combineDateAndTime(date, time)
                     when {
-                        departureMillis == null -> validationError = "Enter a valid future date and time."
+                        departureMillis == null -> validationError = "Choose a departure date and time."
                         departureMillis <= System.currentTimeMillis() -> validationError = "Departure must be in the future."
-                        seatCount <= 0 -> validationError = "Seats available must be at least 1."
                         else -> onPublish(
                             CreateRideDraft(
                                 null,
                                 route.originLat, route.originLng,
                                 route.destinationLat, route.destinationLng,
                                 route.distanceMeters, route.estimatedDurationSeconds,
-                                departureMillis, seatCount,
+                                departureMillis, seats,
                                 notes.trim().ifBlank { null }
                             )
                         )
@@ -166,16 +179,5 @@ private fun RideDetailsForm(
                 Text(if (isPublishing) "Publishing..." else "Publish ride")
             }
         }
-    }
-}
-
-private fun parseDepartureMillis(date: String, time: String): Long? {
-    return try {
-        val format = SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault())
-        format.timeZone = TimeZone.getDefault()
-        format.isLenient = false
-        format.parse("$date $time")?.time
-    } catch (e: Exception) {
-        null
     }
 }
