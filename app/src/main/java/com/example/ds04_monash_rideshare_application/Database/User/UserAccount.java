@@ -47,7 +47,7 @@ public class UserAccount {
         return emailAccount;
     }
     public void setEmailAccount(String emailAccount){
-        this.externalSubjectId = externalSubjectId;
+        this.emailAccount = emailAccount;
     }
     public String getAccountStatus(){
         return accountStatus;
