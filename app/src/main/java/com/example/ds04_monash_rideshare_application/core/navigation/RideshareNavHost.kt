@@ -111,6 +111,11 @@ fun RideshareNavHost(
                     replaceStack(AppDestination.RoleSelection)
                 }
             },
+            onSignInAsTestUser = { identity ->
+                viewModel.signInAsTestUser(identity) {
+                    replaceStack(AppDestination.RoleSelection)
+                }
+            },
             modifier = modifier
         )
 

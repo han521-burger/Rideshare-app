@@ -54,6 +54,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ds04_monash_rideshare_application.Auth.TEST_IDENTITIES
+import com.example.ds04_monash_rideshare_application.Auth.TestIdentity
 import com.example.ds04_monash_rideshare_application.R
 import com.example.ds04_monash_rideshare_application.core.state.RideshareUiState
 
@@ -66,12 +68,12 @@ private val ErrorRed = Color(0xFFC7463D)
 
 internal const val BLANK_EMAIL_ERROR = "This field cannot be left blank"
 internal const val INVALID_EMAIL_ERROR = "Enter a valid Monash email address"
-private const val DEMO_EMAIL = "test.student@student.monash.edu"
 
 @Composable
 fun LoginScreen(
     uiState: RideshareUiState,
     onSignIn: (String) -> Unit,
+    onSignInAsTestUser: (TestIdentity) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var email by rememberSaveable { mutableStateOf("") }
@@ -212,26 +214,40 @@ fun LoginScreen(
 
                 OrDivider()
 
-                OutlinedButton(
-                    onClick = {
-                        email = DEMO_EMAIL
-                        validationError = null
-                        helpMessage = null
-                        onSignIn(DEMO_EMAIL)
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(56.dp),
-                    enabled = !uiState.isSigningIn,
-                    shape = RoundedCornerShape(4.dp),
-                    border = BorderStroke(2.dp, MonashBlue),
-                    colors = ButtonDefaults.outlinedButtonColors(contentColor = MonashBlue)
-                ) {
-                    Text(
-                        text = "Continue with demo account",
-                        fontSize = 17.sp,
-                        textDecoration = TextDecoration.Underline
-                    )
+                Text(
+                    text = "Trial: sign in as a seeded test account",
+                    color = SecondaryText,
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    text = "Real Monash SSO isn't available yet. Each of these is pre-populated " +
+                        "with rides/requests/messages - sign in as a different one to see the other " +
+                        "side of a request (e.g. accept, as Amara, a request you made as Test Student).",
+                    modifier = Modifier.padding(top = 4.dp, bottom = 12.dp),
+                    color = SecondaryText,
+                    style = MaterialTheme.typography.bodySmall
+                )
+                TEST_IDENTITIES.forEach { identity ->
+                    OutlinedButton(
+                        onClick = {
+                            validationError = null
+                            helpMessage = null
+                            onSignInAsTestUser(identity)
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 10.dp)
+                            .height(56.dp),
+                        enabled = !uiState.isSigningIn,
+                        shape = RoundedCornerShape(4.dp),
+                        border = BorderStroke(2.dp, MonashBlue),
+                        colors = ButtonDefaults.outlinedButtonColors(contentColor = MonashBlue)
+                    ) {
+                        Text(
+                            text = "${identity.displayName} (${identity.roleHint})",
+                            fontSize = 16.sp
+                        )
+                    }
                 }
 
                 LoginLink(

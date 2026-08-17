@@ -9,6 +9,7 @@ import com.example.ds04_monash_rideshare_application.Auth.AuthSession
 import com.example.ds04_monash_rideshare_application.Auth.AuthenticatedUser
 import com.example.ds04_monash_rideshare_application.Auth.AuthenticationProvider
 import com.example.ds04_monash_rideshare_application.Auth.FakeAuthenticationProvider
+import com.example.ds04_monash_rideshare_application.Auth.TestIdentity
 import com.example.ds04_monash_rideshare_application.Database.AppDatabase
 import com.example.ds04_monash_rideshare_application.Database.Messaging.Message
 import com.example.ds04_monash_rideshare_application.Database.Passenger.SeatRequest
@@ -97,24 +98,7 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
         uiState = uiState.copy(isSigningIn = true, errorMessage = null)
         authenticationProvider.login(object : AuthenticationProvider.AuthCallback {
             override fun onSuccess(user: AuthenticatedUser) {
-                AuthSession.currentUserId = user.userId
-                uiState = uiState.copy(
-                    isSigningIn = false,
-                    userId = user.userId,
-                    email = email?.trim()?.takeIf { it.isNotBlank() } ?: user.emailAccount,
-                    displayName = user.displayName,
-                    preferredName = user.displayName,
-                    activeRole = null
-                )
-                // UserProfile has a foreign key onto user_account(userId) - the account row must
-                // exist in Room before refreshUserProfile's cache write can succeed, so upsert it
-                // first, on the same background thread, before triggering the profile fetch.
-                ioExecutor.execute {
-                    appDatabase.userAccountDao().upsert(
-                        UserAccount(user.userId, user.externalSubjectId, user.emailAccount, "ACTIVE", System.currentTimeMillis())
-                    )
-                    userRepository.refreshUserProfile(user.userId)
-                }
+                applySignedInUser(user, email)
                 onSuccess()
             }
 
@@ -125,6 +109,39 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
                 )
             }
         })
+    }
+
+    // Trial-only: signs in directly as one of the other seeded test accounts (backend/Database.kt),
+    // bypassing FakeAuthenticationProvider (which only ever returns fake-user-001). Without this
+    // there's no way to test both sides of a request/accept/message flow - every request you make
+    // against another seeded driver's ride would be invisible to you forever, since nobody could
+    // ever sign in as that driver to accept it.
+    fun signInAsTestUser(identity: TestIdentity, onSuccess: () -> Unit = {}) {
+        if (uiState.isSigningIn) return
+        val user = AuthenticatedUser(identity.userId, identity.externalSubjectId, identity.email, identity.displayName)
+        applySignedInUser(user, identity.email)
+        onSuccess()
+    }
+
+    private fun applySignedInUser(user: AuthenticatedUser, emailOverride: String?) {
+        AuthSession.currentUserId = user.userId
+        uiState = uiState.copy(
+            isSigningIn = false,
+            userId = user.userId,
+            email = emailOverride?.trim()?.takeIf { it.isNotBlank() } ?: user.emailAccount,
+            displayName = user.displayName,
+            preferredName = user.displayName,
+            activeRole = null
+        )
+        // UserProfile has a foreign key onto user_account(userId) - the account row must exist in
+        // Room before refreshUserProfile's cache write can succeed, so upsert it first, on the
+        // same background thread, before triggering the profile fetch.
+        ioExecutor.execute {
+            appDatabase.userAccountDao().upsert(
+                UserAccount(user.userId, user.externalSubjectId, user.emailAccount, "ACTIVE", System.currentTimeMillis())
+            )
+            userRepository.refreshUserProfile(user.userId)
+        }
     }
 
     fun selectRole(role: SessionRole) {
