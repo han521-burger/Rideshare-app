@@ -31,8 +31,8 @@ public interface RideApiService {
     void fetchTripHistory(Callback<List<RideOffer>> callback);
 
     void requestSeat(String rideId, int seatsRequested, Callback<SeatRequest> callback);
-    void fetchRequestsForMyRides(Callback<List<SeatRequest>> callback);
-    void fetchMyRequests(Callback<List<SeatRequest>> callback);
+    void fetchRequestsForMyRides(Callback<List<RequestWithRide>> callback);
+    void fetchMyRequests(Callback<List<RequestWithRide>> callback);
     void respondToRequest(String requestId, String newStatus, Callback<SeatRequest> callback);
 
     void fetchMessages(String rideId, Callback<List<Message>> callback);

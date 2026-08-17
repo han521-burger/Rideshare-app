@@ -85,7 +85,8 @@ data class RideRequestDto(
     val seatsRequested: Int,
     val status: String,
     val createdAt: Long,
-    val respondedAt: Long?
+    val respondedAt: Long?,
+    val ride: RideDto? = null
 )
 
 data class CreateSeatRequestBody(val seatsRequested: Int)

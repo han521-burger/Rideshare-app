@@ -20,14 +20,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.ds04_monash_rideshare_application.Database.Passenger.SeatRequest
+import com.example.ds04_monash_rideshare_application.Repository.Remote.RequestWithRide
 import com.example.ds04_monash_rideshare_application.core.state.Resource
 import com.example.ds04_monash_rideshare_application.core.ui.RideshareScaffold
+import com.example.ds04_monash_rideshare_application.ui.describeLocation
+import java.text.SimpleDateFormat
+import java.util.Locale
 
 // Driver view: every PENDING request across all of their rides, with accept/reject (item 6/7).
 @Composable
 fun RideRequestsScreen(
-    requests: Resource<List<SeatRequest>>,
+    requests: Resource<List<RequestWithRide>>,
     onRespond: (requestId: String, newStatus: String) -> Unit,
     onRefresh: () -> Unit,
     onNavigateBack: () -> Unit,
@@ -55,7 +58,7 @@ fun RideRequestsScreen(
             )
 
             requests.data != null -> {
-                val pending = requests.data.filter { it.status == "PENDING" }
+                val pending = requests.data.filter { it.request.status == "PENDING" }
                 if (pending.isEmpty()) {
                     Text(
                         "No pending requests right now.",
@@ -67,8 +70,8 @@ fun RideRequestsScreen(
                         contentPadding = PaddingValues(16.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        items(pending, key = { it.requestId }) { request ->
-                            RequestCard(request, onRespond)
+                        items(pending, key = { it.request.requestId }) { requestWithRide ->
+                            RequestCard(requestWithRide, onRespond)
                         }
                     }
                 }
@@ -78,7 +81,9 @@ fun RideRequestsScreen(
 }
 
 @Composable
-private fun RequestCard(request: SeatRequest, onRespond: (String, String) -> Unit) {
+private fun RequestCard(requestWithRide: RequestWithRide, onRespond: (String, String) -> Unit) {
+    val request = requestWithRide.request
+    val ride = requestWithRide.ride
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
@@ -86,7 +91,16 @@ private fun RequestCard(request: SeatRequest, onRespond: (String, String) -> Uni
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
-            Text("Ride: ${request.rideId}", style = MaterialTheme.typography.bodySmall)
+            if (ride != null) {
+                Text(
+                    SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault()).format(ride.departureTime),
+                    style = MaterialTheme.typography.bodyMedium
+                )
+                Text(
+                    "${describeLocation(ride.originLat, ride.originLng)} -> ${describeLocation(ride.destinationLat, ride.destinationLng)}",
+                    style = MaterialTheme.typography.bodySmall
+                )
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Button(onClick = { onRespond(request.requestId, "ACCEPTED") }) { Text("Accept") }
                 OutlinedButton(onClick = { onRespond(request.requestId, "REJECTED") }) { Text("Reject") }

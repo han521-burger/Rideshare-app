@@ -233,8 +233,8 @@ fun RideshareNavHost(
             onRespond = { requestId, status ->
                 if (status == "ACCEPTED") {
                     viewModel.incomingRequests.data
-                        ?.firstOrNull { it.requestId == requestId }
-                        ?.let { viewModel.selectedRideId = it.rideId }
+                        ?.firstOrNull { it.request.requestId == requestId }
+                        ?.let { viewModel.selectedRideId = it.request.rideId }
                 }
                 viewModel.respondToRequest(requestId, status)
             },

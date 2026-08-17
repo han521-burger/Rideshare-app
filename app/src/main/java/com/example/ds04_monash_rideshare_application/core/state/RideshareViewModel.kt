@@ -19,6 +19,7 @@ import com.example.ds04_monash_rideshare_application.Repository.RideRepository
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateRideDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.DashboardSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RankedRide
+import com.example.ds04_monash_rideshare_application.Repository.Remote.RequestWithRide
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideApiService
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideApiServiceImpl
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSearchCriteria
@@ -75,9 +76,9 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
         private set
     var driverRides by mutableStateOf(Resource<List<RideOffer>>())
         private set
-    var incomingRequests by mutableStateOf(Resource<List<SeatRequest>>())
+    var incomingRequests by mutableStateOf(Resource<List<RequestWithRide>>())
         private set
-    var myRequests by mutableStateOf(Resource<List<SeatRequest>>())
+    var myRequests by mutableStateOf(Resource<List<RequestWithRide>>())
         private set
     var messages by mutableStateOf(Resource<List<Message>>())
         private set
@@ -258,8 +259,8 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun loadIncomingRequests() {
         incomingRequests = Resource(isLoading = true)
-        apiService.fetchRequestsForMyRides(object : RideApiService.Callback<List<SeatRequest>> {
-            override fun onSuccess(result: List<SeatRequest>) {
+        apiService.fetchRequestsForMyRides(object : RideApiService.Callback<List<RequestWithRide>> {
+            override fun onSuccess(result: List<RequestWithRide>) {
                 incomingRequests = Resource(data = result)
             }
 
@@ -271,8 +272,8 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun loadMyRequests() {
         myRequests = Resource(isLoading = true)
-        apiService.fetchMyRequests(object : RideApiService.Callback<List<SeatRequest>> {
-            override fun onSuccess(result: List<SeatRequest>) {
+        apiService.fetchMyRequests(object : RideApiService.Callback<List<RequestWithRide>> {
+            override fun onSuccess(result: List<RequestWithRide>) {
                 myRequests = Resource(data = result)
             }
 

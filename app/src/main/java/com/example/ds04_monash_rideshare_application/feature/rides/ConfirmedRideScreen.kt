@@ -21,6 +21,7 @@ import com.example.ds04_monash_rideshare_application.core.state.Resource
 import com.example.ds04_monash_rideshare_application.core.ui.RideshareScaffold
 import com.example.ds04_monash_rideshare_application.core.ui.RouteMiniMap
 import com.example.ds04_monash_rideshare_application.ui.describeLocation
+import com.example.ds04_monash_rideshare_application.ui.rideStatusLabel
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -65,7 +66,7 @@ fun ConfirmedRideScreen(
                         style = MaterialTheme.typography.headlineSmall,
                         fontWeight = FontWeight.Bold
                     )
-                    Text("Status: ${ride.status}", style = MaterialTheme.typography.bodyLarge)
+                    Text("Status: ${rideStatusLabel(ride.status)}", style = MaterialTheme.typography.bodyLarge)
                     Text(
                         "From ${describeLocation(ride.originLat, ride.originLng)} to ${describeLocation(ride.destinationLat, ride.destinationLng)}",
                         style = MaterialTheme.typography.bodyMedium

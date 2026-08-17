@@ -119,12 +119,12 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         api.requestSeat(rideId, CreateSeatRequestBody(seatsRequested)).dispatch(callback, ::toSeatRequest)
     }
 
-    override fun fetchRequestsForMyRides(callback: RideApiService.Callback<List<SeatRequest>>) {
-        api.getRequestsForMyRides().dispatch(callback) { it.map(::toSeatRequest) }
+    override fun fetchRequestsForMyRides(callback: RideApiService.Callback<List<RequestWithRide>>) {
+        api.getRequestsForMyRides().dispatch(callback) { it.map(::toRequestWithRide) }
     }
 
-    override fun fetchMyRequests(callback: RideApiService.Callback<List<SeatRequest>>) {
-        api.getMyRequests().dispatch(callback) { it.map(::toSeatRequest) }
+    override fun fetchMyRequests(callback: RideApiService.Callback<List<RequestWithRide>>) {
+        api.getMyRequests().dispatch(callback) { it.map(::toRequestWithRide) }
     }
 
     override fun respondToRequest(requestId: String, newStatus: String, callback: RideApiService.Callback<SeatRequest>) {
@@ -173,6 +173,8 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
     private fun toSeatRequest(dto: RideRequestDto) = SeatRequest(
         dto.requestId, dto.rideId, dto.passengerId, dto.seatsRequested, dto.status, dto.createdAt
     )
+
+    private fun toRequestWithRide(dto: RideRequestDto) = RequestWithRide(toSeatRequest(dto), dto.ride?.let(::toRideOffer))
 
     private fun toMessage(dto: MessageDto) = Message(
         dto.messageId, dto.rideId, dto.senderId, dto.body, dto.sentAt, "SENT"

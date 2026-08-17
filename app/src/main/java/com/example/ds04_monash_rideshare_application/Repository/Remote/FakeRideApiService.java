@@ -69,12 +69,12 @@ public class FakeRideApiService implements RideApiService {
     }
 
     @Override
-    public void fetchRequestsForMyRides(Callback<List<SeatRequest>> callback) {
+    public void fetchRequestsForMyRides(Callback<List<RequestWithRide>> callback) {
         callback.onSuccess(Collections.emptyList());
     }
 
     @Override
-    public void fetchMyRequests(Callback<List<SeatRequest>> callback) {
+    public void fetchMyRequests(Callback<List<RequestWithRide>> callback) {
         callback.onSuccess(Collections.emptyList());
     }
 

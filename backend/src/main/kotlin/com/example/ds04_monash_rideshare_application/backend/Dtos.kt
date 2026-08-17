@@ -104,7 +104,10 @@ data class RideRequestDto(
     val seatsRequested: Int,
     val status: String,
     val createdAt: Long,
-    val respondedAt: Long? = null
+    val respondedAt: Long? = null,
+    // Populated by GET /requests and /requests/mine so callers don't have to look the ride up
+    // separately just to show a date/place instead of a bare ride ID.
+    val ride: RideDto? = null
 )
 
 @Serializable

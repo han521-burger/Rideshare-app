@@ -75,10 +75,14 @@ fun Route.rideRequestRoutes() {
         val driverId = call.requireUserId()
         val rideIdFilter = call.request.queryParameters["rideId"]
         val requests = transaction {
-            val ownRideIds = Rides.selectAll().where { Rides.driverId eq driverId }.map { it[Rides.rideId] }.toSet()
+            val ownRides = Rides.selectAll().where { Rides.driverId eq driverId }.associateBy { it[Rides.rideId] }
             RideRequests.selectAll()
-                .map { it.toRideRequestDto() }
-                .filter { it.rideId in ownRideIds && (rideIdFilter == null || it.rideId == rideIdFilter) }
+                .mapNotNull { row ->
+                    val rideId = row[RideRequests.rideId]
+                    val ride = ownRides[rideId] ?: return@mapNotNull null
+                    if (rideIdFilter != null && rideId != rideIdFilter) return@mapNotNull null
+                    row.toRideRequestDto().copy(ride = ride.toRideDto())
+                }
         }
         call.respond(requests)
     }
@@ -87,7 +91,14 @@ fun Route.rideRequestRoutes() {
     get("/requests/mine") {
         val passengerId = call.requireUserId()
         val requests = transaction {
-            RideRequests.selectAll().where { RideRequests.passengerId eq passengerId }.map { it.toRideRequestDto() }
+            val rows = RideRequests.selectAll().where { RideRequests.passengerId eq passengerId }.toList()
+            val rideIds = rows.map { it[RideRequests.rideId] }.toSet()
+            val ridesById = if (rideIds.isEmpty()) emptyMap() else {
+                Rides.selectAll().where { Rides.rideId inList rideIds }.associateBy { it[Rides.rideId] }
+            }
+            rows.map { row ->
+                row.toRideRequestDto().copy(ride = ridesById[row[RideRequests.rideId]]?.toRideDto())
+            }
         }
         call.respond(requests)
     }
