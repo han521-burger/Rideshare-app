@@ -266,6 +266,10 @@ fun RideshareNavHost(
 
         AppDestination.TripHistory -> TripHistoryScreen(
             trips = viewModel.tripHistory,
+            onOpenRide = { rideId ->
+                viewModel.selectedRideId = rideId
+                navigate(AppDestination.RideDetails)
+            },
             onRefresh = viewModel::loadTripHistory,
             onNavigateBack = ::navigateUp,
             modifier = modifier

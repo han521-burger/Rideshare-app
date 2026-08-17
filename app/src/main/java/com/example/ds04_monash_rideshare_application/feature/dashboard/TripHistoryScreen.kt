@@ -20,12 +20,14 @@ import androidx.compose.ui.unit.dp
 import com.example.ds04_monash_rideshare_application.Database.RideShare.RideOffer
 import com.example.ds04_monash_rideshare_application.core.state.Resource
 import com.example.ds04_monash_rideshare_application.core.ui.RideshareScaffold
+import com.example.ds04_monash_rideshare_application.ui.describeLocation
 import java.text.SimpleDateFormat
 import java.util.Locale
 
 @Composable
 fun TripHistoryScreen(
     trips: Resource<List<RideOffer>>,
+    onOpenRide: (String) -> Unit,
     onRefresh: () -> Unit,
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier
@@ -65,14 +67,17 @@ fun TripHistoryScreen(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         items(list, key = { it.rideId }) { ride ->
-                            Card(modifier = Modifier.fillMaxWidth()) {
+                            Card(onClick = { onOpenRide(ride.rideId) }, modifier = Modifier.fillMaxWidth()) {
                                 Column(modifier = Modifier.padding(16.dp)) {
                                     Text(
                                         SimpleDateFormat("EEE d MMM yyyy, HH:mm", Locale.getDefault()).format(ride.departureTime),
                                         style = MaterialTheme.typography.titleMedium,
                                         fontWeight = FontWeight.SemiBold
                                     )
-                                    Text("Completed", style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        "${describeLocation(ride.originLat, ride.originLng)} -> ${describeLocation(ride.destinationLat, ride.destinationLng)}",
+                                        style = MaterialTheme.typography.bodyMedium
+                                    )
                                 }
                             }
                         }
