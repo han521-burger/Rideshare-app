@@ -41,6 +41,7 @@ import com.yandex.mapkit.geometry.Point
 import com.yandex.mapkit.map.CameraPosition
 import com.yandex.mapkit.map.InputListener
 import com.yandex.mapkit.map.PlacemarkMapObject
+import com.yandex.mapkit.map.PolylineMapObject
 import com.yandex.mapkit.map.Map as YandexMap
 import com.yandex.mapkit.mapview.MapView
 import kotlinx.coroutines.delay
@@ -92,6 +93,7 @@ fun MapScreen(
 
     var originMarker by remember { mutableStateOf<PlacemarkMapObject?>(null) }
     var destinationMarker by remember { mutableStateOf<PlacemarkMapObject?>(null) }
+    var routeLine by remember { mutableStateOf<PolylineMapObject?>(null) }
     var drivingSession by remember { mutableStateOf<DrivingSession?>(null) }
     var pendingRequestId by remember { mutableStateOf(0) }
 
@@ -100,8 +102,10 @@ fun MapScreen(
         drivingSession = null
         originMarker?.let { mapView.map.mapObjects.remove(it) }
         destinationMarker?.let { mapView.map.mapObjects.remove(it) }
+        routeLine?.let { mapView.map.mapObjects.remove(it) }
         originMarker = null
         destinationMarker = null
+        routeLine = null
         originPoint = null
         destinationPoint = null
         routeResult = null
@@ -128,6 +132,9 @@ fun MapScreen(
                         statusMessage = "No route found between these points"
                         return
                     }
+                    routeLine?.let { mapView.map.mapObjects.remove(it) }
+                    routeLine = mapView.map.mapObjects.addPolyline(route.geometry)
+
                     val weight = route.metadata.weight
                     val distanceMeters = weight.distance.value
                     val durationSeconds = weight.time.value.toLong()
@@ -139,7 +146,7 @@ fun MapScreen(
                         distanceMeters = distanceMeters,
                         estimatedDurationSeconds = durationSeconds
                     )
-                    statusMessage = "Distance: %.1f km · Duration: %d min (tap to start over)".format(
+                    statusMessage = "%.1f km, %d min by road (Yandex driving directions - tap to start over)".format(
                         distanceMeters / 1000.0,
                         durationSeconds / 60
                     )
