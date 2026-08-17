@@ -13,8 +13,11 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -90,6 +93,8 @@ fun LoginScreen(
             .fillMaxSize()
             .background(PageBackground)
             .imePadding()
+            .statusBarsPadding()
+            .navigationBarsPadding()
             .verticalScroll(rememberScrollState())
     ) {
         ConnectionHeader()
@@ -279,7 +284,7 @@ private fun MonashLogo() {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .height(120.dp)
+            .height(84.dp)
             .background(Color.White)
             .padding(horizontal = 32.dp),
         contentAlignment = Alignment.Center
@@ -288,9 +293,8 @@ private fun MonashLogo() {
             painter = painterResource(R.drawable.monash_logo),
             contentDescription = "Monash University",
             modifier = Modifier
-                .widthIn(max = 440.dp)
-                .fillMaxWidth()
-                .height(82.dp),
+                .width(170.dp)
+                .height(58.dp),
             contentScale = ContentScale.Crop
         )
     }
