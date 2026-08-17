@@ -25,7 +25,10 @@ data class UserSummaryDto(
     val userId: String,
     val displayName: String,
     val photoRef: String? = null,
-    val phoneNumber: String? = null
+    val phoneNumber: String? = null,
+    // Aggregated from Ratings where this user is the ratedUserId - null/0 if they have none yet.
+    val averageRating: Double? = null,
+    val ratingCount: Int = 0
 )
 
 @Serializable
@@ -143,17 +146,31 @@ data class MatchScoreDto(
 @Serializable
 data class RideRequestDto(
     val requestId: String,
-    val rideId: String,
+    // Null until a driver is attached - see RideRequests.rideId in Tables.kt.
+    val rideId: String? = null,
     val passengerId: String,
     val seatsRequested: Int,
     val status: String,
     val note: String? = null,
     val createdAt: Long,
     val respondedAt: Long? = null,
+    // Only meaningful while rideId is null - the passenger's own desired route/time for a
+    // standalone request (see POST /requests).
+    val originLat: Double? = null,
+    val originLng: Double? = null,
+    val destinationLat: Double? = null,
+    val destinationLng: Double? = null,
+    val isAsap: Boolean = false,
+    val desiredDepartureTime: Long? = null,
+    val repeatDaysOfWeek: List<Int> = emptyList(),
+    val repeatWeeks: Int? = null,
     // Populated by GET /requests and /requests/mine so callers don't have to look the ride up
     // separately just to show a date/place instead of a bare ride ID.
     val ride: RideDto? = null,
-    val passenger: UserSummaryDto? = null
+    val passenger: UserSummaryDto? = null,
+    // Advisory match score against the caller's own rides - only populated by GET /requests for
+    // a standalone (rideId == null) request, the same way RideDto.matchScore works for /rides/match.
+    val matchScore: MatchScoreDto? = null
 )
 
 @Serializable
@@ -165,9 +182,31 @@ data class CreateRideRequestBody(
     val applyToRecurringGroup: Boolean = false
 )
 
+// A passenger's standalone ask - route + time with no driver picked yet. A driver later accepts
+// it by supplying targetRideId on PUT /requests/{id} (see UpdateRideRequestStatusBody).
+@Serializable
+data class CreateStandaloneRequestBody(
+    val originLat: Double,
+    val originLng: Double,
+    val destinationLat: Double,
+    val destinationLng: Double,
+    val isAsap: Boolean = false,
+    val desiredDepartureTime: Long? = null,
+    val seatsRequested: Int = 1,
+    val note: String? = null,
+    val repeatDaysOfWeek: List<Int> = emptyList(),
+    val repeatWeeks: Int? = null
+)
+
 @Serializable
 data class UpdateRideRequestStatusBody(
-    val status: String
+    val status: String,
+    // For accepting (status=ACCEPTED) a request that has no rideId yet, one of two ways to
+    // resolve which ride it attaches to: targetRideId picks an existing open ride of the
+    // driver's; newRideSeatsTotal instead creates a brand new ride from the request's own
+    // route/time, so a driver doesn't need to have already posted a matching ride to accept.
+    val targetRideId: String? = null,
+    val newRideSeatsTotal: Int? = null
 )
 
 @Serializable

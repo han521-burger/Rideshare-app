@@ -59,7 +59,6 @@ fun RideDetailScreen(
     emergencyContactPhone: String?,
     onRequestSeat: () -> Unit,
     onCancelMyRequest: (requestId: String) -> Unit,
-    onRespondToRequest: (requestId: String, status: String) -> Unit,
     onSetEnRoute: (Boolean) -> Unit,
     onCancelRide: () -> Unit,
     onOpenChat: () -> Unit,
@@ -137,9 +136,6 @@ fun RideDetailScreen(
                             PassengerRequestCard(
                                 request = request,
                                 rideCompleted = ride.status == RideStatus.COMPLETED,
-                                isActionInFlight = isActionInFlight,
-                                onAccept = { onRespondToRequest(request.requestId, RequestStatus.ACCEPTED) },
-                                onReject = { onRespondToRequest(request.requestId, RequestStatus.REJECTED) },
                                 onRate = {
                                     val name = request.passenger?.displayName ?: "this passenger"
                                     ratingTarget = request.passengerId to name
@@ -157,7 +153,12 @@ fun RideDetailScreen(
                         item { DriverInfoCard(ride) }
 
                         when {
-                            myRequestForRide == null && ride.status == RideStatus.OPEN -> item {
+                            // Joining is instant now (no driver approval step) - so a ride stays
+                            // joinable while it has room left, even after it's flipped to
+                            // CONFIRMED by someone else's join.
+                            myRequestForRide == null &&
+                                ride.seatsAvailable > 0 &&
+                                (ride.status == RideStatus.OPEN || ride.status == RideStatus.CONFIRMED) -> item {
                                 Button(onClick = onRequestSeat, modifier = Modifier.fillMaxWidth()) {
                                     Text("Request a seat")
                                 }
@@ -246,6 +247,11 @@ private fun DriverInfoCard(ride: RideSummary) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Driver", style = MaterialTheme.typography.labelLarge)
             Text(ride.driver?.displayName ?: ride.driverId, fontWeight = FontWeight.SemiBold)
+            val driver = ride.driver
+            val averageRating = driver?.averageRating
+            if (driver != null && averageRating != null) {
+                Text("%.1f / 5 (${driver.ratingCount} rating(s))".format(averageRating), color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
             ride.vehicle?.let { vehicle ->
                 Text("${vehicle.make} ${vehicle.model}${vehicle.variant?.let { " ($it)" } ?: ""}")
                 vehicle.registrationMasked?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -278,13 +284,13 @@ private fun DriverEnRouteCard(enRoute: Boolean, enabled: Boolean, onToggle: (Boo
     }
 }
 
+// Requesting a seat on an already-posted ride is instant now (no driver approval step - see
+// docs on POST /rides/{rideId}/requests), so a request landing here is always already ACCEPTED
+// (or later CANCELLED/COMPLETED) - there's nothing left for the driver to decide.
 @Composable
 private fun PassengerRequestCard(
     request: RideRequestSummary,
     rideCompleted: Boolean,
-    isActionInFlight: Boolean,
-    onAccept: () -> Unit,
-    onReject: () -> Unit,
     onRate: () -> Unit
 ) {
     Card(modifier = Modifier.fillMaxWidth()) {
@@ -293,17 +299,8 @@ private fun PassengerRequestCard(
             Text("${request.seatsRequested} seat(s) · ${requestStatusLabel(request.status)}")
             request.note?.takeIf { it.isNotBlank() }?.let { Text("Note: $it") }
 
-            when {
-                request.status == RequestStatus.PENDING -> Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(top = 8.dp)
-                ) {
-                    Button(onClick = onAccept, enabled = !isActionInFlight) { Text("Accept") }
-                    OutlinedButton(onClick = onReject, enabled = !isActionInFlight) { Text("Decline") }
-                }
-                request.status == RequestStatus.ACCEPTED && rideCompleted -> TextButton(
-                    onClick = onRate, modifier = Modifier.padding(top = 4.dp)
-                ) { Text("Rate this passenger") }
+            if (request.status == RequestStatus.ACCEPTED && rideCompleted) {
+                TextButton(onClick = onRate, modifier = Modifier.padding(top = 4.dp)) { Text("Rate this passenger") }
             }
         }
     }
@@ -323,17 +320,18 @@ private fun MyRequestCard(
             request.note?.takeIf { it.isNotBlank() }?.let { Text("Your note: $it") }
 
             when (request.status) {
-                RequestStatus.PENDING -> OutlinedButton(
-                    onClick = onCancel,
-                    enabled = !isActionInFlight,
-                    modifier = Modifier.padding(top = 8.dp)
-                ) { Text("Cancel request") }
-
-                RequestStatus.ACCEPTED -> Text(
-                    "You're in! Message your driver or share your trip below.",
-                    modifier = Modifier.padding(top = 4.dp),
-                    color = MaterialTheme.colorScheme.primary
-                )
+                RequestStatus.ACCEPTED -> {
+                    Text(
+                        "You're in! Message your driver or share your trip below.",
+                        modifier = Modifier.padding(top = 4.dp),
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                    OutlinedButton(
+                        onClick = onCancel,
+                        enabled = !isActionInFlight,
+                        modifier = Modifier.padding(top = 8.dp)
+                    ) { Text("Cancel my seat") }
+                }
 
                 RequestStatus.COMPLETED -> TextButton(onClick = onRate, modifier = Modifier.padding(top = 4.dp)) {
                     Text("Rate your driver")

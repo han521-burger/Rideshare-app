@@ -55,6 +55,9 @@ interface BackendApi {
     @POST("rides/{rideId}/requests")
     fun requestSeat(@Path("rideId") rideId: String, @Body body: CreateSeatRequestBody): Call<List<RideRequestDto>>
 
+    @POST("requests")
+    fun createStandaloneRequest(@Body body: CreateStandaloneRequestBody): Call<RideRequestDto>
+
     @GET("requests")
     fun getRequestsForMyRides(): Call<List<RideRequestDto>>
 

@@ -6,6 +6,7 @@ import com.example.ds04_monash_rideshare_application.backend.CreateStopInput
 import com.example.ds04_monash_rideshare_application.backend.ForbiddenException
 import com.example.ds04_monash_rideshare_application.backend.MatchSearchResponse
 import com.example.ds04_monash_rideshare_application.backend.NotFoundException
+import com.example.ds04_monash_rideshare_application.backend.Ratings
 import com.example.ds04_monash_rideshare_application.backend.RideDto
 import com.example.ds04_monash_rideshare_application.backend.RideRequestStatus
 import com.example.ds04_monash_rideshare_application.backend.RideRequests
@@ -57,13 +58,20 @@ fun Route.rideRoutes() {
         val destinationLng = call.request.queryParameters["destinationLng"]?.toDoubleOrNull()
         val radiusMeters = call.request.queryParameters["radiusMeters"]?.toDoubleOrNull() ?: 5_000.0
 
-        val rides = transaction {
-            val rows = Rides.selectAll().where { Rides.status eq RideStatus.OPEN }.toList()
-            enrichRideDtos(rows)
-        }.filter { ride ->
+        val (rides, alreadyRequestedRideIds) = transaction {
+            // CONFIRMED (not just OPEN) too - joining is instant now (see RideRequestRoutes.kt's
+            // POST /rides/{rideId}/requests), so a ride flips to CONFIRMED as soon as its first
+            // seat is taken but should keep showing here for everyone else while seats remain.
+            val rows = Rides.selectAll().where { Rides.status inList listOf(RideStatus.OPEN, RideStatus.CONFIRMED) }.toList()
+            enrichRideDtos(rows) to callerActiveRequestedRideIds(callerId)
+        }
+        val filtered = rides.filter { ride ->
             // A ride you drive isn't a ride you can join - exclude it from browse/search rather
             // than showing it and relying on the passenger-request endpoint's rejection.
             if (ride.driverId == callerId) return@filter false
+            // Already requested (pending or accepted) - joining shouldn't leave the ride sitting
+            // in your own browse list, even though it correctly still shows for everyone else.
+            if (ride.rideId in alreadyRequestedRideIds) return@filter false
             if (availableOnly && ride.seatsAvailable <= 0) return@filter false
             if (dateParam != null && !isSameCalendarDay(ride.departureTime, dateParam)) return@filter false
             if (originLat != null && originLng != null) {
@@ -76,7 +84,7 @@ fun Route.rideRoutes() {
             }
             true
         }
-        call.respond(rides)
+        call.respond(filtered)
     }
 
     // GET /rides/match - ranked search using the weighted matching pipeline (FR-04).
@@ -97,8 +105,9 @@ fun Route.rideRoutes() {
         val criteria = SearchCriteria(originLat, originLng, destinationLat, destinationLng, departureTime, seatsNeeded)
 
         val (candidates, ridesByRideId) = transaction {
-            val rows = Rides.selectAll().where { Rides.status eq RideStatus.OPEN }
-                .filter { it[Rides.driverId] != callerId }
+            val alreadyRequestedRideIds = callerActiveRequestedRideIds(callerId)
+            val rows = Rides.selectAll().where { Rides.status inList listOf(RideStatus.OPEN, RideStatus.CONFIRMED) }
+                .filter { it[Rides.driverId] != callerId && it[Rides.rideId] !in alreadyRequestedRideIds }
             val candidates = rows.map {
                 RideCandidate(
                     rideId = it[Rides.rideId],
@@ -247,16 +256,36 @@ fun Route.rideRoutes() {
     }
 }
 
-// Batch-loads driver/vehicle/stops for a set of ride rows so listing endpoints don't do an N+1
-// query per ride. Must be called from inside an already-open transaction.
+// Ride IDs the caller already has a live (non-rejected/cancelled) request against - used to keep
+// a ride you've already joined (or are waiting on) out of your own browse/search results, while
+// it correctly keeps showing for everyone else. Must be called from inside an already-open
+// transaction.
+internal fun callerActiveRequestedRideIds(callerId: String): Set<String> =
+    RideRequests.selectAll()
+        .where {
+            (RideRequests.passengerId eq callerId) and
+                (RideRequests.status inList listOf(RideRequestStatus.PENDING, RideRequestStatus.ACCEPTED))
+        }
+        .mapNotNull { it[RideRequests.rideId] }
+        .toSet()
+
+// Batch-loads driver/vehicle/stops/driver-rating for a set of ride rows so listing endpoints
+// don't do an N+1 query per ride. Must be called from inside an already-open transaction.
 internal fun enrichRideDtos(rows: List<ResultRow>): List<RideDto> {
     if (rows.isEmpty()) return emptyList()
     val driverIds = rows.map { it[Rides.driverId] }.toSet()
     val vehicleIds = rows.mapNotNull { it[Rides.vehicleId] }.toSet()
     val rideIds = rows.map { it[Rides.rideId] }.toSet()
 
+    val ratingsByDriver = Ratings.selectAll().where { Ratings.ratedUserId inList driverIds }
+        .groupBy { it[Ratings.ratedUserId] }
+        .mapValues { (_, ratingRows) -> ratingRows.map { it[Ratings.stars] }.average() to ratingRows.size }
+
     val driversById = Users.selectAll().where { Users.userId inList driverIds }
-        .associate { it[Users.userId] to it.toUserSummaryDto() }
+        .associate { row ->
+            val (average, count) = ratingsByDriver[row[Users.userId]] ?: (null to 0)
+            row[Users.userId] to row.toUserSummaryDto(averageRating = average, ratingCount = count)
+        }
     val vehiclesById = if (vehicleIds.isEmpty()) emptyMap() else {
         Vehicles.selectAll().where { Vehicles.vehicleId inList vehicleIds }
             .associate { it[Vehicles.vehicleId] to it.toVehicleDto() }

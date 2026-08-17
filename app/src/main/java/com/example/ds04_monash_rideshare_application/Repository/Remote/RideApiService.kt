@@ -35,9 +35,16 @@ interface RideApiService {
         applyToRecurringGroup: Boolean,
         callback: Callback<List<RideRequestSummary>>
     )
+    fun createStandaloneRequest(draft: StandaloneRequestDraft, callback: Callback<RideRequestSummary>)
     fun fetchIncomingRequests(callback: Callback<List<RideRequestSummary>>)
     fun fetchMyRequests(callback: Callback<List<RideRequestSummary>>)
-    fun respondToRequest(requestId: String, newStatus: String, callback: Callback<RideRequestSummary>)
+    fun respondToRequest(
+        requestId: String,
+        newStatus: String,
+        targetRideId: String?,
+        newRideSeatsTotal: Int?,
+        callback: Callback<RideRequestSummary>
+    )
 
     fun fetchMessages(rideId: String, callback: Callback<List<MessageSummary>>)
     fun sendMessage(rideId: String, body: String, callback: Callback<MessageSummary>)

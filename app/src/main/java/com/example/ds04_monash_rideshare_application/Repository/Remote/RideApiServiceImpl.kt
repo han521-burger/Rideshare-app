@@ -126,6 +126,17 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
             .dispatch(callback) { it.map(::toRideRequestSummary) }
     }
 
+    override fun createStandaloneRequest(draft: StandaloneRequestDraft, callback: RideApiService.Callback<RideRequestSummary>) {
+        val body = CreateStandaloneRequestBody(
+            originLat = draft.originLat, originLng = draft.originLng,
+            destinationLat = draft.destinationLat, destinationLng = draft.destinationLng,
+            isAsap = draft.isAsap, desiredDepartureTime = draft.desiredDepartureTime,
+            seatsRequested = draft.seatsRequested, note = draft.note,
+            repeatDaysOfWeek = draft.repeatDaysOfWeek, repeatWeeks = draft.repeatWeeks
+        )
+        api.createStandaloneRequest(body).dispatch(callback, ::toRideRequestSummary)
+    }
+
     override fun fetchIncomingRequests(callback: RideApiService.Callback<List<RideRequestSummary>>) {
         api.getRequestsForMyRides().dispatch(callback) { it.map(::toRideRequestSummary) }
     }
@@ -134,8 +145,15 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         api.getMyRequests().dispatch(callback) { it.map(::toRideRequestSummary) }
     }
 
-    override fun respondToRequest(requestId: String, newStatus: String, callback: RideApiService.Callback<RideRequestSummary>) {
-        api.updateRequestStatus(requestId, UpdateRequestStatusBody(newStatus)).dispatch(callback, ::toRideRequestSummary)
+    override fun respondToRequest(
+        requestId: String,
+        newStatus: String,
+        targetRideId: String?,
+        newRideSeatsTotal: Int?,
+        callback: RideApiService.Callback<RideRequestSummary>
+    ) {
+        api.updateRequestStatus(requestId, UpdateRequestStatusBody(newStatus, targetRideId, newRideSeatsTotal))
+            .dispatch(callback, ::toRideRequestSummary)
     }
 
     override fun fetchMessages(rideId: String, callback: RideApiService.Callback<List<MessageSummary>>) {
@@ -188,7 +206,8 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         emergencyContactPhone = dto.emergencyContactPhone
     )
 
-    private fun toUserSummary(dto: UserSummaryDto) = UserSummary(dto.userId, dto.displayName, dto.photoRef, dto.phoneNumber)
+    private fun toUserSummary(dto: UserSummaryDto) =
+        UserSummary(dto.userId, dto.displayName, dto.photoRef, dto.phoneNumber, dto.averageRating, dto.ratingCount)
 
     private fun toVehicleSummary(dto: VehicleDto) = VehicleSummary(
         dto.vehicleId, dto.make, dto.model, dto.variant, dto.registrationMasked, dto.fuelType, dto.seatCapacity
@@ -229,8 +248,17 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         note = dto.note,
         createdAt = dto.createdAt,
         respondedAt = dto.respondedAt,
+        originLat = dto.originLat,
+        originLng = dto.originLng,
+        destinationLat = dto.destinationLat,
+        destinationLng = dto.destinationLng,
+        isAsap = dto.isAsap,
+        desiredDepartureTime = dto.desiredDepartureTime,
+        repeatDaysOfWeek = dto.repeatDaysOfWeek,
+        repeatWeeks = dto.repeatWeeks,
         ride = dto.ride?.let(::toRideSummary),
-        passenger = dto.passenger?.let(::toUserSummary)
+        passenger = dto.passenger?.let(::toUserSummary),
+        matchScoreTotal = dto.matchScore?.total
     )
 
     private fun toMessageSummary(dto: MessageDto) = MessageSummary(dto.messageId, dto.rideId, dto.senderId, dto.body, dto.sentAt)

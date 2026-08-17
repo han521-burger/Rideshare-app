@@ -37,11 +37,14 @@ fun Route.dashboardRoutes() {
             val driverRows = Rides.selectAll()
                 .where { (Rides.driverId eq userId) and (Rides.status eq RideStatus.COMPLETED) }.toList()
 
+            // rideId is nullable on RideRequests (a still-driverless standalone request), but a
+            // row can only reach ACCEPTED/COMPLETED once a ride's attached - filterNotNull just
+            // keeps that guarantee explicit for the type checker/inList below.
             val passengerRideIds = RideRequests.selectAll()
                 .where {
                     (RideRequests.passengerId eq userId) and
                         ((RideRequests.status eq RideRequestStatus.ACCEPTED) or (RideRequests.status eq RideRequestStatus.COMPLETED))
-                }.map { it[RideRequests.rideId] }.toSet()
+                }.mapNotNull { it[RideRequests.rideId] }.toSet()
 
             val passengerRows = if (passengerRideIds.isEmpty()) emptyList() else {
                 Rides.selectAll()

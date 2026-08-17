@@ -9,7 +9,9 @@ data class UserSummary(
     val userId: String,
     val displayName: String,
     val photoRef: String?,
-    val phoneNumber: String?
+    val phoneNumber: String?,
+    val averageRating: Double?,
+    val ratingCount: Int
 )
 
 data class VehicleSummary(
@@ -71,15 +73,46 @@ data class RideSummary(
 
 data class RideRequestSummary(
     val requestId: String,
-    val rideId: String,
+    // Null until a driver is attached - a standalone request (see StandaloneRequestDraft) starts
+    // with no ride at all.
+    val rideId: String?,
     val passengerId: String,
     val seatsRequested: Int,
     val status: String,
     val note: String?,
     val createdAt: Long,
     val respondedAt: Long?,
+    // Only meaningful while rideId is null - the passenger's own desired route/time.
+    val originLat: Double?,
+    val originLng: Double?,
+    val destinationLat: Double?,
+    val destinationLng: Double?,
+    val isAsap: Boolean,
+    val desiredDepartureTime: Long?,
+    val repeatDaysOfWeek: List<Int>,
+    val repeatWeeks: Int?,
     val ride: RideSummary?,
-    val passenger: UserSummary?
+    val passenger: UserSummary?,
+    // Advisory match score against the viewer's own rides - only populated for a driver viewing
+    // a standalone (rideId == null) request in their incoming list.
+    val matchScoreTotal: Double?
+)
+
+// Everything a passenger fills in on the standalone Request-a-Ride flow - a route + time with no
+// driver picked yet (POST /requests). Distinct from CreateRideDraft (a driver's Offer-a-Ride) and
+// from the seats/note-only request made against an already-picked ride (POST /rides/{id}/requests,
+// still driven by RideApiService.requestSeat).
+data class StandaloneRequestDraft(
+    val originLat: Double,
+    val originLng: Double,
+    val destinationLat: Double,
+    val destinationLng: Double,
+    val isAsap: Boolean,
+    val desiredDepartureTime: Long?,
+    val seatsRequested: Int,
+    val note: String?,
+    val repeatDaysOfWeek: List<Int> = emptyList(),
+    val repeatWeeks: Int? = null
 )
 
 data class MessageSummary(

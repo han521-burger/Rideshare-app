@@ -244,7 +244,7 @@ fun LoginScreen(
                         colors = ButtonDefaults.outlinedButtonColors(contentColor = MonashBlue)
                     ) {
                         Text(
-                            text = "${identity.displayName} (${identity.roleHint})",
+                            text = identity.displayName,
                             fontSize = 16.sp
                         )
                     }

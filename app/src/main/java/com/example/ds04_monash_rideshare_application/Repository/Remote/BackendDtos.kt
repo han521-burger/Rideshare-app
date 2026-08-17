@@ -22,7 +22,9 @@ data class UserSummaryDto(
     val userId: String,
     val displayName: String,
     val photoRef: String? = null,
-    val phoneNumber: String? = null
+    val phoneNumber: String? = null,
+    val averageRating: Double? = null,
+    val ratingCount: Int = 0
 )
 
 data class UpdateProfileRequestBody(
@@ -120,15 +122,24 @@ data class MatchSearchResponse(
 
 data class RideRequestDto(
     val requestId: String,
-    val rideId: String,
+    val rideId: String? = null,
     val passengerId: String,
     val seatsRequested: Int,
     val status: String,
     val note: String? = null,
     val createdAt: Long,
     val respondedAt: Long?,
+    val originLat: Double? = null,
+    val originLng: Double? = null,
+    val destinationLat: Double? = null,
+    val destinationLng: Double? = null,
+    val isAsap: Boolean = false,
+    val desiredDepartureTime: Long? = null,
+    val repeatDaysOfWeek: List<Int> = emptyList(),
+    val repeatWeeks: Int? = null,
     val ride: RideDto? = null,
-    val passenger: UserSummaryDto? = null
+    val passenger: UserSummaryDto? = null,
+    val matchScore: MatchScoreDto? = null
 )
 
 data class CreateSeatRequestBody(
@@ -137,7 +148,20 @@ data class CreateSeatRequestBody(
     val applyToRecurringGroup: Boolean = false
 )
 
-data class UpdateRequestStatusBody(val status: String)
+data class CreateStandaloneRequestBody(
+    val originLat: Double,
+    val originLng: Double,
+    val destinationLat: Double,
+    val destinationLng: Double,
+    val isAsap: Boolean = false,
+    val desiredDepartureTime: Long? = null,
+    val seatsRequested: Int = 1,
+    val note: String? = null,
+    val repeatDaysOfWeek: List<Int> = emptyList(),
+    val repeatWeeks: Int? = null
+)
+
+data class UpdateRequestStatusBody(val status: String, val targetRideId: String? = null, val newRideSeatsTotal: Int? = null)
 
 data class MessageDto(
     val messageId: String,

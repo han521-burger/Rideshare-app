@@ -106,13 +106,31 @@ object RideRequestStatus {
 
 object RideRequests : Table("ride_requests") {
     val requestId = varchar("request_id", 64)
-    val rideId = varchar("ride_id", 64).references(Rides.rideId)
+    // Nullable: a request can exist before any driver is attached (a passenger's standalone
+    // "ask" - see originLat etc. below). Set the moment a driver accepts it, or from creation
+    // when the passenger requested a seat on a specific already-posted ride.
+    val rideId = varchar("ride_id", 64).references(Rides.rideId).nullable()
     val passengerId = varchar("passenger_id", 64).references(Users.userId)
     val seatsRequested = integer("seats_requested")
     val status = varchar("status", 32).default(RideRequestStatus.PENDING)
     // Free text from the passenger, shown to the driver alongside the request (e.g. "near the
     // bike racks, red jacket").
     val note = varchar("note", 500).nullable()
+    // Populated only while rideId is null - the passenger's own desired route/time for a
+    // standalone request, so it has something to show/match against before any ride exists.
+    // Left in place (unused) once a ride is attached, rather than cleared, so the original ask
+    // stays visible on the request's own record.
+    val originLat = double("origin_lat").nullable()
+    val originLng = double("origin_lng").nullable()
+    val destinationLat = double("destination_lat").nullable()
+    val destinationLng = double("destination_lng").nullable()
+    val isAsap = bool("is_asap").default(false)
+    val desiredDepartureTime = long("desired_departure_time").nullable()
+    // "Also wants this on Mon/Wed" - informational only for a standalone request. There's no
+    // scheduler in this trial (see Rides.recurringGroupId), so this isn't exploded into further
+    // requests; a driver just sees it as a note when deciding whether to accept.
+    val repeatDaysOfWeek = varchar("repeat_days_of_week", 32).nullable()
+    val repeatWeeks = integer("repeat_weeks").nullable()
     val createdAt = long("created_at")
     val respondedAt = long("responded_at").nullable()
 

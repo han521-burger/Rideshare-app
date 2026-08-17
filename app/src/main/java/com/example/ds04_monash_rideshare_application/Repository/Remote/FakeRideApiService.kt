@@ -64,6 +64,10 @@ class FakeRideApiService : RideApiService {
         callback.onFailure(unavailable)
     }
 
+    override fun createStandaloneRequest(draft: StandaloneRequestDraft, callback: RideApiService.Callback<RideRequestSummary>) {
+        callback.onFailure(unavailable)
+    }
+
     override fun fetchIncomingRequests(callback: RideApiService.Callback<List<RideRequestSummary>>) {
         callback.onSuccess(emptyList())
     }
@@ -72,7 +76,13 @@ class FakeRideApiService : RideApiService {
         callback.onSuccess(emptyList())
     }
 
-    override fun respondToRequest(requestId: String, newStatus: String, callback: RideApiService.Callback<RideRequestSummary>) {
+    override fun respondToRequest(
+        requestId: String,
+        newStatus: String,
+        targetRideId: String?,
+        newRideSeatsTotal: Int?,
+        callback: RideApiService.Callback<RideRequestSummary>
+    ) {
         callback.onFailure(unavailable)
     }
 

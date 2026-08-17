@@ -12,7 +12,11 @@ sealed class AppDestination(val route: String, val title: String) {
     data object Profile : AppDestination("profile", "Profile")
 
     data object RideDetail : AppDestination("ride-detail", "Ride Detail")
+    data object RequestDetail : AppDestination("request-detail", "Request Detail")
+    // Standalone ask - route + time, no driver picked yet (Search -> When -> Repeat -> Note -> Confirm).
     data object RequestRide : AppDestination("request-ride", "Request a Ride")
+    // Requesting a seat on a ride already picked from Home/browsing (Repeat -> Note/Seats -> Confirm).
+    data object RequestSeat : AppDestination("request-seat", "Request a Seat")
     data object OfferRide : AppDestination("offer-ride", "Offer a Ride")
     data object Messages : AppDestination("messages", "Messages")
     data object Leaderboard : AppDestination("leaderboard", "Leaderboard")
@@ -24,7 +28,7 @@ sealed class AppDestination(val route: String, val title: String) {
         val allDestinations: List<AppDestination>
             get() = listOf(
                 Splash, Login, Home, Requests, Activity, Profile,
-                RideDetail, RequestRide, OfferRide, Messages, Leaderboard
+                RideDetail, RequestDetail, RequestRide, RequestSeat, OfferRide, Messages, Leaderboard
             )
 
         fun fromRoute(route: String?): AppDestination? =

@@ -22,6 +22,7 @@ import com.example.ds04_monash_rideshare_application.Repository.Remote.RideReque
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSearchCriteria
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideStatus
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
+import com.example.ds04_monash_rideshare_application.Repository.Remote.StandaloneRequestDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.UserAccountSummary
 
 enum class AppMode { PASSENGER, DRIVER }
@@ -62,6 +63,7 @@ class RideshareViewModel : ViewModel() {
         private set
 
     var selectedRideId by mutableStateOf<String?>(null)
+    var selectedRequestId by mutableStateOf<String?>(null)
 
     var profileDetails by mutableStateOf(Resource<UserAccountSummary>())
         private set
@@ -317,6 +319,22 @@ class RideshareViewModel : ViewModel() {
         })
     }
 
+    fun createStandaloneRequest(draft: StandaloneRequestDraft, onDone: (Boolean, String?) -> Unit) {
+        actionInFlight = true
+        apiService.createStandaloneRequest(draft, object : RideApiService.Callback<RideRequestSummary> {
+            override fun onSuccess(result: RideRequestSummary) {
+                actionInFlight = false
+                loadMyRequests()
+                onDone(true, null)
+            }
+
+            override fun onFailure(error: Exception) {
+                actionInFlight = false
+                onDone(false, error.message ?: "Couldn't send that request. Please try again.")
+            }
+        })
+    }
+
     fun loadMyRequests() {
         myRequests = Resource(isLoading = true)
         apiService.fetchMyRequests(object : RideApiService.Callback<List<RideRequestSummary>> {
@@ -333,9 +351,15 @@ class RideshareViewModel : ViewModel() {
         })
     }
 
-    fun respondToRequest(requestId: String, newStatus: String, onDone: (Boolean, String?) -> Unit = { _, _ -> }) {
+    fun respondToRequest(
+        requestId: String,
+        newStatus: String,
+        targetRideId: String? = null,
+        newRideSeatsTotal: Int? = null,
+        onDone: (Boolean, String?) -> Unit = { _, _ -> }
+    ) {
         actionInFlight = true
-        apiService.respondToRequest(requestId, newStatus, object : RideApiService.Callback<RideRequestSummary> {
+        apiService.respondToRequest(requestId, newStatus, targetRideId, newRideSeatsTotal, object : RideApiService.Callback<RideRequestSummary> {
             override fun onSuccess(result: RideRequestSummary) {
                 actionInFlight = false
                 loadIncomingRequests()

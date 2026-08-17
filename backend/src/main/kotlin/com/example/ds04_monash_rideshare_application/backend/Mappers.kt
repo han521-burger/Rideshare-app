@@ -17,11 +17,13 @@ fun ResultRow.toUserDto() = UserDto(
     createdAt = this[Users.createdAt]
 )
 
-fun ResultRow.toUserSummaryDto() = UserSummaryDto(
+fun ResultRow.toUserSummaryDto(averageRating: Double? = null, ratingCount: Int = 0) = UserSummaryDto(
     userId = this[Users.userId],
     displayName = this[Users.displayName],
     photoRef = this[Users.photoRef],
-    phoneNumber = this[Users.phoneNumber]
+    phoneNumber = this[Users.phoneNumber],
+    averageRating = averageRating,
+    ratingCount = ratingCount
 )
 
 fun ResultRow.toVehicleDto() = VehicleDto(
@@ -83,7 +85,15 @@ fun ResultRow.toRideRequestDto() = RideRequestDto(
     status = this[RideRequests.status],
     note = this[RideRequests.note],
     createdAt = this[RideRequests.createdAt],
-    respondedAt = this[RideRequests.respondedAt]
+    respondedAt = this[RideRequests.respondedAt],
+    originLat = this[RideRequests.originLat],
+    originLng = this[RideRequests.originLng],
+    destinationLat = this[RideRequests.destinationLat],
+    destinationLng = this[RideRequests.destinationLng],
+    isAsap = this[RideRequests.isAsap],
+    desiredDepartureTime = this[RideRequests.desiredDepartureTime],
+    repeatDaysOfWeek = this[RideRequests.repeatDaysOfWeek]?.split(",")?.mapNotNull { it.toIntOrNull() } ?: emptyList(),
+    repeatWeeks = this[RideRequests.repeatWeeks]
 )
 
 fun ResultRow.toMessageDto() = MessageDto(
