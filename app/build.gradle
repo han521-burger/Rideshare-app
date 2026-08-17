@@ -22,6 +22,10 @@ android {
         versionName "1.0"
 
         buildConfigField "String", "YANDEX_MAPKIT_API_KEY", "\"${localProperties.getProperty('YANDEX_MAPKIT_API_KEY', '')}\""
+        // 10.0.2.2 is the Android emulator's alias for the host machine's localhost, where
+        // `./gradlew :backend:run` listens. Override in local.properties for a physical device
+        // or a hosted backend once the team picks one (docs/BACKEND.md).
+        buildConfigField "String", "BACKEND_BASE_URL", "\"${localProperties.getProperty('BACKEND_BASE_URL', 'http://10.0.2.2:8080/')}\""
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -46,6 +50,9 @@ android {
 }
 
 dependencies {
+    implementation libs.retrofit.core
+    implementation libs.retrofit.converter.gson
+    implementation libs.okhttp.logging.interceptor
     implementation libs.yandex.mapkit
     implementation platform(libs.androidx.compose.bom)
     implementation libs.androidx.activity.compose

@@ -75,14 +75,6 @@ fun PlaceholderScreen(
 }
 
 private fun descriptionFor(destination: AppDestination): String = when (destination) {
-    AppDestination.CreateRide -> "Drivers will publish a route, departure time, vehicle, and available seats here."
-    AppDestination.FindRide -> "Passengers will search for compatible campus rides here."
-    AppDestination.RideDetails -> "Route, driver, timing, seat, and emissions information will appear here."
-    AppDestination.RideRequests -> "Drivers will accept or reject passenger requests here."
-    AppDestination.ConfirmedRide -> "Confirmed journey and meeting-point details will appear here."
-    AppDestination.Messages -> "Messaging will be available after a seat request is accepted."
-    AppDestination.TripHistory -> "Completed and cancelled rides will be listed here."
-    AppDestination.SustainabilityDashboard -> "Shared trips and estimated CO2 savings will be summarised here."
     AppDestination.Settings -> "Notification, privacy, and application preferences will appear here."
     else -> "This screen is part of the planned Monash Rideshare flow."
 }

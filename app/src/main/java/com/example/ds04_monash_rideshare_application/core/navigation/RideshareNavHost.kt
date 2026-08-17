@@ -3,6 +3,7 @@ package com.example.ds04_monash_rideshare_application.core.navigation
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -13,8 +14,16 @@ import com.example.ds04_monash_rideshare_application.core.state.RideshareViewMod
 import com.example.ds04_monash_rideshare_application.core.ui.RideshareScaffold
 import com.example.ds04_monash_rideshare_application.feature.auth.LoginScreen
 import com.example.ds04_monash_rideshare_application.feature.auth.SplashScreen
+import com.example.ds04_monash_rideshare_application.feature.dashboard.SustainabilityDashboardScreen
+import com.example.ds04_monash_rideshare_application.feature.dashboard.TripHistoryScreen
 import com.example.ds04_monash_rideshare_application.feature.home.HomeScreen
+import com.example.ds04_monash_rideshare_application.feature.messages.MessagesScreen
 import com.example.ds04_monash_rideshare_application.feature.profile.ProfileScreen
+import com.example.ds04_monash_rideshare_application.feature.rides.ConfirmedRideScreen
+import com.example.ds04_monash_rideshare_application.feature.rides.CreateRideScreen
+import com.example.ds04_monash_rideshare_application.feature.rides.FindRideScreen
+import com.example.ds04_monash_rideshare_application.feature.rides.RideDetailsScreen
+import com.example.ds04_monash_rideshare_application.feature.rides.RideRequestsScreen
 import com.example.ds04_monash_rideshare_application.feature.role.RoleSelectionScreen
 import com.example.ds04_monash_rideshare_application.feature.shared.PlaceholderScreen
 import com.example.ds04_monash_rideshare_application.ui.MapScreen
@@ -66,6 +75,22 @@ fun RideshareNavHost(
 
     val currentDestination = AppDestination.fromRoute(backStack.lastOrNull())
         ?: AppDestination.Splash
+
+    // Central place to (re)load data whenever a data-driven destination becomes active, so every
+    // entry point into it (home menu, search results, accept/reject, etc.) stays in sync without
+    // each caller having to remember to trigger the right load itself.
+    LaunchedEffect(currentDestination, viewModel.selectedRideId) {
+        when (currentDestination) {
+            AppDestination.RideRequests -> viewModel.loadIncomingRequests()
+            AppDestination.TripHistory -> viewModel.loadTripHistory()
+            AppDestination.SustainabilityDashboard -> viewModel.loadDashboard()
+            AppDestination.RideDetails, AppDestination.ConfirmedRide ->
+                viewModel.selectedRideId?.let { viewModel.loadRideDetails(it) }
+            AppDestination.Messages ->
+                viewModel.selectedRideId?.let { viewModel.loadMessages(it) }
+            else -> Unit
+        }
+    }
 
     when (currentDestination) {
         AppDestination.Splash -> SplashScreen(
@@ -132,36 +157,85 @@ fun RideshareNavHost(
             MapScreen(modifier = Modifier.padding(contentPadding))
         }
 
-        AppDestination.CreateRide,
-        AppDestination.FindRide,
-        AppDestination.RideDetails,
-        AppDestination.RideRequests,
-        AppDestination.ConfirmedRide,
-        AppDestination.Messages,
-        AppDestination.TripHistory,
-        AppDestination.SustainabilityDashboard,
-        AppDestination.Settings -> {
-            val action = placeholderAction(currentDestination, ::navigate)
-            PlaceholderScreen(
-                destination = currentDestination,
-                onNavigateBack = ::navigateUp,
-                primaryActionLabel = action?.first,
-                onPrimaryAction = action?.second ?: {},
-                modifier = modifier
-            )
-        }
-    }
-}
+        AppDestination.CreateRide -> CreateRideScreen(
+            isPublishing = viewModel.actionInFlight,
+            onPublish = { draft, onSuccess, onError ->
+                viewModel.createRide(draft, { onSuccess() }, onError)
+            },
+            onNavigateBack = ::navigateUp,
+            onPublished = { navigateUp() },
+            modifier = modifier
+        )
 
-private fun placeholderAction(
-    destination: AppDestination,
-    onNavigate: (AppDestination) -> Unit
-): Pair<String, () -> Unit>? = when (destination) {
-    AppDestination.CreateRide -> "Choose a route on the map" to {
-        onNavigate(AppDestination.Map)
+        AppDestination.FindRide -> FindRideScreen(
+            results = viewModel.searchResults,
+            onSearch = viewModel::searchRides,
+            onOpenRide = { rideId ->
+                viewModel.selectedRideId = rideId
+                navigate(AppDestination.RideDetails)
+            },
+            onNavigateBack = ::navigateUp,
+            modifier = modifier
+        )
+
+        AppDestination.RideDetails -> RideDetailsScreen(
+            rideDetails = viewModel.rideDetails,
+            currentUserId = uiState.userId,
+            canRequestSeat = uiState.activeRole == SessionRole.PASSENGER,
+            isRequesting = viewModel.actionInFlight,
+            onRequestSeat = { rideId, onDone -> viewModel.requestSeat(rideId, 1, onDone) },
+            onNavigateBack = ::navigateUp,
+            modifier = modifier
+        )
+
+        AppDestination.RideRequests -> RideRequestsScreen(
+            requests = viewModel.incomingRequests,
+            onRespond = { requestId, status ->
+                if (status == "ACCEPTED") {
+                    viewModel.incomingRequests.data
+                        ?.firstOrNull { it.requestId == requestId }
+                        ?.let { viewModel.selectedRideId = it.rideId }
+                }
+                viewModel.respondToRequest(requestId, status)
+            },
+            onNavigateBack = ::navigateUp,
+            modifier = modifier
+        )
+
+        AppDestination.ConfirmedRide -> ConfirmedRideScreen(
+            rideDetails = viewModel.rideDetails,
+            onOpenMessages = { navigate(AppDestination.Messages) },
+            onNavigateBack = ::navigateUp,
+            modifier = modifier
+        )
+
+        AppDestination.Messages -> MessagesScreen(
+            messages = viewModel.messages,
+            currentUserId = uiState.userId,
+            onSend = { body, onDone ->
+                viewModel.selectedRideId?.let { rideId -> viewModel.sendMessage(rideId, body, onDone) }
+                    ?: onDone("No ride selected")
+            },
+            onNavigateBack = ::navigateUp,
+            modifier = modifier
+        )
+
+        AppDestination.TripHistory -> TripHistoryScreen(
+            trips = viewModel.tripHistory,
+            onNavigateBack = ::navigateUp,
+            modifier = modifier
+        )
+
+        AppDestination.SustainabilityDashboard -> SustainabilityDashboardScreen(
+            dashboard = viewModel.dashboard,
+            onNavigateBack = ::navigateUp,
+            modifier = modifier
+        )
+
+        AppDestination.Settings -> PlaceholderScreen(
+            destination = currentDestination,
+            onNavigateBack = ::navigateUp,
+            modifier = modifier
+        )
     }
-    AppDestination.FindRide -> "Open sample ride details" to {
-        onNavigate(AppDestination.RideDetails)
-    }
-    else -> null
 }

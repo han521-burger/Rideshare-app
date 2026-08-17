@@ -41,17 +41,7 @@ sealed class AppDestination(val route: String, val title: String) {
             )
 
         val placeholders: List<AppDestination>
-            get() = listOf(
-                CreateRide,
-                FindRide,
-                RideDetails,
-                RideRequests,
-                ConfirmedRide,
-                Messages,
-                TripHistory,
-                SustainabilityDashboard,
-                Settings
-            )
+            get() = listOf(Settings)
 
         fun fromRoute(route: String?): AppDestination? =
             sprintOneDestinations.firstOrNull { it.route == route }

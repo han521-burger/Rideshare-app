@@ -1,0 +1,75 @@
+package com.example.ds04_monash_rideshare_application.Repository.Remote
+
+import retrofit2.Call
+import retrofit2.http.Body
+import retrofit2.http.DELETE
+import retrofit2.http.GET
+import retrofit2.http.POST
+import retrofit2.http.PUT
+import retrofit2.http.Path
+import retrofit2.http.Query
+
+// Thin 1:1 mapping onto the backend's routes (backend/.../routes/*.kt, documented in
+// docs/BACKEND.md). RideApiServiceImpl is the only caller - it maps these DTOs to/from the
+// Room @Entity types the rest of the app works with.
+interface BackendApi {
+    @GET("users/me")
+    fun getMyProfile(): Call<UserDto>
+
+    @PUT("users/me")
+    fun updateMyProfile(@Body body: UpdateProfileRequestBody): Call<UserDto>
+
+    @GET("rides")
+    fun getRides(
+        @Query("availableOnly") availableOnly: Boolean = true
+    ): Call<List<RideDto>>
+
+    @GET("rides/match")
+    fun matchRides(
+        @Query("originLat") originLat: Double,
+        @Query("originLng") originLng: Double,
+        @Query("destinationLat") destinationLat: Double,
+        @Query("destinationLng") destinationLng: Double,
+        @Query("departureTime") departureTime: Long,
+        @Query("seatsNeeded") seatsNeeded: Int
+    ): Call<MatchSearchResponse>
+
+    @POST("rides")
+    fun createRide(@Body body: CreateRideRequestBody): Call<RideDto>
+
+    @GET("rides/{id}")
+    fun getRide(@Path("id") rideId: String): Call<RideDto>
+
+    @PUT("rides/{id}")
+    fun updateRide(@Path("id") rideId: String, @Body body: UpdateRideRequestBody): Call<RideDto>
+
+    @DELETE("rides/{id}")
+    fun deleteRide(@Path("id") rideId: String): Call<Map<String, Boolean>>
+
+    @GET("users/{id}/rides")
+    fun getRidesForUser(@Path("id") userId: String): Call<List<RideDto>>
+
+    @GET("users/me/trip-history")
+    fun getTripHistory(): Call<List<RideDto>>
+
+    @POST("rides/{rideId}/requests")
+    fun requestSeat(@Path("rideId") rideId: String, @Body body: CreateSeatRequestBody): Call<RideRequestDto>
+
+    @GET("requests")
+    fun getRequestsForMyRides(): Call<List<RideRequestDto>>
+
+    @GET("requests/mine")
+    fun getMyRequests(): Call<List<RideRequestDto>>
+
+    @PUT("requests/{requestId}")
+    fun updateRequestStatus(@Path("requestId") requestId: String, @Body body: UpdateRequestStatusBody): Call<RideRequestDto>
+
+    @GET("rides/{rideId}/messages")
+    fun getMessages(@Path("rideId") rideId: String): Call<List<MessageDto>>
+
+    @POST("rides/{rideId}/messages")
+    fun sendMessage(@Path("rideId") rideId: String, @Body body: SendMessageRequestBody): Call<MessageDto>
+
+    @GET("users/me/dashboard")
+    fun getDashboard(): Call<DashboardResponseDto>
+}

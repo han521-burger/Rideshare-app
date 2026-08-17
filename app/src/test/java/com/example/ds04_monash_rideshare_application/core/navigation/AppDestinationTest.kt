@@ -14,18 +14,11 @@ class AppDestinationTest {
     }
 
     @Test
-    fun `all planned placeholder screens are registered`() {
-        val expectedRoutes = setOf(
-            "create-ride",
-            "find-ride",
-            "ride-details",
-            "ride-requests",
-            "confirmed-ride",
-            "messages",
-            "trip-history",
-            "sustainability-dashboard",
-            "settings"
-        )
+    fun `only Settings remains a placeholder screen`() {
+        // create-ride, find-ride, ride-details, ride-requests, confirmed-ride, messages,
+        // trip-history, and sustainability-dashboard all got real implementations - see
+        // RideshareNavHost. Settings is the only one still pending.
+        val expectedRoutes = setOf("settings")
 
         assertEquals(expectedRoutes, AppDestination.placeholders.map { it.route }.toSet())
     }

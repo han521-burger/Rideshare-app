@@ -1,9 +1,11 @@
 package com.example.ds04_monash_rideshare_application.ui
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -53,7 +55,10 @@ data class RouteQueryResult(
 )
 
 @Composable
-fun MapScreen(modifier: Modifier = Modifier) {
+fun MapScreen(
+    modifier: Modifier = Modifier,
+    onRouteConfirmed: ((RouteQueryResult) -> Unit)? = null
+) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -199,7 +204,20 @@ fun MapScreen(modifier: Modifier = Modifier) {
                 .padding(16.dp),
             tonalElevation = 4.dp
         ) {
-            Text(text = statusMessage, modifier = Modifier.padding(12.dp))
+            Column(modifier = Modifier.padding(12.dp)) {
+                Text(text = statusMessage)
+                val result = routeResult
+                if (result != null && onRouteConfirmed != null) {
+                    Button(
+                        onClick = { onRouteConfirmed(result) },
+                        modifier = Modifier
+                            .padding(top = 8.dp)
+                            .fillMaxWidth()
+                    ) {
+                        Text("Use this route")
+                    }
+                }
+            }
         }
     }
 }
