@@ -1,33 +1,30 @@
 package com.example.ds04_monash_rideshare_application.core.state
 
-import android.app.Application
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import androidx.lifecycle.AndroidViewModel
+import androidx.lifecycle.ViewModel
 import com.example.ds04_monash_rideshare_application.Auth.AuthSession
 import com.example.ds04_monash_rideshare_application.Auth.AuthenticatedUser
 import com.example.ds04_monash_rideshare_application.Auth.AuthenticationProvider
 import com.example.ds04_monash_rideshare_application.Auth.FakeAuthenticationProvider
 import com.example.ds04_monash_rideshare_application.Auth.TestIdentity
-import com.example.ds04_monash_rideshare_application.Database.AppDatabase
-import com.example.ds04_monash_rideshare_application.Database.Messaging.Message
-import com.example.ds04_monash_rideshare_application.Database.Passenger.SeatRequest
-import com.example.ds04_monash_rideshare_application.Database.RideShare.RideOffer
-import com.example.ds04_monash_rideshare_application.Database.User.UserAccount
-import com.example.ds04_monash_rideshare_application.Database.User.UserProfile
-import com.example.ds04_monash_rideshare_application.Repository.RideRepository
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateRideDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.DashboardSummary
-import com.example.ds04_monash_rideshare_application.Repository.Remote.RankedRide
-import com.example.ds04_monash_rideshare_application.Repository.Remote.RequestWithRide
+import com.example.ds04_monash_rideshare_application.Repository.Remote.FavoriteDriverSummary
+import com.example.ds04_monash_rideshare_application.Repository.Remote.LeaderboardResult
+import com.example.ds04_monash_rideshare_application.Repository.Remote.MessageSummary
+import com.example.ds04_monash_rideshare_application.Repository.Remote.RatingSummary
+import com.example.ds04_monash_rideshare_application.Repository.Remote.RequestStatus
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideApiService
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideApiServiceImpl
+import com.example.ds04_monash_rideshare_application.Repository.Remote.RideRequestSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSearchCriteria
-import com.example.ds04_monash_rideshare_application.Repository.RouteRepository
-import com.example.ds04_monash_rideshare_application.Repository.UserRepository
-import com.example.ds04_monash_rideshare_application.core.model.SessionRole
-import java.util.concurrent.Executors
+import com.example.ds04_monash_rideshare_application.Repository.Remote.RideStatus
+import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
+import com.example.ds04_monash_rideshare_application.Repository.Remote.UserAccountSummary
+
+enum class AppMode { PASSENGER, DRIVER }
 
 data class RideshareUiState(
     val isSigningIn: Boolean = false,
@@ -35,7 +32,6 @@ data class RideshareUiState(
     val email: String = "",
     val displayName: String = "",
     val preferredName: String = "",
-    val activeRole: SessionRole? = null,
     val passengerEnabled: Boolean = true,
     val errorMessage: String? = null
 ) {
@@ -46,55 +42,82 @@ data class RideshareUiState(
         get() = preferredName.ifBlank { displayName.ifBlank { "Monash traveller" } }
 }
 
-// Generic loading/data/error holder for the network-backed lists this ViewModel exposes -
-// avoids repeating the same three fields on every screen's state.
+// Generic loading/data/error holder for the network-backed state this ViewModel exposes.
 data class Resource<T>(
     val isLoading: Boolean = false,
     val data: T? = null,
     val errorMessage: String? = null
 )
 
-class RideshareViewModel(application: Application) : AndroidViewModel(application) {
+class RideshareViewModel : ViewModel() {
     private val authenticationProvider: AuthenticationProvider = FakeAuthenticationProvider()
     private val apiService: RideApiService = RideApiServiceImpl()
-    private val ioExecutor = Executors.newFixedThreadPool(2)
-
-    private val appDatabase = AppDatabase.getInstance(application)
-    private val userRepository = UserRepository(appDatabase.userProfileDao(), apiService, ioExecutor)
-    private val rideRepository = RideRepository(appDatabase.rideOfferDao(), apiService, ioExecutor)
-    private val routeRepository = RouteRepository(appDatabase.routeSnapshotDao(), apiService, ioExecutor)
 
     var uiState by mutableStateOf(RideshareUiState())
         private set
 
-    var selectedRideId: String? by mutableStateOf(null)
+    // In-app toggle (Passenger teal / Driver amber) - not a login-time choice, and doesn't
+    // partition data: a single account can be driving one ride and riding another at once.
+    var activeMode by mutableStateOf(AppMode.PASSENGER)
+        private set
 
-    var openRides by mutableStateOf(Resource<List<RideOffer>>())
+    var selectedRideId by mutableStateOf<String?>(null)
+
+    var profileDetails by mutableStateOf(Resource<UserAccountSummary>())
         private set
-    var searchResults by mutableStateOf(Resource<List<RankedRide>>())
+    var myDriverRides by mutableStateOf(Resource<List<RideSummary>>())
         private set
-    var rideDetails by mutableStateOf(Resource<RideOffer>())
+    var myRequests by mutableStateOf(Resource<List<RideRequestSummary>>())
         private set
-    var driverRides by mutableStateOf(Resource<List<RideOffer>>())
+    var incomingRequests by mutableStateOf(Resource<List<RideRequestSummary>>())
         private set
-    var incomingRequests by mutableStateOf(Resource<List<RequestWithRide>>())
+    var openRides by mutableStateOf(Resource<List<RideSummary>>())
         private set
-    var myRequests by mutableStateOf(Resource<List<RequestWithRide>>())
+    var searchResults by mutableStateOf(Resource<List<RideSummary>>())
         private set
-    var messages by mutableStateOf(Resource<List<Message>>())
+    var rideDetails by mutableStateOf(Resource<RideSummary>())
         private set
-    var tripHistory by mutableStateOf(Resource<List<RideOffer>>())
+    var messages by mutableStateOf(Resource<List<MessageSummary>>())
+        private set
+    var tripHistory by mutableStateOf(Resource<List<RideSummary>>())
         private set
     var dashboard by mutableStateOf(Resource<DashboardSummary>())
         private set
+    var leaderboard by mutableStateOf(Resource<LeaderboardResult>())
+        private set
+    var ratings by mutableStateOf(Resource<List<RatingSummary>>())
+        private set
+    var favorites by mutableStateOf(Resource<List<FavoriteDriverSummary>>())
+        private set
     var actionInFlight by mutableStateOf(false)
         private set
-    var lastCreatedRide by mutableStateOf<RideOffer?>(null)
+    var lastCreatedRide by mutableStateOf<RideSummary?>(null)
         private set
+
+    // Rides upcoming, already locked in - driving (CONFIRMED) or riding (your request ACCEPTED).
+    // Computed client-side from data already loaded for Home/Requests rather than a dedicated
+    // endpoint - there's no "confirmed" concept the backend needs to track separately.
+    val confirmedRides: List<RideSummary>
+        get() {
+            val driving = myDriverRides.data.orEmpty().filter { it.status == RideStatus.CONFIRMED }
+            val riding = myRequests.data.orEmpty()
+                .filter { it.status == RequestStatus.ACCEPTED }
+                .mapNotNull { it.ride }
+            return (driving + riding).distinctBy { it.rideId }.sortedBy { it.departureTime }
+        }
+
+    val myPendingRequests: List<RideRequestSummary>
+        get() = myRequests.data.orEmpty().filter { it.status == RequestStatus.PENDING }
+
+    val incomingPendingRequests: List<RideRequestSummary>
+        get() = incomingRequests.data.orEmpty().filter { it.status == RequestStatus.PENDING }
+
+    fun setActiveMode(mode: AppMode) {
+        activeMode = mode
+    }
 
     fun signIn(email: String? = null, onSuccess: () -> Unit = {}) {
         if (uiState.isSigningIn) return
-
         uiState = uiState.copy(isSigningIn = true, errorMessage = null)
         authenticationProvider.login(object : AuthenticationProvider.AuthCallback {
             override fun onSuccess(user: AuthenticatedUser) {
@@ -103,19 +126,14 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
             }
 
             override fun onFailure(error: Exception) {
-                uiState = uiState.copy(
-                    isSigningIn = false,
-                    errorMessage = error.message ?: "Sign in was unsuccessful. Please try again."
-                )
+                uiState = uiState.copy(isSigningIn = false, errorMessage = error.message ?: "Sign in was unsuccessful. Please try again.")
             }
         })
     }
 
     // Trial-only: signs in directly as one of the other seeded test accounts (backend/Database.kt),
     // bypassing FakeAuthenticationProvider (which only ever returns fake-user-001). Without this
-    // there's no way to test both sides of a request/accept/message flow - every request you make
-    // against another seeded driver's ride would be invisible to you forever, since nobody could
-    // ever sign in as that driver to accept it.
+    // there's no way to test both sides of a request/accept/message flow.
     fun signInAsTestUser(identity: TestIdentity, onSuccess: () -> Unit = {}) {
         if (uiState.isSigningIn) return
         val user = AuthenticatedUser(identity.userId, identity.externalSubjectId, identity.email, identity.displayName)
@@ -130,56 +148,9 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
             userId = user.userId,
             email = emailOverride?.trim()?.takeIf { it.isNotBlank() } ?: user.emailAccount,
             displayName = user.displayName,
-            preferredName = user.displayName,
-            activeRole = null
+            preferredName = user.displayName
         )
-        // UserProfile has a foreign key onto user_account(userId) - the account row must exist in
-        // Room before refreshUserProfile's cache write can succeed, so upsert it first, on the
-        // same background thread, before triggering the profile fetch.
-        ioExecutor.execute {
-            appDatabase.userAccountDao().upsert(
-                UserAccount(user.userId, user.externalSubjectId, user.emailAccount, "ACTIVE", System.currentTimeMillis())
-            )
-            userRepository.refreshUserProfile(user.userId)
-        }
-    }
-
-    fun selectRole(role: SessionRole) {
-        uiState = uiState.copy(activeRole = role)
-    }
-
-    fun updateProfile(displayName: String, preferredName: String) {
-        val userId = uiState.userId ?: return
-        uiState = uiState.copy(displayName = displayName.trim(), preferredName = preferredName.trim())
-        apiService.updateUserProfile(userId, displayName.trim(), preferredName.trim(), true, object : RideApiService.Callback<UserProfile> {
-            override fun onSuccess(result: UserProfile) {
-                ioExecutor.execute { appDatabase.userProfileDao().upsert(result) }
-            }
-
-            override fun onFailure(error: Exception) {
-                uiState = uiState.copy(errorMessage = error.message)
-            }
-        })
-    }
-
-    fun updatePassengerEnabled(enabled: Boolean) {
-        val userId = uiState.userId ?: return
-        uiState = uiState.copy(passengerEnabled = enabled)
-        apiService.updateUserProfile(userId, uiState.displayName, uiState.preferredName, enabled, object : RideApiService.Callback<UserProfile> {
-            override fun onSuccess(result: UserProfile) {
-                ioExecutor.execute { appDatabase.userProfileDao().upsert(result) }
-            }
-
-            override fun onFailure(error: Exception) {
-                uiState = uiState.copy(errorMessage = error.message)
-            }
-        })
-    }
-
-    // Wipes the Room cache only - the backend is still the source of truth, so this just forces
-    // the next screen visit to fetch fresh data instead of showing whatever was cached locally.
-    fun clearLocalCache() {
-        ioExecutor.execute { appDatabase.clearAllTables() }
+        loadProfile()
     }
 
     fun signOut(onComplete: () -> Unit = {}) {
@@ -187,14 +158,11 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
             override fun onSuccess(user: AuthenticatedUser?) {
                 AuthSession.currentUserId = null
                 uiState = RideshareUiState()
-                openRides = Resource()
-                searchResults = Resource()
-                driverRides = Resource()
-                incomingRequests = Resource()
-                myRequests = Resource()
-                messages = Resource()
-                tripHistory = Resource()
-                dashboard = Resource()
+                activeMode = AppMode.PASSENGER
+                profileDetails = Resource(); myDriverRides = Resource(); myRequests = Resource()
+                incomingRequests = Resource(); openRides = Resource(); searchResults = Resource()
+                rideDetails = Resource(); messages = Resource(); tripHistory = Resource()
+                dashboard = Resource(); leaderboard = Resource(); ratings = Resource(); favorites = Resource()
                 onComplete()
             }
 
@@ -204,107 +172,141 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
         })
     }
 
-    fun loadOpenRides() {
-        openRides = Resource(isLoading = true)
-        apiService.fetchRides(object : RideApiService.Callback<List<RideOffer>> {
-            override fun onSuccess(result: List<RideOffer>) {
-                openRides = Resource(data = result)
+    fun loadProfile() {
+        profileDetails = Resource(isLoading = true)
+        apiService.fetchMyProfile(object : RideApiService.Callback<UserAccountSummary> {
+            override fun onSuccess(result: UserAccountSummary) {
+                profileDetails = Resource(data = result)
+                uiState = uiState.copy(
+                    displayName = result.displayName,
+                    preferredName = result.preferredName,
+                    passengerEnabled = result.passengerEnabled
+                )
             }
 
             override fun onFailure(error: Exception) {
-                openRides = Resource(errorMessage = error.message)
+                profileDetails = Resource(errorMessage = error.message)
             }
+        })
+    }
+
+    fun updateProfile(
+        displayName: String,
+        preferredName: String,
+        passengerEnabled: Boolean,
+        emergencyContactName: String?,
+        emergencyContactPhone: String?,
+        onDone: (String?) -> Unit = {}
+    ) {
+        apiService.updateProfile(displayName, preferredName, passengerEnabled, emergencyContactName, emergencyContactPhone,
+            object : RideApiService.Callback<UserAccountSummary> {
+                override fun onSuccess(result: UserAccountSummary) {
+                    profileDetails = Resource(data = result)
+                    uiState = uiState.copy(displayName = result.displayName, preferredName = result.preferredName, passengerEnabled = result.passengerEnabled)
+                    onDone(null)
+                }
+
+                override fun onFailure(error: Exception) {
+                    onDone(error.message ?: "Couldn't save your profile. Please try again.")
+                }
+            })
+    }
+
+    fun loadOpenRides() {
+        openRides = Resource(isLoading = true)
+        apiService.fetchOpenRides(object : RideApiService.Callback<List<RideSummary>> {
+            override fun onSuccess(result: List<RideSummary>) { openRides = Resource(data = result) }
+            override fun onFailure(error: Exception) { openRides = Resource(errorMessage = error.message) }
         })
     }
 
     fun searchRides(criteria: RideSearchCriteria) {
         searchResults = Resource(isLoading = true)
-        apiService.searchRides(criteria, object : RideApiService.Callback<List<RankedRide>> {
-            override fun onSuccess(result: List<RankedRide>) {
-                searchResults = Resource(data = result)
-            }
-
-            override fun onFailure(error: Exception) {
-                searchResults = Resource(errorMessage = error.message)
-            }
+        apiService.searchRides(criteria, object : RideApiService.Callback<List<RideSummary>> {
+            override fun onSuccess(result: List<RideSummary>) { searchResults = Resource(data = result) }
+            override fun onFailure(error: Exception) { searchResults = Resource(errorMessage = error.message) }
         })
     }
 
     fun loadRideDetails(rideId: String) {
         rideDetails = Resource(isLoading = true)
-        apiService.fetchRide(rideId, object : RideApiService.Callback<RideOffer> {
-            override fun onSuccess(result: RideOffer) {
-                rideDetails = Resource(data = result)
-            }
-
-            override fun onFailure(error: Exception) {
-                rideDetails = Resource(errorMessage = error.message)
-            }
+        apiService.fetchRide(rideId, object : RideApiService.Callback<RideSummary> {
+            override fun onSuccess(result: RideSummary) { rideDetails = Resource(data = result) }
+            override fun onFailure(error: Exception) { rideDetails = Resource(errorMessage = error.message) }
         })
     }
 
-    fun createRide(draft: CreateRideDraft, onSuccess: (RideOffer) -> Unit, onError: (String) -> Unit) {
+    fun createRide(draft: CreateRideDraft, onSuccess: (RideSummary) -> Unit, onError: (String) -> Unit) {
         actionInFlight = true
-        apiService.createRide(draft, object : RideApiService.Callback<RideOffer> {
-            override fun onSuccess(result: RideOffer) {
+        apiService.createRide(draft, object : RideApiService.Callback<RideSummary> {
+            override fun onSuccess(result: RideSummary) {
                 actionInFlight = false
                 lastCreatedRide = result
-                rideRepository.refreshRides()
-                routeRepository.refreshRouteSummaries(result.rideId)
+                loadMyDriverRides()
                 onSuccess(result)
             }
 
             override fun onFailure(error: Exception) {
                 actionInFlight = false
-                onError(error.message ?: "Couldn't create the ride. Please try again.")
+                onError(error.message ?: "Couldn't publish the ride. Please try again.")
             }
         })
     }
 
-    fun loadDriverRides() {
-        driverRides = Resource(isLoading = true)
-        apiService.fetchMyDriverRides(object : RideApiService.Callback<List<RideOffer>> {
-            override fun onSuccess(result: List<RideOffer>) {
-                driverRides = Resource(data = result)
-            }
-
-            override fun onFailure(error: Exception) {
-                driverRides = Resource(errorMessage = error.message)
-            }
-        })
-    }
-
-    fun loadIncomingRequests() {
-        incomingRequests = Resource(isLoading = true)
-        apiService.fetchRequestsForMyRides(object : RideApiService.Callback<List<RequestWithRide>> {
-            override fun onSuccess(result: List<RequestWithRide>) {
-                incomingRequests = Resource(data = result)
-            }
-
-            override fun onFailure(error: Exception) {
-                incomingRequests = Resource(errorMessage = error.message)
-            }
-        })
-    }
-
-    fun loadMyRequests() {
-        myRequests = Resource(isLoading = true)
-        apiService.fetchMyRequests(object : RideApiService.Callback<List<RequestWithRide>> {
-            override fun onSuccess(result: List<RequestWithRide>) {
-                myRequests = Resource(data = result)
-            }
-
-            override fun onFailure(error: Exception) {
-                myRequests = Resource(errorMessage = error.message)
-            }
-        })
-    }
-
-    fun requestSeat(rideId: String, seats: Int, onDone: (Boolean, String?) -> Unit) {
+    fun cancelRide(rideId: String, onDone: (String?) -> Unit = {}) {
         actionInFlight = true
-        apiService.requestSeat(rideId, seats, object : RideApiService.Callback<SeatRequest> {
-            override fun onSuccess(result: SeatRequest) {
+        apiService.cancelRide(rideId, object : RideApiService.Callback<RideSummary> {
+            override fun onSuccess(result: RideSummary) {
                 actionInFlight = false
+                rideDetails = Resource(data = result)
+                loadMyDriverRides()
+                onDone(null)
+            }
+
+            override fun onFailure(error: Exception) {
+                actionInFlight = false
+                onDone(error.message ?: "Couldn't cancel the ride. Please try again.")
+            }
+        })
+    }
+
+    // "I'm coming" - a status flag, not live GPS (docs/RTM.md / backend Tables.kt).
+    fun setDriverEnRoute(rideId: String, enRoute: Boolean, onDone: (String?) -> Unit = {}) {
+        apiService.setDriverEnRoute(rideId, enRoute, object : RideApiService.Callback<RideSummary> {
+            override fun onSuccess(result: RideSummary) {
+                rideDetails = Resource(data = result)
+                loadMyDriverRides()
+                onDone(null)
+            }
+
+            override fun onFailure(error: Exception) {
+                onDone(error.message ?: "Couldn't update status. Please try again.")
+            }
+        })
+    }
+
+    fun loadMyDriverRides() {
+        myDriverRides = Resource(isLoading = true)
+        apiService.fetchMyDriverRides(object : RideApiService.Callback<List<RideSummary>> {
+            override fun onSuccess(result: List<RideSummary>) { myDriverRides = Resource(data = result) }
+            override fun onFailure(error: Exception) { myDriverRides = Resource(errorMessage = error.message) }
+        })
+    }
+
+    fun loadTripHistory() {
+        tripHistory = Resource(isLoading = true)
+        apiService.fetchTripHistory(object : RideApiService.Callback<List<RideSummary>> {
+            override fun onSuccess(result: List<RideSummary>) { tripHistory = Resource(data = result) }
+            override fun onFailure(error: Exception) { tripHistory = Resource(errorMessage = error.message) }
+        })
+    }
+
+    fun requestSeat(rideId: String, seats: Int, note: String?, applyToRecurringGroup: Boolean, onDone: (Boolean, String?) -> Unit) {
+        actionInFlight = true
+        apiService.requestSeat(rideId, seats, note, applyToRecurringGroup, object : RideApiService.Callback<List<RideRequestSummary>> {
+            override fun onSuccess(result: List<RideRequestSummary>) {
+                actionInFlight = false
+                loadMyRequests()
                 onDone(true, null)
             }
 
@@ -315,13 +317,29 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
         })
     }
 
+    fun loadMyRequests() {
+        myRequests = Resource(isLoading = true)
+        apiService.fetchMyRequests(object : RideApiService.Callback<List<RideRequestSummary>> {
+            override fun onSuccess(result: List<RideRequestSummary>) { myRequests = Resource(data = result) }
+            override fun onFailure(error: Exception) { myRequests = Resource(errorMessage = error.message) }
+        })
+    }
+
+    fun loadIncomingRequests() {
+        incomingRequests = Resource(isLoading = true)
+        apiService.fetchIncomingRequests(object : RideApiService.Callback<List<RideRequestSummary>> {
+            override fun onSuccess(result: List<RideRequestSummary>) { incomingRequests = Resource(data = result) }
+            override fun onFailure(error: Exception) { incomingRequests = Resource(errorMessage = error.message) }
+        })
+    }
+
     fun respondToRequest(requestId: String, newStatus: String, onDone: (Boolean, String?) -> Unit = { _, _ -> }) {
         actionInFlight = true
-        apiService.respondToRequest(requestId, newStatus, object : RideApiService.Callback<SeatRequest> {
-            override fun onSuccess(result: SeatRequest) {
+        apiService.respondToRequest(requestId, newStatus, object : RideApiService.Callback<RideRequestSummary> {
+            override fun onSuccess(result: RideRequestSummary) {
                 actionInFlight = false
                 loadIncomingRequests()
-                rideRepository.refreshRides()
+                loadMyDriverRides()
                 onDone(true, null)
             }
 
@@ -334,53 +352,63 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun loadMessages(rideId: String) {
         messages = Resource(isLoading = true)
-        apiService.fetchMessages(rideId, object : RideApiService.Callback<List<Message>> {
-            override fun onSuccess(result: List<Message>) {
-                messages = Resource(data = result)
-            }
-
-            override fun onFailure(error: Exception) {
-                messages = Resource(errorMessage = error.message)
-            }
+        apiService.fetchMessages(rideId, object : RideApiService.Callback<List<MessageSummary>> {
+            override fun onSuccess(result: List<MessageSummary>) { messages = Resource(data = result) }
+            override fun onFailure(error: Exception) { messages = Resource(errorMessage = error.message) }
         })
     }
 
     fun sendMessage(rideId: String, body: String, onDone: (String?) -> Unit = {}) {
-        apiService.sendMessage(rideId, body, object : RideApiService.Callback<Message> {
-            override fun onSuccess(result: Message) {
-                loadMessages(rideId)
-                onDone(null)
-            }
-
-            override fun onFailure(error: Exception) {
-                onDone(error.message ?: "Message couldn't be sent. Please try again.")
-            }
-        })
-    }
-
-    fun loadTripHistory() {
-        tripHistory = Resource(isLoading = true)
-        apiService.fetchTripHistory(object : RideApiService.Callback<List<RideOffer>> {
-            override fun onSuccess(result: List<RideOffer>) {
-                tripHistory = Resource(data = result)
-            }
-
-            override fun onFailure(error: Exception) {
-                tripHistory = Resource(errorMessage = error.message)
-            }
+        apiService.sendMessage(rideId, body, object : RideApiService.Callback<MessageSummary> {
+            override fun onSuccess(result: MessageSummary) { loadMessages(rideId); onDone(null) }
+            override fun onFailure(error: Exception) { onDone(error.message ?: "Message couldn't be sent. Please try again.") }
         })
     }
 
     fun loadDashboard() {
         dashboard = Resource(isLoading = true)
         apiService.fetchDashboard(object : RideApiService.Callback<DashboardSummary> {
-            override fun onSuccess(result: DashboardSummary) {
-                dashboard = Resource(data = result)
-            }
-
-            override fun onFailure(error: Exception) {
-                dashboard = Resource(errorMessage = error.message)
-            }
+            override fun onSuccess(result: DashboardSummary) { dashboard = Resource(data = result) }
+            override fun onFailure(error: Exception) { dashboard = Resource(errorMessage = error.message) }
         })
+    }
+
+    fun loadLeaderboard() {
+        leaderboard = Resource(isLoading = true)
+        apiService.fetchLeaderboard(20, object : RideApiService.Callback<LeaderboardResult> {
+            override fun onSuccess(result: LeaderboardResult) { leaderboard = Resource(data = result) }
+            override fun onFailure(error: Exception) { leaderboard = Resource(errorMessage = error.message) }
+        })
+    }
+
+    fun submitRating(rideId: String, ratedUserId: String, stars: Int, tags: List<String>, comment: String?, onDone: (String?) -> Unit) {
+        apiService.submitRating(rideId, ratedUserId, stars, tags, comment, object : RideApiService.Callback<RatingSummary> {
+            override fun onSuccess(result: RatingSummary) { loadRatings(rideId); onDone(null) }
+            override fun onFailure(error: Exception) { onDone(error.message ?: "Couldn't submit that rating. Please try again.") }
+        })
+    }
+
+    fun loadRatings(rideId: String) {
+        ratings = Resource(isLoading = true)
+        apiService.fetchRatings(rideId, object : RideApiService.Callback<List<RatingSummary>> {
+            override fun onSuccess(result: List<RatingSummary>) { ratings = Resource(data = result) }
+            override fun onFailure(error: Exception) { ratings = Resource(errorMessage = error.message) }
+        })
+    }
+
+    fun loadFavorites() {
+        favorites = Resource(isLoading = true)
+        apiService.fetchFavorites(object : RideApiService.Callback<List<FavoriteDriverSummary>> {
+            override fun onSuccess(result: List<FavoriteDriverSummary>) { favorites = Resource(data = result) }
+            override fun onFailure(error: Exception) { favorites = Resource(errorMessage = error.message) }
+        })
+    }
+
+    fun toggleFavorite(driverId: String, currentlyFavorite: Boolean, onDone: (String?) -> Unit = {}) {
+        val callback = object : RideApiService.Callback<Boolean> {
+            override fun onSuccess(result: Boolean) { loadFavorites(); onDone(null) }
+            override fun onFailure(error: Exception) { onDone(error.message ?: "Couldn't update favorites. Please try again.") }
+        }
+        if (currentlyFavorite) apiService.removeFavorite(driverId, callback) else apiService.addFavorite(driverId, callback)
     }
 }

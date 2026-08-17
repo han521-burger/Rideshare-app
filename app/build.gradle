@@ -64,7 +64,6 @@ dependencies {
     implementation libs.androidx.core.ktx
     implementation libs.androidx.graphics.path
     implementation libs.androidx.lifecycle.runtime.ktx
-    implementation libs.androidx.room.common
     testImplementation libs.junit
     androidTestImplementation platform(libs.androidx.compose.bom)
     androidTestImplementation libs.androidx.compose.ui.test.junit4
@@ -72,12 +71,6 @@ dependencies {
     androidTestImplementation libs.androidx.junit
     debugImplementation libs.androidx.compose.ui.test.manifest
     debugImplementation libs.androidx.compose.ui.tooling
-    implementation("androidx.room:room-runtime:2.6.1")
-    implementation("androidx.room:room-ktx:2.6.1")
-    annotationProcessor("androidx.room:room-compiler:2.6.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.4")
-    implementation("androidx.lifecycle:lifecycle-livedata-ktx:2.8.4")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
-
-
 }

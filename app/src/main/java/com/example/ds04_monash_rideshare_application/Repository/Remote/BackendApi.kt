@@ -11,7 +11,7 @@ import retrofit2.http.Query
 
 // Thin 1:1 mapping onto the backend's routes (backend/.../routes/*.kt, documented in
 // docs/BACKEND.md). RideApiServiceImpl is the only caller - it maps these DTOs to/from the
-// Room @Entity types the rest of the app works with.
+// domain models in RideModels.kt the rest of the app works with.
 interface BackendApi {
     @GET("users/me")
     fun getMyProfile(): Call<UserDto>
@@ -53,7 +53,7 @@ interface BackendApi {
     fun getTripHistory(): Call<List<RideDto>>
 
     @POST("rides/{rideId}/requests")
-    fun requestSeat(@Path("rideId") rideId: String, @Body body: CreateSeatRequestBody): Call<RideRequestDto>
+    fun requestSeat(@Path("rideId") rideId: String, @Body body: CreateSeatRequestBody): Call<List<RideRequestDto>>
 
     @GET("requests")
     fun getRequestsForMyRides(): Call<List<RideRequestDto>>
@@ -72,4 +72,22 @@ interface BackendApi {
 
     @GET("users/me/dashboard")
     fun getDashboard(): Call<DashboardResponseDto>
+
+    @GET("leaderboard")
+    fun getLeaderboard(@Query("limit") limit: Int = 10): Call<LeaderboardResponseDto>
+
+    @POST("rides/{rideId}/ratings")
+    fun submitRating(@Path("rideId") rideId: String, @Body body: SubmitRatingRequestBody): Call<RatingDto>
+
+    @GET("rides/{rideId}/ratings")
+    fun getRatings(@Path("rideId") rideId: String): Call<List<RatingDto>>
+
+    @GET("favorites")
+    fun getFavorites(): Call<List<FavoriteDriverDto>>
+
+    @POST("favorites/{driverId}")
+    fun addFavorite(@Path("driverId") driverId: String): Call<Map<String, Boolean>>
+
+    @DELETE("favorites/{driverId}")
+    fun removeFavorite(@Path("driverId") driverId: String): Call<Map<String, Boolean>>
 }

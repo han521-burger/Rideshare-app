@@ -23,16 +23,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.ds04_monash_rideshare_application.Database.Messaging.Message
+import com.example.ds04_monash_rideshare_application.Repository.Remote.MessageSummary
 import com.example.ds04_monash_rideshare_application.core.state.Resource
 import com.example.ds04_monash_rideshare_application.core.ui.RideshareScaffold
 import java.text.SimpleDateFormat
+import java.util.Date
 import java.util.Locale
 
-// Item 7: basic text messaging tied to a confirmed ride.
+// The Chat overlay from the ride-detail spec: basic text messaging tied to a ride once a seat's
+// confirmed. Opened from RideDetailScreen for both the driver and the passengers on that ride.
 @Composable
 fun MessagesScreen(
-    messages: Resource<List<Message>>,
+    messages: Resource<List<MessageSummary>>,
     currentUserId: String?,
     onSend: (String, onDone: (String?) -> Unit) -> Unit,
     onRefresh: () -> Unit,
@@ -114,13 +116,13 @@ fun MessagesScreen(
 }
 
 @Composable
-private fun MessageBubble(message: Message, isMine: Boolean) {
+private fun MessageBubble(message: MessageSummary, isMine: Boolean) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(12.dp)) {
             Text(if (isMine) "You" else message.senderId, style = MaterialTheme.typography.labelMedium)
             Text(message.body, style = MaterialTheme.typography.bodyLarge)
             Text(
-                SimpleDateFormat("HH:mm", Locale.getDefault()).format(message.sentAt),
+                SimpleDateFormat("HH:mm", Locale.getDefault()).format(Date(message.sentAt)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

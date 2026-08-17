@@ -7,21 +7,24 @@ import org.junit.Test
 
 class AppDestinationTest {
     @Test
-    fun `every Sprint 1 destination has a unique route`() {
-        val routes = AppDestination.sprintOneDestinations.map { it.route }
+    fun `every destination has a unique route`() {
+        val routes = AppDestination.allDestinations.map { it.route }
 
         assertEquals(routes.size, routes.toSet().size)
     }
 
     @Test
-    fun `no destinations remain as placeholders`() {
-        // Settings was the last one - see RideshareNavHost and feature/settings/SettingsScreen.
-        assertEquals(emptyList<AppDestination>(), AppDestination.placeholders)
+    fun `all four bottom-nav tabs are destinations`() {
+        assertEquals(4, AppDestination.tabDestinations.size)
+        assertEquals(
+            setOf(AppDestination.Home, AppDestination.Requests, AppDestination.Activity, AppDestination.Profile),
+            AppDestination.tabDestinations.toSet()
+        )
     }
 
     @Test
     fun `route lookup returns known destinations only`() {
-        assertNotNull(AppDestination.fromRoute("passenger-home"))
+        assertNotNull(AppDestination.fromRoute("home"))
         assertNull(AppDestination.fromRoute("not-a-real-route"))
     }
 }

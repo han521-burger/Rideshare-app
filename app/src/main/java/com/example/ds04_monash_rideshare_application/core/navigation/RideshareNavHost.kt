@@ -1,6 +1,7 @@
 package com.example.ds04_monash_rideshare_application.core.navigation
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -9,26 +10,21 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import com.example.ds04_monash_rideshare_application.core.model.SessionRole
+import com.example.ds04_monash_rideshare_application.Repository.Remote.RequestStatus
+import com.example.ds04_monash_rideshare_application.core.state.AppMode
 import com.example.ds04_monash_rideshare_application.core.state.RideshareViewModel
-import com.example.ds04_monash_rideshare_application.core.ui.RideshareScaffold
+import com.example.ds04_monash_rideshare_application.core.ui.BottomNavScaffold
+import com.example.ds04_monash_rideshare_application.feature.activity.ActivityScreen
+import com.example.ds04_monash_rideshare_application.feature.activity.LeaderboardScreen
 import com.example.ds04_monash_rideshare_application.feature.auth.LoginScreen
 import com.example.ds04_monash_rideshare_application.feature.auth.SplashScreen
-import com.example.ds04_monash_rideshare_application.feature.dashboard.SustainabilityDashboardScreen
-import com.example.ds04_monash_rideshare_application.feature.dashboard.TripHistoryScreen
 import com.example.ds04_monash_rideshare_application.feature.home.HomeScreen
 import com.example.ds04_monash_rideshare_application.feature.messages.MessagesScreen
 import com.example.ds04_monash_rideshare_application.feature.profile.ProfileScreen
-import com.example.ds04_monash_rideshare_application.Database.RideShare.RideOffer
-import com.example.ds04_monash_rideshare_application.feature.rides.ConfirmedRideScreen
-import com.example.ds04_monash_rideshare_application.feature.rides.CreateRideScreen
-import com.example.ds04_monash_rideshare_application.feature.rides.FindRideScreen
-import com.example.ds04_monash_rideshare_application.feature.rides.MyRidesScreen
-import com.example.ds04_monash_rideshare_application.feature.rides.RideDetailsScreen
-import com.example.ds04_monash_rideshare_application.feature.rides.RideRequestsScreen
-import com.example.ds04_monash_rideshare_application.feature.role.RoleSelectionScreen
-import com.example.ds04_monash_rideshare_application.feature.settings.SettingsScreen
-import com.example.ds04_monash_rideshare_application.ui.MapScreen
+import com.example.ds04_monash_rideshare_application.feature.requests.RequestsScreen
+import com.example.ds04_monash_rideshare_application.feature.rides.OfferRideFlowScreen
+import com.example.ds04_monash_rideshare_application.feature.rides.RequestRideFlowScreen
+import com.example.ds04_monash_rideshare_application.feature.rides.RideDetailScreen
 
 @Composable
 fun RideshareNavHost(
@@ -56,13 +52,8 @@ fun RideshareNavHost(
         }
     }
 
-    fun returnToRoleSelection() {
-        val roleIndex = backStack.indexOfLast { it == AppDestination.RoleSelection.route }
-        backStack = if (roleIndex >= 0) {
-            backStack.take(roleIndex + 1)
-        } else {
-            listOf(AppDestination.RoleSelection.route)
-        }
+    fun switchTab(destination: AppDestination) {
+        backStack = listOf(destination.route)
     }
 
     fun returnToLogin() {
@@ -75,28 +66,102 @@ fun RideshareNavHost(
         navigateUp()
     }
 
-    val currentDestination = AppDestination.fromRoute(backStack.lastOrNull())
-        ?: AppDestination.Splash
+    val currentDestination = AppDestination.fromRoute(backStack.lastOrNull()) ?: AppDestination.Splash
+    val currentTab = AppDestination.tabDestinations.firstOrNull { it.route == backStack.firstOrNull() }
+        ?: AppDestination.Home
 
     // Central place to (re)load data whenever a data-driven destination becomes active, so every
-    // entry point into it (home menu, search results, accept/reject, etc.) stays in sync without
-    // each caller having to remember to trigger the right load itself.
-    LaunchedEffect(currentDestination, viewModel.selectedRideId) {
+    // entry point into it (tab switch, drilling into a ride, mode toggle, etc.) stays in sync
+    // without each caller having to remember to trigger the right load itself.
+    LaunchedEffect(currentDestination, viewModel.selectedRideId, viewModel.activeMode) {
         when (currentDestination) {
-            AppDestination.MyRides -> {
-                viewModel.loadDriverRides()
+            AppDestination.Home -> {
+                viewModel.loadMyDriverRides()
+                viewModel.loadMyRequests()
+                if (viewModel.activeMode == AppMode.PASSENGER) viewModel.loadOpenRides()
+            }
+            AppDestination.Requests -> {
+                viewModel.loadMyRequests()
+                viewModel.loadIncomingRequests()
+            }
+            AppDestination.Activity -> {
+                viewModel.loadDashboard()
+                viewModel.loadTripHistory()
+            }
+            AppDestination.Profile -> {
+                viewModel.loadProfile()
+                viewModel.loadFavorites()
+            }
+            AppDestination.RideDetail, AppDestination.RequestRide -> {
+                viewModel.selectedRideId?.let { viewModel.loadRideDetails(it) }
+                viewModel.loadIncomingRequests()
                 viewModel.loadMyRequests()
             }
-            AppDestination.FindRide -> viewModel.loadOpenRides()
-            AppDestination.RideRequests -> viewModel.loadIncomingRequests()
-            AppDestination.TripHistory -> viewModel.loadTripHistory()
-            AppDestination.SustainabilityDashboard -> viewModel.loadDashboard()
-            AppDestination.RideDetails, AppDestination.ConfirmedRide ->
-                viewModel.selectedRideId?.let { viewModel.loadRideDetails(it) }
-            AppDestination.Messages ->
-                viewModel.selectedRideId?.let { viewModel.loadMessages(it) }
+            AppDestination.Messages -> viewModel.selectedRideId?.let { viewModel.loadMessages(it) }
+            AppDestination.Leaderboard -> viewModel.loadLeaderboard()
             else -> Unit
         }
+    }
+
+    if (currentDestination in AppDestination.tabDestinations) {
+        BottomNavScaffold(
+            activeMode = viewModel.activeMode,
+            onModeChange = viewModel::setActiveMode,
+            currentTab = currentTab,
+            onTabSelected = ::switchTab,
+            requestsBadgeCount = viewModel.myPendingRequests.size + viewModel.incomingPendingRequests.size,
+            greetingName = uiState.greetingName,
+            modifier = modifier
+        ) { contentPadding ->
+            Box(modifier = Modifier.padding(contentPadding)) {
+                when (currentDestination) {
+                    AppDestination.Home -> HomeScreen(
+                        activeMode = viewModel.activeMode,
+                        currentUserId = uiState.userId,
+                        confirmedRides = viewModel.confirmedRides,
+                        openRides = viewModel.openRides,
+                        myDriverRides = viewModel.myDriverRides,
+                        onOpenRide = { rideId ->
+                            viewModel.selectedRideId = rideId
+                            navigate(AppDestination.RideDetail)
+                        },
+                        onOfferRide = { navigate(AppDestination.OfferRide) }
+                    )
+
+                    AppDestination.Requests -> RequestsScreen(
+                        activeMode = viewModel.activeMode,
+                        myRequests = viewModel.myRequests.data.orEmpty(),
+                        incomingRequests = viewModel.incomingRequests.data.orEmpty(),
+                        onOpenRide = { rideId ->
+                            viewModel.selectedRideId = rideId
+                            navigate(AppDestination.RideDetail)
+                        }
+                    )
+
+                    AppDestination.Activity -> ActivityScreen(
+                        dashboard = viewModel.dashboard,
+                        tripHistory = viewModel.tripHistory,
+                        onOpenLeaderboard = { navigate(AppDestination.Leaderboard) },
+                        onOpenRide = { rideId ->
+                            viewModel.selectedRideId = rideId
+                            navigate(AppDestination.RideDetail)
+                        }
+                    )
+
+                    AppDestination.Profile -> ProfileScreen(
+                        uiState = uiState,
+                        profileDetails = viewModel.profileDetails,
+                        favorites = viewModel.favorites,
+                        onSave = viewModel::updateProfile,
+                        onRemoveFavorite = { driverId -> viewModel.toggleFavorite(driverId, currentlyFavorite = true) },
+                        onSignOut = ::returnToLogin
+                    )
+
+                    else -> Unit
+                }
+            }
+        }
+        return
     }
 
     when (currentDestination) {
@@ -107,152 +172,69 @@ fun RideshareNavHost(
         AppDestination.Login -> LoginScreen(
             uiState = uiState,
             onSignIn = { email ->
-                viewModel.signIn(email) {
-                    replaceStack(AppDestination.RoleSelection)
-                }
+                viewModel.signIn(email) { replaceStack(AppDestination.Home) }
             },
             onSignInAsTestUser = { identity ->
-                viewModel.signInAsTestUser(identity) {
-                    replaceStack(AppDestination.RoleSelection)
+                viewModel.signInAsTestUser(identity) { replaceStack(AppDestination.Home) }
+            },
+            modifier = modifier
+        )
+
+        AppDestination.RideDetail -> RideDetailScreen(
+            rideDetails = viewModel.rideDetails,
+            currentUserId = uiState.userId,
+            myRequestForRide = viewModel.myRequests.data.orEmpty().firstOrNull { it.rideId == viewModel.selectedRideId },
+            incomingRequestsForRide = viewModel.incomingRequests.data.orEmpty().filter { it.rideId == viewModel.selectedRideId },
+            isActionInFlight = viewModel.actionInFlight,
+            emergencyContactPhone = viewModel.profileDetails.data?.emergencyContactPhone,
+            onRequestSeat = { navigate(AppDestination.RequestRide) },
+            onCancelMyRequest = { requestId -> viewModel.respondToRequest(requestId, RequestStatus.CANCELLED) },
+            onRespondToRequest = { requestId, status -> viewModel.respondToRequest(requestId, status) },
+            onSetEnRoute = { enRoute ->
+                viewModel.selectedRideId?.let { viewModel.setDriverEnRoute(it, enRoute) }
+            },
+            onCancelRide = {
+                viewModel.selectedRideId?.let { viewModel.cancelRide(it) }
+            },
+            onOpenChat = { navigate(AppDestination.Messages) },
+            onSubmitRating = { ratedUserId, stars, comment ->
+                viewModel.selectedRideId?.let { rideId ->
+                    viewModel.submitRating(rideId, ratedUserId, stars, emptyList(), comment) {}
                 }
             },
-            modifier = modifier
-        )
-
-        AppDestination.RoleSelection -> RoleSelectionScreen(
-            greetingName = uiState.greetingName,
-            onRoleSelected = { role ->
-                viewModel.selectRole(role)
-                navigate(
-                    if (role == SessionRole.PASSENGER) {
-                        AppDestination.PassengerHome
-                    } else {
-                        AppDestination.DriverHome
-                    }
-                )
-            },
-            onSignOut = ::returnToLogin,
-            modifier = modifier
-        )
-
-        AppDestination.PassengerHome -> HomeScreen(
-            role = SessionRole.PASSENGER,
-            greetingName = uiState.greetingName,
-            onNavigate = ::navigate,
-            onChangeRole = ::returnToRoleSelection,
-            onSignOut = ::returnToLogin,
-            modifier = modifier
-        )
-
-        AppDestination.DriverHome -> HomeScreen(
-            role = SessionRole.DRIVER,
-            greetingName = uiState.greetingName,
-            onNavigate = ::navigate,
-            onChangeRole = ::returnToRoleSelection,
-            onSignOut = ::returnToLogin,
-            modifier = modifier
-        )
-
-        AppDestination.Profile -> ProfileScreen(
-            uiState = uiState,
-            onNavigateBack = ::navigateUp,
-            onSave = viewModel::updateProfile,
-            modifier = modifier
-        )
-
-        AppDestination.Map -> RideshareScaffold(
-            title = AppDestination.Map.title,
-            canNavigateBack = true,
-            onNavigateBack = ::navigateUp,
-            modifier = modifier
-        ) { contentPadding ->
-            MapScreen(modifier = Modifier.padding(contentPadding))
-        }
-
-        AppDestination.MyRides -> MyRidesScreen(
-            driverRides = viewModel.driverRides,
-            myRequests = viewModel.myRequests,
-            onOpenDriverRide = { ride ->
-                viewModel.selectedRideId = ride.rideId
-                navigate(
-                    if (ride.status == RideOffer.STATUS_CONFIRMED || ride.status == RideOffer.STATUS_COMPLETED) {
-                        AppDestination.ConfirmedRide
-                    } else {
-                        AppDestination.RideDetails
-                    }
-                )
-            },
-            onOpenRequest = { request ->
-                viewModel.selectedRideId = request.rideId
-                navigate(
-                    if (request.status == "ACCEPTED" || request.status == "COMPLETED") {
-                        AppDestination.ConfirmedRide
-                    } else {
-                        AppDestination.RideDetails
-                    }
-                )
-            },
-            onRefresh = {
-                viewModel.loadDriverRides()
-                viewModel.loadMyRequests()
-            },
             onNavigateBack = ::navigateUp,
             modifier = modifier
         )
 
-        AppDestination.CreateRide -> CreateRideScreen(
+        AppDestination.RequestRide -> RequestRideFlowScreen(
+            rideDetails = viewModel.rideDetails,
+            isSubmitting = viewModel.actionInFlight,
+            onSubmit = { seats, note, applyToRecurringGroup, onDone ->
+                val rideId = viewModel.selectedRideId
+                if (rideId == null) {
+                    onDone("No ride selected")
+                } else {
+                    viewModel.requestSeat(rideId, seats, note, applyToRecurringGroup) { success, error ->
+                        onDone(error)
+                        if (success) navigateUp()
+                    }
+                }
+            },
+            onExit = ::navigateUp,
+            modifier = modifier
+        )
+
+        AppDestination.OfferRide -> OfferRideFlowScreen(
             isPublishing = viewModel.actionInFlight,
             onPublish = { draft, onSuccess, onError ->
-                viewModel.createRide(draft, { onSuccess() }, onError)
+                viewModel.createRide(draft, onSuccess, onError)
             },
-            onNavigateBack = ::navigateUp,
-            onPublished = { navigateUp() },
-            modifier = modifier
-        )
-
-        AppDestination.FindRide -> FindRideScreen(
-            openRides = viewModel.openRides,
-            searchResults = viewModel.searchResults,
-            currentUserId = uiState.userId,
-            onSearch = viewModel::searchRides,
-            onOpenRide = { rideId ->
-                viewModel.selectedRideId = rideId
-                navigate(AppDestination.RideDetails)
+            onExit = ::navigateUp,
+            onPublished = { ride ->
+                viewModel.selectedRideId = ride.rideId
+                replaceStack(AppDestination.Home)
+                navigate(AppDestination.RideDetail)
             },
-            onRefreshOpenRides = viewModel::loadOpenRides,
-            onNavigateBack = ::navigateUp,
-            modifier = modifier
-        )
-
-        AppDestination.RideDetails -> RideDetailsScreen(
-            rideDetails = viewModel.rideDetails,
-            currentUserId = uiState.userId,
-            canRequestSeat = uiState.activeRole == SessionRole.PASSENGER,
-            isRequesting = viewModel.actionInFlight,
-            onRequestSeat = { rideId, onDone -> viewModel.requestSeat(rideId, 1, onDone) },
-            onNavigateBack = ::navigateUp,
-            modifier = modifier
-        )
-
-        AppDestination.RideRequests -> RideRequestsScreen(
-            requests = viewModel.incomingRequests,
-            onRespond = { requestId, status ->
-                if (status == "ACCEPTED") {
-                    viewModel.incomingRequests.data
-                        ?.firstOrNull { it.request.requestId == requestId }
-                        ?.let { viewModel.selectedRideId = it.request.rideId }
-                }
-                viewModel.respondToRequest(requestId, status)
-            },
-            onRefresh = viewModel::loadIncomingRequests,
-            onNavigateBack = ::navigateUp,
-            modifier = modifier
-        )
-
-        AppDestination.ConfirmedRide -> ConfirmedRideScreen(
-            rideDetails = viewModel.rideDetails,
-            onOpenMessages = { navigate(AppDestination.Messages) },
-            onNavigateBack = ::navigateUp,
             modifier = modifier
         )
 
@@ -270,31 +252,13 @@ fun RideshareNavHost(
             modifier = modifier
         )
 
-        AppDestination.TripHistory -> TripHistoryScreen(
-            trips = viewModel.tripHistory,
-            onOpenRide = { rideId ->
-                viewModel.selectedRideId = rideId
-                navigate(AppDestination.RideDetails)
-            },
-            onRefresh = viewModel::loadTripHistory,
+        AppDestination.Leaderboard -> LeaderboardScreen(
+            leaderboard = viewModel.leaderboard,
+            currentUserId = uiState.userId,
             onNavigateBack = ::navigateUp,
             modifier = modifier
         )
 
-        AppDestination.SustainabilityDashboard -> SustainabilityDashboardScreen(
-            dashboard = viewModel.dashboard,
-            onRefresh = viewModel::loadDashboard,
-            onNavigateBack = ::navigateUp,
-            modifier = modifier
-        )
-
-        AppDestination.Settings -> SettingsScreen(
-            uiState = uiState,
-            onPassengerEnabledChange = viewModel::updatePassengerEnabled,
-            onClearLocalCache = viewModel::clearLocalCache,
-            onSignOut = ::returnToLogin,
-            onNavigateBack = ::navigateUp,
-            modifier = modifier
-        )
+        else -> Unit
     }
 }

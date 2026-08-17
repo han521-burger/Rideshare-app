@@ -3,50 +3,31 @@ package com.example.ds04_monash_rideshare_application.core.navigation
 sealed class AppDestination(val route: String, val title: String) {
     data object Splash : AppDestination("splash", "Monash Rideshare")
     data object Login : AppDestination("login", "Sign in")
-    data object RoleSelection : AppDestination("role-selection", "Choose your role")
-    data object PassengerHome : AppDestination("passenger-home", "Passenger Home")
-    data object DriverHome : AppDestination("driver-home", "Driver Home")
+
+    // Bottom-nav tabs. Same four routes regardless of active mode (Passenger/Driver) - the mode
+    // toggle changes what each tab shows, it doesn't fork the navigation graph.
+    data object Home : AppDestination("home", "Home")
+    data object Requests : AppDestination("requests", "Requests")
+    data object Activity : AppDestination("activity", "Activity")
     data object Profile : AppDestination("profile", "Profile")
-    data object MyRides : AppDestination("my-rides", "My Rides")
-    data object CreateRide : AppDestination("create-ride", "Create Ride")
-    data object FindRide : AppDestination("find-ride", "Find Ride")
-    data object RideDetails : AppDestination("ride-details", "Ride Details")
-    data object RideRequests : AppDestination("ride-requests", "Ride Requests")
-    data object ConfirmedRide : AppDestination("confirmed-ride", "Confirmed Ride")
+
+    data object RideDetail : AppDestination("ride-detail", "Ride Detail")
+    data object RequestRide : AppDestination("request-ride", "Request a Ride")
+    data object OfferRide : AppDestination("offer-ride", "Offer a Ride")
     data object Messages : AppDestination("messages", "Messages")
-    data object TripHistory : AppDestination("trip-history", "Trip History")
-    data object SustainabilityDashboard :
-        AppDestination("sustainability-dashboard", "Sustainability Dashboard")
-    data object Settings : AppDestination("settings", "Settings")
-    data object Map : AppDestination("map", "Route Map")
+    data object Leaderboard : AppDestination("leaderboard", "Leaderboard")
 
     companion object {
-        val sprintOneDestinations: List<AppDestination>
+        val tabDestinations: List<AppDestination>
+            get() = listOf(Home, Requests, Activity, Profile)
+
+        val allDestinations: List<AppDestination>
             get() = listOf(
-                Splash,
-                Login,
-                RoleSelection,
-                PassengerHome,
-                DriverHome,
-                Profile,
-                MyRides,
-                CreateRide,
-                FindRide,
-                RideDetails,
-                RideRequests,
-                ConfirmedRide,
-                Messages,
-                TripHistory,
-                SustainabilityDashboard,
-                Settings,
-                Map
+                Splash, Login, Home, Requests, Activity, Profile,
+                RideDetail, RequestRide, OfferRide, Messages, Leaderboard
             )
 
-        // Nothing left as a placeholder - every Sprint 1 destination has a real screen now.
-        val placeholders: List<AppDestination>
-            get() = emptyList()
-
         fun fromRoute(route: String?): AppDestination? =
-            sprintOneDestinations.firstOrNull { it.route == route }
+            allDestinations.firstOrNull { it.route == route }
     }
 }

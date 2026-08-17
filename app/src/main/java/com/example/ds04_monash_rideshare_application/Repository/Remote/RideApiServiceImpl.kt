@@ -1,18 +1,13 @@
 package com.example.ds04_monash_rideshare_application.Repository.Remote
 
 import com.example.ds04_monash_rideshare_application.Auth.AuthSession
-import com.example.ds04_monash_rideshare_application.Database.Messaging.Message
-import com.example.ds04_monash_rideshare_application.Database.Passenger.SeatRequest
-import com.example.ds04_monash_rideshare_application.Database.RideShare.RideOffer
-import com.example.ds04_monash_rideshare_application.Database.RideShare.RouteSnapshot
-import com.example.ds04_monash_rideshare_application.Database.User.UserProfile
 import retrofit2.Call
 import retrofit2.Callback as RetrofitCallback
 import retrofit2.Response
 
 // Real backend-backed implementation of RideApiService (see docs/BACKEND.md). Every method maps
-// the backend's wire DTOs onto the Room @Entity types the rest of the app already works with, and
-// funnels every failure through NetworkErrorMapper so the UI only ever sees a friendly message.
+// the backend's wire DTOs onto the domain models in RideModels.kt, and funnels every failure
+// through NetworkErrorMapper so the UI only ever sees a friendly message.
 class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi) : RideApiService {
 
     private fun <T, R> Call<T>.dispatch(callback: RideApiService.Callback<R>, mapper: (T) -> R) {
@@ -40,30 +35,32 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         })
     }
 
-    override fun fetchRides(callback: RideApiService.Callback<List<RideOffer>>) {
-        api.getRides(true).dispatch(callback) { it.map(::toRideOffer) }
+    override fun fetchMyProfile(callback: RideApiService.Callback<UserAccountSummary>) {
+        api.getMyProfile().dispatch(callback, ::toUserAccountSummary)
     }
 
-    override fun fetchUserProfile(userId: String, callback: RideApiService.Callback<UserProfile>) {
-        api.getMyProfile().dispatch(callback, ::toUserProfile)
-    }
-
-    override fun fetchRouteSummaries(rideId: String, callback: RideApiService.Callback<List<RouteSnapshot>>) {
-        api.getRide(rideId).dispatch(callback) { dto -> listOf(toRouteSnapshot(dto)) }
-    }
-
-    override fun updateUserProfile(
-        userId: String,
+    override fun updateProfile(
         displayName: String,
         preferredName: String,
         passengerEnabled: Boolean,
-        callback: RideApiService.Callback<UserProfile>
+        emergencyContactName: String?,
+        emergencyContactPhone: String?,
+        callback: RideApiService.Callback<UserAccountSummary>
     ) {
-        val body = UpdateProfileRequestBody(displayName, preferredName, passengerEnabled = passengerEnabled)
-        api.updateMyProfile(body).dispatch(callback, ::toUserProfile)
+        val body = UpdateProfileRequestBody(
+            displayName, preferredName,
+            passengerEnabled = passengerEnabled,
+            emergencyContactName = emergencyContactName,
+            emergencyContactPhone = emergencyContactPhone
+        )
+        api.updateMyProfile(body).dispatch(callback, ::toUserAccountSummary)
     }
 
-    override fun searchRides(criteria: RideSearchCriteria, callback: RideApiService.Callback<List<RankedRide>>) {
+    override fun fetchOpenRides(callback: RideApiService.Callback<List<RideSummary>>) {
+        api.getRides(true).dispatch(callback) { it.map(::toRideSummary) }
+    }
+
+    override fun searchRides(criteria: RideSearchCriteria, callback: RideApiService.Callback<List<RideSummary>>) {
         api.matchRides(
             originLat = criteria.originLat,
             originLng = criteria.originLng,
@@ -71,18 +68,14 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
             destinationLng = criteria.destinationLng,
             departureTime = criteria.departureTime,
             seatsNeeded = criteria.seatsNeeded
-        ).dispatch(callback) { response ->
-            response.rides.map { dto ->
-                RankedRide(toRideOffer(dto), dto.matchScore?.total ?: 0.0, response.usedFallback)
-            }
-        }
+        ).dispatch(callback) { response -> response.rides.map(::toRideSummary) }
     }
 
-    override fun fetchRide(rideId: String, callback: RideApiService.Callback<RideOffer>) {
-        api.getRide(rideId).dispatch(callback, ::toRideOffer)
+    override fun fetchRide(rideId: String, callback: RideApiService.Callback<RideSummary>) {
+        api.getRide(rideId).dispatch(callback, ::toRideSummary)
     }
 
-    override fun createRide(draft: CreateRideDraft, callback: RideApiService.Callback<RideOffer>) {
+    override fun createRide(draft: CreateRideDraft, callback: RideApiService.Callback<RideSummary>) {
         val body = CreateRideRequestBody(
             vehicleId = draft.vehicleId,
             originLat = draft.originLat,
@@ -93,90 +86,167 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
             estimatedDurationSeconds = draft.estimatedDurationSeconds,
             departureTime = draft.departureTime,
             seatsTotal = draft.seatsTotal,
-            notes = draft.notes
+            notes = draft.notes,
+            stops = draft.stops.map { CreateStopInputBody(it.lat, it.lng, it.label) },
+            repeatDaysOfWeek = draft.repeatDaysOfWeek,
+            repeatWeeks = draft.repeatWeeks
         )
-        api.createRide(body).dispatch(callback, ::toRideOffer)
+        api.createRide(body).dispatch(callback, ::toRideSummary)
     }
 
-    override fun cancelRide(rideId: String, callback: RideApiService.Callback<RideOffer>) {
-        api.updateRide(rideId, UpdateRideRequestBody(status = "CANCELLED")).dispatch(callback, ::toRideOffer)
+    override fun cancelRide(rideId: String, callback: RideApiService.Callback<RideSummary>) {
+        api.updateRide(rideId, UpdateRideRequestBody(status = "CANCELLED")).dispatch(callback, ::toRideSummary)
     }
 
-    override fun fetchMyDriverRides(callback: RideApiService.Callback<List<RideOffer>>) {
+    override fun setDriverEnRoute(rideId: String, enRoute: Boolean, callback: RideApiService.Callback<RideSummary>) {
+        api.updateRide(rideId, UpdateRideRequestBody(driverEnRoute = enRoute)).dispatch(callback, ::toRideSummary)
+    }
+
+    override fun fetchMyDriverRides(callback: RideApiService.Callback<List<RideSummary>>) {
         val userId = AuthSession.currentUserId
         if (userId == null) {
             callback.onFailure(BackendException("Please sign in again."))
             return
         }
-        api.getRidesForUser(userId).dispatch(callback) { it.map(::toRideOffer) }
+        api.getRidesForUser(userId).dispatch(callback) { it.map(::toRideSummary) }
     }
 
-    override fun fetchTripHistory(callback: RideApiService.Callback<List<RideOffer>>) {
-        api.getTripHistory().dispatch(callback) { it.map(::toRideOffer) }
+    override fun fetchTripHistory(callback: RideApiService.Callback<List<RideSummary>>) {
+        api.getTripHistory().dispatch(callback) { it.map(::toRideSummary) }
     }
 
-    override fun requestSeat(rideId: String, seatsRequested: Int, callback: RideApiService.Callback<SeatRequest>) {
-        api.requestSeat(rideId, CreateSeatRequestBody(seatsRequested)).dispatch(callback, ::toSeatRequest)
+    override fun requestSeat(
+        rideId: String,
+        seats: Int,
+        note: String?,
+        applyToRecurringGroup: Boolean,
+        callback: RideApiService.Callback<List<RideRequestSummary>>
+    ) {
+        api.requestSeat(rideId, CreateSeatRequestBody(seats, note, applyToRecurringGroup))
+            .dispatch(callback) { it.map(::toRideRequestSummary) }
     }
 
-    override fun fetchRequestsForMyRides(callback: RideApiService.Callback<List<RequestWithRide>>) {
-        api.getRequestsForMyRides().dispatch(callback) { it.map(::toRequestWithRide) }
+    override fun fetchIncomingRequests(callback: RideApiService.Callback<List<RideRequestSummary>>) {
+        api.getRequestsForMyRides().dispatch(callback) { it.map(::toRideRequestSummary) }
     }
 
-    override fun fetchMyRequests(callback: RideApiService.Callback<List<RequestWithRide>>) {
-        api.getMyRequests().dispatch(callback) { it.map(::toRequestWithRide) }
+    override fun fetchMyRequests(callback: RideApiService.Callback<List<RideRequestSummary>>) {
+        api.getMyRequests().dispatch(callback) { it.map(::toRideRequestSummary) }
     }
 
-    override fun respondToRequest(requestId: String, newStatus: String, callback: RideApiService.Callback<SeatRequest>) {
-        api.updateRequestStatus(requestId, UpdateRequestStatusBody(newStatus)).dispatch(callback, ::toSeatRequest)
+    override fun respondToRequest(requestId: String, newStatus: String, callback: RideApiService.Callback<RideRequestSummary>) {
+        api.updateRequestStatus(requestId, UpdateRequestStatusBody(newStatus)).dispatch(callback, ::toRideRequestSummary)
     }
 
-    override fun fetchMessages(rideId: String, callback: RideApiService.Callback<List<Message>>) {
-        api.getMessages(rideId).dispatch(callback) { it.map { dto -> toMessage(dto) } }
+    override fun fetchMessages(rideId: String, callback: RideApiService.Callback<List<MessageSummary>>) {
+        api.getMessages(rideId).dispatch(callback) { it.map(::toMessageSummary) }
     }
 
-    override fun sendMessage(rideId: String, body: String, callback: RideApiService.Callback<Message>) {
-        api.sendMessage(rideId, SendMessageRequestBody(body)).dispatch(callback, ::toMessage)
+    override fun sendMessage(rideId: String, body: String, callback: RideApiService.Callback<MessageSummary>) {
+        api.sendMessage(rideId, SendMessageRequestBody(body)).dispatch(callback, ::toMessageSummary)
     }
 
     override fun fetchDashboard(callback: RideApiService.Callback<DashboardSummary>) {
-        api.getDashboard().dispatch(callback) { dto ->
-            DashboardSummary(
-                dto.totalRidesCompleted,
-                dto.totalCo2AvoidedKg,
-                dto.monthlyTripSummary.map { DashboardSummary.MonthlySummary(it.monthLabel, it.tripsCompleted, it.co2AvoidedKg) }
-            )
+        api.getDashboard().dispatch(callback, ::toDashboardSummary)
+    }
+
+    override fun fetchLeaderboard(limit: Int, callback: RideApiService.Callback<LeaderboardResult>) {
+        api.getLeaderboard(limit).dispatch(callback) { dto ->
+            LeaderboardResult(dto.top.map(::toLeaderboardEntry), dto.me?.let(::toLeaderboardEntry))
         }
     }
 
-    private fun toUserProfile(dto: UserDto) = UserProfile(
-        dto.userId, dto.displayName, dto.preferredName, dto.phoneNumber, dto.photoRef, dto.passengerEnabled
+    override fun submitRating(rideId: String, ratedUserId: String, stars: Int, tags: List<String>, comment: String?, callback: RideApiService.Callback<RatingSummary>) {
+        api.submitRating(rideId, SubmitRatingRequestBody(ratedUserId, stars, tags, comment)).dispatch(callback, ::toRatingSummary)
+    }
+
+    override fun fetchRatings(rideId: String, callback: RideApiService.Callback<List<RatingSummary>>) {
+        api.getRatings(rideId).dispatch(callback) { it.map(::toRatingSummary) }
+    }
+
+    override fun fetchFavorites(callback: RideApiService.Callback<List<FavoriteDriverSummary>>) {
+        api.getFavorites().dispatch(callback) { it.map(::toFavoriteDriverSummary) }
+    }
+
+    override fun addFavorite(driverId: String, callback: RideApiService.Callback<Boolean>) {
+        api.addFavorite(driverId).dispatch(callback) { it["favorited"] ?: true }
+    }
+
+    override fun removeFavorite(driverId: String, callback: RideApiService.Callback<Boolean>) {
+        api.removeFavorite(driverId).dispatch(callback) { it["favorited"] ?: false }
+    }
+
+    private fun toUserAccountSummary(dto: UserDto) = UserAccountSummary(
+        userId = dto.userId,
+        displayName = dto.displayName,
+        preferredName = dto.preferredName,
+        emailAccount = dto.emailAccount,
+        phoneNumber = dto.phoneNumber,
+        photoRef = dto.photoRef,
+        passengerEnabled = dto.passengerEnabled,
+        emergencyContactName = dto.emergencyContactName,
+        emergencyContactPhone = dto.emergencyContactPhone
     )
 
-    private fun toRideOffer(dto: RideDto) = RideOffer(
-        dto.rideId, dto.driverId, dto.vehicleId,
-        dto.originLat, dto.originLng, dto.destinationLat, dto.destinationLng,
-        dto.departureTime, dto.seatsAvailable, dto.status, dto.createdAt
+    private fun toUserSummary(dto: UserSummaryDto) = UserSummary(dto.userId, dto.displayName, dto.photoRef, dto.phoneNumber)
+
+    private fun toVehicleSummary(dto: VehicleDto) = VehicleSummary(
+        dto.vehicleId, dto.make, dto.model, dto.variant, dto.registrationMasked, dto.fuelType, dto.seatCapacity
     )
 
-    private fun toRouteSnapshot(dto: RideDto) = RouteSnapshot(
-        "route-${dto.rideId}",
-        dto.rideId,
-        "${dto.originLat},${dto.originLng}",
-        "${dto.destinationLat},${dto.destinationLng}",
-        dto.distanceMeters.toLong(),
-        dto.estimatedDurationSeconds,
-        "yandex",
-        dto.createdAt
+    private fun toRideStop(dto: RideStopDto) = RideStop(dto.stopId, dto.sequence, dto.lat, dto.lng, dto.label)
+
+    private fun toRideSummary(dto: RideDto) = RideSummary(
+        rideId = dto.rideId,
+        driverId = dto.driverId,
+        vehicleId = dto.vehicleId,
+        originLat = dto.originLat,
+        originLng = dto.originLng,
+        destinationLat = dto.destinationLat,
+        destinationLng = dto.destinationLng,
+        distanceMeters = dto.distanceMeters,
+        estimatedDurationSeconds = dto.estimatedDurationSeconds,
+        departureTime = dto.departureTime,
+        seatsTotal = dto.seatsTotal,
+        seatsAvailable = dto.seatsAvailable,
+        notes = dto.notes,
+        status = dto.status,
+        createdAt = dto.createdAt,
+        driverEnRoute = dto.driverEnRoute,
+        recurringGroupId = dto.recurringGroupId,
+        stops = dto.stops.map(::toRideStop),
+        driver = dto.driver?.let(::toUserSummary),
+        vehicle = dto.vehicle?.let(::toVehicleSummary),
+        matchScoreTotal = dto.matchScore?.total
     )
 
-    private fun toSeatRequest(dto: RideRequestDto) = SeatRequest(
-        dto.requestId, dto.rideId, dto.passengerId, dto.seatsRequested, dto.status, dto.createdAt
+    private fun toRideRequestSummary(dto: RideRequestDto) = RideRequestSummary(
+        requestId = dto.requestId,
+        rideId = dto.rideId,
+        passengerId = dto.passengerId,
+        seatsRequested = dto.seatsRequested,
+        status = dto.status,
+        note = dto.note,
+        createdAt = dto.createdAt,
+        respondedAt = dto.respondedAt,
+        ride = dto.ride?.let(::toRideSummary),
+        passenger = dto.passenger?.let(::toUserSummary)
     )
 
-    private fun toRequestWithRide(dto: RideRequestDto) = RequestWithRide(toSeatRequest(dto), dto.ride?.let(::toRideOffer))
+    private fun toMessageSummary(dto: MessageDto) = MessageSummary(dto.messageId, dto.rideId, dto.senderId, dto.body, dto.sentAt)
 
-    private fun toMessage(dto: MessageDto) = Message(
-        dto.messageId, dto.rideId, dto.senderId, dto.body, dto.sentAt, "SENT"
+    private fun toDashboardSummary(dto: DashboardResponseDto) = DashboardSummary(
+        totalRidesCompleted = dto.totalRidesCompleted,
+        totalCo2AvoidedKg = dto.totalCo2AvoidedKg,
+        totalFuelSavedLitres = dto.totalFuelSavedLitres,
+        monthlyTripSummary = dto.monthlyTripSummary.map { MonthlyTripSummary(it.monthLabel, it.tripsCompleted, it.co2AvoidedKg) }
     )
+
+    private fun toLeaderboardEntry(dto: LeaderboardEntryDto) = LeaderboardEntry(dto.userId, dto.displayName, dto.totalCo2AvoidedKg, dto.rank)
+
+    private fun toRatingSummary(dto: RatingDto) = RatingSummary(
+        dto.ratingId, dto.rideId, dto.raterId, dto.ratedUserId, dto.stars, dto.tags, dto.comment, dto.createdAt
+    )
+
+    private fun toFavoriteDriverSummary(dto: FavoriteDriverDto) = FavoriteDriverSummary(dto.driverId, dto.displayName, dto.photoRef, dto.addedAt)
 }
