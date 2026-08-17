@@ -21,6 +21,7 @@ import com.example.ds04_monash_rideshare_application.Database.Passenger.SeatRequ
 import com.example.ds04_monash_rideshare_application.Database.RideShare.RideOffer
 import com.example.ds04_monash_rideshare_application.core.state.Resource
 import com.example.ds04_monash_rideshare_application.core.ui.RideshareScaffold
+import com.example.ds04_monash_rideshare_application.ui.describeLocation
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -88,6 +89,11 @@ fun MyRidesScreen(
                                 fontWeight = FontWeight.SemiBold
                             )
                             Text("${ride.status} - ${ride.seatsAvailable} seat(s) available", style = MaterialTheme.typography.bodyMedium)
+                            Text(
+                                "${describeLocation(ride.originLat, ride.originLng)} -> ${describeLocation(ride.destinationLat, ride.destinationLng)}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }

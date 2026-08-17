@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -21,6 +23,8 @@ import androidx.compose.ui.unit.dp
 import com.example.ds04_monash_rideshare_application.Database.RideShare.RideOffer
 import com.example.ds04_monash_rideshare_application.core.state.Resource
 import com.example.ds04_monash_rideshare_application.core.ui.RideshareScaffold
+import com.example.ds04_monash_rideshare_application.core.ui.RouteMiniMap
+import com.example.ds04_monash_rideshare_application.ui.describeLocation
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -61,6 +65,7 @@ fun RideDetailsScreen(
                     modifier = Modifier
                         .padding(contentPadding)
                         .fillMaxSize()
+                        .verticalScroll(rememberScrollState())
                         .padding(24.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
@@ -72,10 +77,14 @@ fun RideDetailsScreen(
                     Text("Status: ${ride.status}", style = MaterialTheme.typography.bodyLarge)
                     Text("${ride.seatsAvailable} seat(s) available", style = MaterialTheme.typography.bodyLarge)
                     Text(
-                        "From %.4f, %.4f to %.4f, %.4f".format(
-                            ride.originLat, ride.originLng, ride.destinationLat, ride.destinationLng
-                        ),
+                        "From ${describeLocation(ride.originLat, ride.originLng)} to ${describeLocation(ride.destinationLat, ride.destinationLng)}",
                         style = MaterialTheme.typography.bodyMedium
+                    )
+                    RouteMiniMap(
+                        originLat = ride.originLat,
+                        originLng = ride.originLng,
+                        destinationLat = ride.destinationLat,
+                        destinationLng = ride.destinationLng
                     )
 
                     if (ride.driverId == currentUserId) {

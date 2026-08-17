@@ -51,16 +51,6 @@ private const val MELBOURNE_ZOOM = 11.0f
 private const val JUMP_ZOOM = 14.5f
 private const val ROUTE_REQUEST_TIMEOUT_MS = 15_000L
 
-// Same locations used by the backend's seed data (backend/Database.kt) - jumping straight to one
-// of these is far more reliable than trying to eyeball it from a city-wide zoom level.
-private val NAMED_LOCATIONS = listOf(
-    "Melbourne CBD" to MELBOURNE_CBD,
-    "Oakleigh" to Point(-37.8988, 145.0906),
-    "Chadstone" to Point(-37.8862, 145.0733),
-    "Glen Waverley" to Point(-37.8811, 145.1628),
-    "Monash Clayton" to Point(-37.9105, 145.1362)
-)
-
 //Result of an origin -> Yandex -> destination routing request (proposal Member C: Yandex first implementation).
 data class RouteQueryResult(
     val originLat: Double,
@@ -257,11 +247,11 @@ fun MapScreen(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     modifier = Modifier.padding(top = 4.dp)
                 ) {
-                    items(NAMED_LOCATIONS, key = { it.first }) { (name, point) ->
+                    items(NAMED_LOCATIONS, key = { it.name }) { location ->
                         OutlinedButton(onClick = {
-                            mapView.map.move(CameraPosition(point, JUMP_ZOOM, 0.0f, 0.0f))
+                            mapView.map.move(CameraPosition(location.point, JUMP_ZOOM, 0.0f, 0.0f))
                         }) {
-                            Text(name)
+                            Text(location.name)
                         }
                     }
                 }
