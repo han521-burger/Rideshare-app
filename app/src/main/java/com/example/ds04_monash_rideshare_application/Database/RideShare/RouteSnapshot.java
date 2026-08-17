@@ -2,18 +2,13 @@ package com.example.ds04_monash_rideshare_application.Database.RideShare;
 
 import androidx.annotation.NonNull;
 import androidx.room.Entity;
-import androidx.room.ForeignKey;
 import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
+// No foreign key onto ride_offer here on purpose - see RideOffer.java's header comment. Route
+// snapshots and their ride can arrive as separate, unordered cache writes.
 @Entity(
         tableName = "route_snapshot",
-        foreignKeys = @ForeignKey(
-                entity = RideOffer.class,
-                parentColumns = "rideId",
-                childColumns = "rideId",
-                onDelete = ForeignKey.CASCADE
-        ),
         indices = @Index("rideId")
 )
 public class RouteSnapshot {

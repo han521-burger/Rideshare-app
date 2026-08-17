@@ -13,6 +13,7 @@ import com.example.ds04_monash_rideshare_application.Database.AppDatabase
 import com.example.ds04_monash_rideshare_application.Database.Messaging.Message
 import com.example.ds04_monash_rideshare_application.Database.Passenger.SeatRequest
 import com.example.ds04_monash_rideshare_application.Database.RideShare.RideOffer
+import com.example.ds04_monash_rideshare_application.Database.User.UserAccount
 import com.example.ds04_monash_rideshare_application.Database.User.UserProfile
 import com.example.ds04_monash_rideshare_application.Repository.RideRepository
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateRideDraft
@@ -102,7 +103,15 @@ class RideshareViewModel(application: Application) : AndroidViewModel(applicatio
                     preferredName = user.displayName,
                     activeRole = null
                 )
-                userRepository.refreshUserProfile(user.userId)
+                // UserProfile has a foreign key onto user_account(userId) - the account row must
+                // exist in Room before refreshUserProfile's cache write can succeed, so upsert it
+                // first, on the same background thread, before triggering the profile fetch.
+                ioExecutor.execute {
+                    appDatabase.userAccountDao().upsert(
+                        UserAccount(user.userId, user.externalSubjectId, user.emailAccount, "ACTIVE", System.currentTimeMillis())
+                    )
+                    userRepository.refreshUserProfile(user.userId)
+                }
                 onSuccess()
             }
 

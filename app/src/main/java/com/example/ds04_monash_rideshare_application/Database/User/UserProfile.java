@@ -2,19 +2,11 @@ package com.example.ds04_monash_rideshare_application.Database.User;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.room.Entity;
-import androidx.room.ForeignKey;
 import androidx.room.PrimaryKey;
 
-//onDelete = ForeignKey.Cascade takes into account the primary key ; if PK is deleted ; would be deleted here as well
-@Entity(
-        tableName = "user_profile",
-        foreignKeys = @ForeignKey(
-                entity = UserAccount.class,
-        parentColumns = "userId",
-        childColumns = "userId",
-        onDelete = ForeignKey.CASCADE
-                )
-)
+// No foreign key onto user_account here on purpose - see RideOffer.java's header comment for why
+// (this is a partial cache of backend data, not a fully-mirrored local copy).
+@Entity(tableName = "user_profile")
 public class UserProfile {
     @PrimaryKey
     @NonNull

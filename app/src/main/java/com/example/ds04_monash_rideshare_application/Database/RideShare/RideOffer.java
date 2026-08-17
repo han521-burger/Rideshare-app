@@ -3,29 +3,16 @@ package com.example.ds04_monash_rideshare_application.Database.RideShare;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.room.Entity;
-import androidx.room.ForeignKey;
 import androidx.room.Index;
 import androidx.room.PrimaryKey;
 
-import com.example.ds04_monash_rideshare_application.Database.Driver.Vehicle;
-import com.example.ds04_monash_rideshare_application.Database.User.UserAccount;
-
+// No foreign keys here on purpose: this is a partial cache of whatever rides the backend last
+// returned (see AppDatabase's header comment), and Room only ever stores the currently signed-in
+// user's own UserAccount/Vehicle rows locally - a ride driven by anyone else would fail to cache
+// under an FK constraint referencing those tables. The backend enforces the real foreign keys
+// (backend/Tables.kt); this is a read-through cache, not a second copy of record.
 @Entity(
         tableName = "ride_offer",
-        foreignKeys = {
-                @ForeignKey(
-                        entity = UserAccount.class,
-                        parentColumns = "userId",
-                        childColumns = "driverId",
-                        onDelete = ForeignKey.CASCADE
-                ),
-                @ForeignKey(
-                        entity = Vehicle.class,
-                        parentColumns = "vehicleId",
-                        childColumns = "vehicleId",
-                        onDelete = ForeignKey.SET_NULL
-                )
-        },
         indices = {
                 @Index("driverId"),
                 @Index("vehicleId"),

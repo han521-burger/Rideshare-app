@@ -20,6 +20,7 @@ import com.example.ds04_monash_rideshare_application.Database.RideShare.RideOffe
 import com.example.ds04_monash_rideshare_application.Database.RideShare.RouteSnapshot;
 import com.example.ds04_monash_rideshare_application.Database.RideShare.RouteSnapshotDao;
 import com.example.ds04_monash_rideshare_application.Database.User.UserAccount;
+import com.example.ds04_monash_rideshare_application.Database.User.UserAccountDao;
 import com.example.ds04_monash_rideshare_application.Database.User.UserProfile;
 import com.example.ds04_monash_rideshare_application.Database.User.UserProfileDao;
 
@@ -44,11 +45,12 @@ import com.example.ds04_monash_rideshare_application.Database.User.UserProfileDa
                 Conversation.class,
                 Message.class
         },
-        version = 1,
+        version = 2,
         exportSchema = false
 )
 public abstract class AppDatabase extends RoomDatabase {
 
+    public abstract UserAccountDao userAccountDao();
     public abstract UserProfileDao userProfileDao();
     public abstract RideOfferDao rideOfferDao();
     public abstract RouteSnapshotDao routeSnapshotDao();
@@ -61,11 +63,13 @@ public abstract class AppDatabase extends RoomDatabase {
         if (instance == null) {
             synchronized (AppDatabase.class) {
                 if (instance == null) {
+                    // This is a cache (see the class comment) - if its schema changes, wiping and
+                    // rebuilding it locally is harmless, so no real Migration is needed here.
                     instance = Room.databaseBuilder(
                             context.getApplicationContext(),
                             AppDatabase.class,
                             "ds04_rideshare.db"
-                    ).build();
+                    ).fallbackToDestructiveMigration().build();
                 }
             }
         }
