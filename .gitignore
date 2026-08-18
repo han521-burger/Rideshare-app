@@ -11,11 +11,8 @@
 /.idea/deploymentTargetSelector.xml
 .DS_Store
 /build
-/backend/build
 /captures
 .externalNativeBuild
 .cxx
 local.properties
 .kotlin
-/backend/*.db
-/backend/*.db-journal
