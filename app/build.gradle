@@ -12,12 +12,12 @@ if (localPropertiesFile.exists()) {
 
 android {
     namespace 'com.example.ds04_monash_rideshare_application'
-    compileSdk 34 // Standard stable API level
+    compileSdk 35
 
     defaultConfig {
         applicationId "com.example.ds04_monash_rideshare_application"
         minSdk 26 // Yandex MapKit requires 26+
-        targetSdk 34 // Must match compileSdk
+        targetSdk 34
         versionCode 1
         versionName "1.0"
 

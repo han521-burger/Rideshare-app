@@ -22,12 +22,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.example.ds04_monash_rideshare_application.BuildConfig
 import com.yandex.mapkit.MapKitFactory
 import com.yandex.mapkit.RequestPoint
 import com.yandex.mapkit.RequestPointType
@@ -44,6 +46,7 @@ import com.yandex.mapkit.map.PlacemarkMapObject
 import com.yandex.mapkit.map.PolylineMapObject
 import com.yandex.mapkit.map.Map as YandexMap
 import com.yandex.mapkit.mapview.MapView
+import java.lang.ref.WeakReference
 import kotlinx.coroutines.delay
 
 private val MELBOURNE_CBD = Point(-37.8136, 144.9631)
@@ -66,6 +69,26 @@ fun MapScreen(
     modifier: Modifier = Modifier,
     onRouteConfirmed: ((RouteQueryResult) -> Unit)? = null
 ) {
+    if (BuildConfig.YANDEX_MAPKIT_API_KEY.isBlank()) {
+        Surface(
+            modifier = modifier.fillMaxSize(),
+            color = Color.White
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(24.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "Yandex MapKit is not configured. Add YANDEX_MAPKIT_API_KEY to local.properties and rebuild the app.",
+                    color = Color(0xFF1F1F1F)
+                )
+            }
+        }
+        return
+    }
+
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -149,7 +172,7 @@ fun MapScreen(
         )
     }
 
-    val inputListener = remember {
+    val inputListener: InputListener = remember {
         object : InputListener {
             override fun onMapTap(map: YandexMap, point: Point) {
                 when {
@@ -175,6 +198,7 @@ fun MapScreen(
             override fun onMapLongTap(map: YandexMap, point: Point) = Unit
         }
     }
+    val inputListenerReference = remember(inputListener) { WeakReference(inputListener) }
 
     LaunchedEffect(pendingRequestId) {
         if (pendingRequestId == 0) return@LaunchedEffect
@@ -191,10 +215,10 @@ fun MapScreen(
                 Lifecycle.Event.ON_START -> {
                     MapKitFactory.getInstance().onStart()
                     mapView.onStart()
-                    mapView.map.addInputListener(inputListener)
+                    mapView.map.addInputListener(inputListenerReference)
                 }
                 Lifecycle.Event.ON_STOP -> {
-                    mapView.map.removeInputListener(inputListener)
+                    mapView.map.removeInputListener(inputListenerReference)
                     mapView.onStop()
                     MapKitFactory.getInstance().onStop()
                 }

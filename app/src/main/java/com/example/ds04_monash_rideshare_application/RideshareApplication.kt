@@ -6,6 +6,8 @@ import com.yandex.mapkit.MapKitFactory
 class RideshareApplication : Application() {
     override fun onCreate() {
         super.onCreate()
-        MapKitFactory.setApiKey(BuildConfig.YANDEX_MAPKIT_API_KEY)
+        if (BuildConfig.YANDEX_MAPKIT_API_KEY.isNotBlank()) {
+            MapKitFactory.setApiKey(BuildConfig.YANDEX_MAPKIT_API_KEY)
+        }
     }
 }
