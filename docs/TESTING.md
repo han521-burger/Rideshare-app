@@ -1,14 +1,14 @@
 # Testing Conventions
 
 Owner:Tony Doan (QA / security / integration / documentation).
-Status: conventions defined ahead of code landing. Concrete test files should be added
-alongside the User/Ride/Vehicle/DriverApplication models as Members A/B create them 
+Status: conventions plus initial Android and Ktor integration tests are present. Add coverage
+beside each new validation or state transition.
 
 ## Frameworks
 
 | Layer | Framework | Notes                                                                                              |
 |---|---|----------------------------------------------------------------------------------------------------|
-| Backend (Spring Boot, Kotlin) | JUnit 5 + MockK + `spring-boot-starter-test` | Pure unit tests for services/validators; reserve that for repository/controller integration tests. |
+| Backend (Ktor, Kotlin) | JUnit 5 + Ktor `testApplication` | Route integration tests use a temporary SQLite database; pure matching/validation logic can use unit tests. |
 | Android — domain/ViewModel/repository (JVM, no Android framework dependency) | JUnit 5 + MockK + `kotlinx-coroutines-test` | Runs on the JVM, fast, no emulator needed.                                                         |
 | Android — Compose UI / instrumented | JUnit 4 + AndroidX Test + Compose Test rule | AndroidX's instrumented test runner requires JUnit 4, not JUnit 5                                  |
 
@@ -28,6 +28,11 @@ alongside the User/Ride/Vehicle/DriverApplication models as Members A/B create t
 
 Per the weekly build plan, any PR/MR touching validation or state-transition logic needs
 tests covering both the valid and invalid paths.
+
+`backend/src/test/.../RideRequestApprovalTest.kt` currently verifies the key approval path:
+request creation stays `PENDING`, capacity is unchanged before approval, the owning driver sees
+the request, acceptance changes both request status and available seats, another driver cannot
+respond, and rejection leaves ride capacity unchanged.
 
 ## Validation test matrix (Week 2 scope)
 

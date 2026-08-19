@@ -41,6 +41,20 @@ is granted.
 - `GET/POST /rides/{rideId}/messages` (driver + accepted passengers only)
 - `GET /users/me/dashboard`, `GET /users/me/trip-history`
 
+## Driver approval flow (FR-03 / FR-05)
+
+1. `POST /rides/{rideId}/requests` creates a `PENDING` request. It does not reserve a seat or
+   change the ride status.
+2. Drivers receive pending requests through `GET /requests`. The Android app quietly refreshes
+   this inbox every eight seconds while a driver is on a main tab and shows an animated banner.
+3. The owning driver accepts or rejects with `PUT /requests/{requestId}`. Acceptance performs the
+   authoritative capacity check inside the transaction, decrements seats and marks the ride
+   `CONFIRMED`; rejection leaves capacity unchanged.
+4. A passenger can cancel a pending request. Cancelling an accepted request returns its seats.
+
+This is polling for the local trial, not a push-notification service. A hosted version should
+replace polling with an authenticated realtime channel or platform push notification.
+
 ## Matching (FR-04)
 
 Rule-based only, no ML, per the weekly plan (Week 5). `matching/MatchingEngine.kt`:

@@ -34,13 +34,10 @@ import org.jetbrains.exposed.sql.update
 import java.util.UUID
 
 fun Route.rideRequestRoutes() {
-    // Passenger joins a SPECIFIC already-posted ride - instant, no driver approval step. Posting
-    // a ride with open seats is the driver's consent; requesting one just fills it, the same way
-    // most real carpool apps treat a listing with open seats. Atomically re-checks capacity and
-    // decrements it in the same transaction as the insert, so two overlapping joins can't
-    // overbook a ride (same SQLite-serialises-writers reasoning as PUT /requests/{id}). If
-    // applyToRecurringGroup is set and the ride belongs to a "repeat this route" group (see
-    // RideRoutes.kt's POST /rides), also joins every other sibling in that group with room left.
+    // A passenger asking for a seat on a specific posted ride always creates a PENDING request.
+    // Seats are deliberately not reserved here: the owning driver makes the final decision and
+    // PUT /requests/{id} performs the atomic capacity check/decrement at acceptance time. If
+    // applyToRecurringGroup is set, one pending request is created for each eligible sibling.
     post("/rides/{rideId}/requests") {
         val passengerId = call.requireUserId()
         val rideId = call.parameters["rideId"] ?: throw NotFoundException()
@@ -68,16 +65,16 @@ fun Route.rideRequestRoutes() {
                 if (target[Rides.driverId] == passengerId) continue // skip your own ride silently
                 if (target[Rides.status] !in joinableStatuses) continue
 
-                val alreadyJoined = RideRequests.selectAll()
+                val alreadyRequested = RideRequests.selectAll()
                     .where {
                         (RideRequests.rideId eq targetRideId) and
                             (RideRequests.passengerId eq passengerId) and
-                            (RideRequests.status eq RideRequestStatus.ACCEPTED)
+                            (RideRequests.status inList listOf(RideRequestStatus.PENDING, RideRequestStatus.ACCEPTED))
                     }.count() > 0
-                if (alreadyJoined) continue
+                if (alreadyRequested) continue
 
-                // Re-read seatsAvailable right before writing - see PUT /requests/{id}'s
-                // equivalent check for why this is safe under SQLite's write serialisation.
+                // This is an early friendly check only. Other pending requests do not reserve a
+                // seat, so the authoritative capacity check still happens when the driver accepts.
                 val freshRide = Rides.selectAll().where { Rides.rideId eq targetRideId }.first()
                 if (freshRide[Rides.seatsAvailable] < body.seatsRequested) continue
 
@@ -87,19 +84,14 @@ fun Route.rideRequestRoutes() {
                     it[RideRequests.rideId] = targetRideId
                     it[RideRequests.passengerId] = passengerId
                     it[seatsRequested] = body.seatsRequested
-                    it[status] = RideRequestStatus.ACCEPTED
+                    it[status] = RideRequestStatus.PENDING
                     it[note] = body.note
                     it[createdAt] = now
-                    it[respondedAt] = now
-                }
-                Rides.update({ Rides.rideId eq targetRideId }) {
-                    it[seatsAvailable] = freshRide[Rides.seatsAvailable] - body.seatsRequested
-                    it[status] = RideStatus.CONFIRMED
                 }
                 createdIds += requestId
             }
             if (createdIds.isEmpty()) {
-                throw ConflictException("Couldn't join this ride - it may be full, cancelled, or your own")
+                throw ConflictException("Couldn't request this ride - it may be full, unavailable, already requested, or your own")
             }
         }
         val dtos = transaction {
@@ -241,15 +233,9 @@ fun Route.rideRequestRoutes() {
         call.respond(requests)
     }
 
-    // Either party cancels/completes an already-resolved request. ACCEPTED here is really only
-    // reachable for a standalone request now - a request on a specific already-posted ride joins
-    // instantly (see POST /rides/{rideId}/requests) and never sits PENDING, so this ACCEPTED
-    // branch exists to let a driver pick up a driverless ask, either by supplying targetRideId
-    // (one of their own open rides with room) or by leaving it out and providing
-    // newRideSeatsTotal instead, which creates a brand new ride from the request's own route/time
-    // on the spot - no separate "offer a ride" step required. REJECTED only makes sense for that
-    // vanishing case where an attached request is still PENDING - a standalone request has no
-    // single owning driver to decline it on everyone's behalf, so it's forbidden there.
+    // Drivers accept/reject requests attached to their own rides. A standalone request can be
+    // accepted by attaching one of the driver's rides, or by creating a new ride from the
+    // request's route/time. Passengers may cancel their own pending or accepted requests.
     put("/requests/{requestId}") {
         val userId = call.requireUserId()
         val requestId = call.parameters["requestId"] ?: throw NotFoundException()
@@ -352,8 +338,8 @@ fun Route.rideRequestRoutes() {
                 }
                 RideRequestStatus.CANCELLED -> {
                     if (!isPassenger && !isOwningDriver) throw ForbiddenException("Not your request")
-                    // A confirmed seat (joining is instant now - see POST /rides/{rideId}/requests)
-                    // gives its seat back on cancel, so someone else can take it.
+                    // An accepted seat is returned on cancellation so another request can be
+                    // approved. Cancelling a still-pending request never changes capacity.
                     if (currentStatus == RideRequestStatus.ACCEPTED && existingRideId != null) {
                         val freshRide = Rides.selectAll().where { Rides.rideId eq existingRideId }.first()
                         Rides.update({ Rides.rideId eq existingRideId }) {

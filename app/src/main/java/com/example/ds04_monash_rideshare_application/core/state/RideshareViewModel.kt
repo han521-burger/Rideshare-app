@@ -93,8 +93,11 @@ class RideshareViewModel : ViewModel() {
         private set
     var actionInFlight by mutableStateOf(false)
         private set
+    var requestActionError by mutableStateOf<String?>(null)
+        private set
     var lastCreatedRide by mutableStateOf<RideSummary?>(null)
         private set
+    private var incomingRequestRefreshInFlight = false
 
     // Rides upcoming, already locked in - driving (CONFIRMED) or riding (your request ACCEPTED).
     // Computed client-side from data already loaded for Home/Requests rather than a dedicated
@@ -105,6 +108,7 @@ class RideshareViewModel : ViewModel() {
             val riding = myRequests.data.orEmpty()
                 .filter { it.status == RequestStatus.ACCEPTED }
                 .mapNotNull { it.ride }
+                .filter { it.status == RideStatus.CONFIRMED }
             return (driving + riding).distinctBy { it.rideId }.sortedBy { it.departureTime }
         }
 
@@ -165,6 +169,8 @@ class RideshareViewModel : ViewModel() {
                 incomingRequests = Resource(); openRides = Resource(); searchResults = Resource()
                 rideDetails = Resource(); messages = Resource(); tripHistory = Resource()
                 dashboard = Resource(); leaderboard = Resource(); ratings = Resource(); favorites = Resource()
+                selectedRideId = null; selectedRequestId = null; requestActionError = null
+                actionInFlight = false; incomingRequestRefreshInFlight = false; lastCreatedRide = null
                 onComplete()
             }
 
@@ -343,12 +349,25 @@ class RideshareViewModel : ViewModel() {
         })
     }
 
-    fun loadIncomingRequests() {
-        incomingRequests = Resource(isLoading = true)
+    fun loadIncomingRequests(showLoading: Boolean = true) {
+        if (incomingRequestRefreshInFlight) return
+        incomingRequestRefreshInFlight = true
+        if (showLoading) incomingRequests = Resource(isLoading = true, data = incomingRequests.data)
         apiService.fetchIncomingRequests(object : RideApiService.Callback<List<RideRequestSummary>> {
-            override fun onSuccess(result: List<RideRequestSummary>) { incomingRequests = Resource(data = result) }
-            override fun onFailure(error: Exception) { incomingRequests = Resource(errorMessage = error.message) }
+            override fun onSuccess(result: List<RideRequestSummary>) {
+                incomingRequestRefreshInFlight = false
+                incomingRequests = Resource(data = result)
+            }
+
+            override fun onFailure(error: Exception) {
+                incomingRequestRefreshInFlight = false
+                incomingRequests = Resource(data = incomingRequests.data, errorMessage = error.message)
+            }
         })
+    }
+
+    fun clearRequestActionError() {
+        requestActionError = null
     }
 
     fun respondToRequest(
@@ -358,18 +377,23 @@ class RideshareViewModel : ViewModel() {
         newRideSeatsTotal: Int? = null,
         onDone: (Boolean, String?) -> Unit = { _, _ -> }
     ) {
+        requestActionError = null
         actionInFlight = true
         apiService.respondToRequest(requestId, newStatus, targetRideId, newRideSeatsTotal, object : RideApiService.Callback<RideRequestSummary> {
             override fun onSuccess(result: RideRequestSummary) {
                 actionInFlight = false
                 loadIncomingRequests()
                 loadMyDriverRides()
+                loadMyRequests()
+                result.rideId?.takeIf { it == selectedRideId }?.let(::loadRideDetails)
                 onDone(true, null)
             }
 
             override fun onFailure(error: Exception) {
                 actionInFlight = false
-                onDone(false, error.message ?: "Couldn't update that request. Please try again.")
+                val message = error.message ?: "Couldn't update that request. Please try again."
+                requestActionError = message
+                onDone(false, message)
             }
         })
     }

@@ -35,8 +35,8 @@ private val STEP_LABELS = listOf("Ride", "Repeat", "Note", "Confirm")
 
 // Requesting a seat on a ride you're already browsing (tapped into from Home/Requests's open
 // rides list) - the ride and its time are already fixed, so this is shorter than the standalone
-// Request-a-Ride flow (RequestRideFlowScreen): just whether to join the whole recurring series,
-// how many seats, an optional note, then confirm.
+// Request-a-Ride flow (RequestRideFlowScreen): choose recurring dates, seats and a note, then
+// send the request to the driver for approval.
 @Composable
 fun RequestSeatFlowScreen(
     rideDetails: Resource<RideSummary>,
@@ -154,7 +154,7 @@ private fun ConfirmStep(ride: RideSummary, seats: Int, note: String, applyToRecu
             if (applyToRecurringGroup) Text("Applies to every date in this series")
             note.takeIf { it.isNotBlank() }?.let { Text("Note: $it") }
             Text(
-                "This driver already posted open seats, so confirming here books you in immediately.",
+                "The driver will review this request. Your seat is confirmed only after they accept it.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

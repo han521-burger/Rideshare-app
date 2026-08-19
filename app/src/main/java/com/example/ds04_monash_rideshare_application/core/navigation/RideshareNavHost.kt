@@ -28,6 +28,7 @@ import com.example.ds04_monash_rideshare_application.feature.rides.OfferRideFlow
 import com.example.ds04_monash_rideshare_application.feature.rides.RequestRideFlowScreen
 import com.example.ds04_monash_rideshare_application.feature.rides.RequestSeatFlowScreen
 import com.example.ds04_monash_rideshare_application.feature.rides.RideDetailScreen
+import kotlinx.coroutines.delay
 
 @Composable
 fun RideshareNavHost(
@@ -56,6 +57,7 @@ fun RideshareNavHost(
     }
 
     fun switchTab(destination: AppDestination) {
+        viewModel.clearRequestActionError()
         backStack = listOf(destination.route)
     }
 
@@ -65,20 +67,12 @@ fun RideshareNavHost(
         }
     }
 
-    // Tapping a request: if it already has a ride attached, Ride Detail already shows the full
-    // passenger list with accept/reject inline - go straight there. Only a still-driverless
-    // (standalone) request needs its own Request Detail screen, since there's no ride yet to show.
+    // A request always opens its own decision screen. Attached requests include the ride summary;
+    // standalone ones also let a driver select or create a suitable ride before accepting.
     fun openRequest(requestId: String) {
+        viewModel.clearRequestActionError()
         viewModel.selectedRequestId = requestId
-        val request = (viewModel.myRequests.data.orEmpty() + viewModel.incomingRequests.data.orEmpty())
-            .firstOrNull { it.requestId == requestId }
-        val rideId = request?.rideId
-        if (rideId != null) {
-            viewModel.selectedRideId = rideId
-            navigate(AppDestination.RideDetail)
-        } else {
-            navigate(AppDestination.RequestDetail)
-        }
+        navigate(AppDestination.RequestDetail)
     }
 
     BackHandler(enabled = backStack.size > 1) {
@@ -130,13 +124,47 @@ fun RideshareNavHost(
         }
     }
 
+    // The trial backend does not have push notifications yet. While a signed-in driver is on any
+    // main tab, refresh quietly so a newly-arrived request can animate into view without requiring
+    // a tab switch or manual refresh. The ViewModel prevents overlapping network calls.
+    LaunchedEffect(uiState.userId, viewModel.activeMode, currentDestination) {
+        if (uiState.isSignedIn && viewModel.activeMode == AppMode.DRIVER &&
+            currentDestination in AppDestination.tabDestinations
+        ) {
+            while (true) {
+                viewModel.loadIncomingRequests(showLoading = false)
+                delay(8_000)
+            }
+        }
+    }
+
     if (currentDestination in AppDestination.tabDestinations) {
+        val pendingDriverRequests = viewModel.incomingPendingRequests
+        val newestDriverRequest = pendingDriverRequests.maxByOrNull { it.createdAt }
         BottomNavScaffold(
             activeMode = viewModel.activeMode,
-            onModeChange = viewModel::updateActiveMode,
+            onModeChange = { mode ->
+                viewModel.clearRequestActionError()
+                viewModel.updateActiveMode(mode)
+            },
             currentTab = currentTab,
             onTabSelected = ::switchTab,
-            requestsBadgeCount = viewModel.myPendingRequests.size + viewModel.incomingPendingRequests.size,
+            requestsBadgeCount = if (viewModel.activeMode == AppMode.DRIVER) {
+                pendingDriverRequests.size
+            } else {
+                viewModel.myPendingRequests.size
+            },
+            driverRequest = newestDriverRequest,
+            driverRequestCount = pendingDriverRequests.size,
+            isRequestActionInFlight = viewModel.actionInFlight,
+            requestActionError = viewModel.requestActionError,
+            onReviewDriverRequest = ::openRequest,
+            onAcceptDriverRequest = { requestId ->
+                viewModel.respondToRequest(requestId, RequestStatus.ACCEPTED)
+            },
+            onDeclineDriverRequest = { requestId ->
+                viewModel.respondToRequest(requestId, RequestStatus.REJECTED)
+            },
             greetingName = uiState.greetingName,
             modifier = modifier
         ) { contentPadding ->
@@ -155,15 +183,13 @@ fun RideshareNavHost(
 
                     AppDestination.Requests -> RequestsScreen(
                         activeMode = viewModel.activeMode,
-                        // Joining an already-posted ride is instant now, so an ACCEPTED request
-                        // is already showing as a confirmed ride on Home (and, for the driver, as
-                        // an updated seat-fill count there) - showing it again here would just be
-                        // a duplicate. Only genuinely-still-pending (standalone) asks belong here.
+                        // Pending requests remain here until the driver accepts, rejects, or the
+                        // passenger cancels. Accepted requests move to the Home confirmed list.
                         myRequests = viewModel.myRequests.data.orEmpty().filter { it.status == RequestStatus.PENDING },
                         incomingRequests = viewModel.incomingRequests.data.orEmpty().filter { it.status == RequestStatus.PENDING },
                         openRides = viewModel.openRides,
-                        // Still-empty offers only - the instant one gets a passenger it flips to
-                        // CONFIRMED and moves over to Home instead (see HomeScreen.kt).
+                        // OPEN offers wait for their first approved passenger; confirmed rides
+                        // already appear on Home and remain reachable from there.
                         myOffers = viewModel.myDriverRides.data.orEmpty().filter { it.status == RideStatus.OPEN },
                         onOpenRequest = ::openRequest,
                         onOpenRide = { rideId ->
@@ -222,9 +248,12 @@ fun RideshareNavHost(
             myRequestForRide = viewModel.myRequests.data.orEmpty().firstOrNull { it.rideId == viewModel.selectedRideId },
             incomingRequestsForRide = viewModel.incomingRequests.data.orEmpty().filter { it.rideId == viewModel.selectedRideId },
             isActionInFlight = viewModel.actionInFlight,
+            requestActionError = viewModel.requestActionError,
             emergencyContactPhone = viewModel.profileDetails.data?.emergencyContactPhone,
             onRequestSeat = { navigate(AppDestination.RequestSeat) },
             onCancelMyRequest = { requestId -> viewModel.respondToRequest(requestId, RequestStatus.CANCELLED) },
+            onAcceptRequest = { requestId -> viewModel.respondToRequest(requestId, RequestStatus.ACCEPTED) },
+            onRejectRequest = { requestId -> viewModel.respondToRequest(requestId, RequestStatus.REJECTED) },
             onSetEnRoute = { enRoute ->
                 viewModel.selectedRideId?.let { viewModel.setDriverEnRoute(it, enRoute) }
             },
@@ -249,26 +278,45 @@ fun RideshareNavHost(
                 request = request,
                 currentUserId = uiState.userId,
                 myOpenRidesForAccept = viewModel.myDriverRides.data.orEmpty()
-                    .filter { it.status == RideStatus.OPEN && it.seatsAvailable >= minSeats },
+                    .filter {
+                        it.status in listOf(RideStatus.OPEN, RideStatus.CONFIRMED) && it.seatsAvailable >= minSeats
+                    },
                 isActionInFlight = viewModel.actionInFlight,
+                actionErrorMessage = viewModel.requestActionError,
                 onAcceptAttached = {
-                    request?.let { viewModel.respondToRequest(it.requestId, RequestStatus.ACCEPTED) { _, _ -> navigateUp() } }
+                    request?.let {
+                        viewModel.respondToRequest(it.requestId, RequestStatus.ACCEPTED) { success, _ ->
+                            if (success) navigateUp()
+                        }
+                    }
                 },
                 onAcceptStandalone = { targetRideId ->
-                    request?.let { viewModel.respondToRequest(it.requestId, RequestStatus.ACCEPTED, targetRideId) { _, _ -> navigateUp() } }
+                    request?.let {
+                        viewModel.respondToRequest(it.requestId, RequestStatus.ACCEPTED, targetRideId) { success, _ ->
+                            if (success) navigateUp()
+                        }
+                    }
                 },
                 onCreateRideAndAccept = { seatsTotal ->
                     request?.let {
-                        viewModel.respondToRequest(it.requestId, RequestStatus.ACCEPTED, targetRideId = null, newRideSeatsTotal = seatsTotal) { _, _ ->
-                            navigateUp()
+                        viewModel.respondToRequest(it.requestId, RequestStatus.ACCEPTED, targetRideId = null, newRideSeatsTotal = seatsTotal) { success, _ ->
+                            if (success) navigateUp()
                         }
                     }
                 },
                 onDecline = {
-                    request?.let { viewModel.respondToRequest(it.requestId, RequestStatus.REJECTED) { _, _ -> navigateUp() } }
+                    request?.let {
+                        viewModel.respondToRequest(it.requestId, RequestStatus.REJECTED) { success, _ ->
+                            if (success) navigateUp()
+                        }
+                    }
                 },
                 onCancel = {
-                    request?.let { viewModel.respondToRequest(it.requestId, RequestStatus.CANCELLED) { _, _ -> navigateUp() } }
+                    request?.let {
+                        viewModel.respondToRequest(it.requestId, RequestStatus.CANCELLED) { success, _ ->
+                            if (success) navigateUp()
+                        }
+                    }
                 },
                 onNavigateBack = ::navigateUp,
                 modifier = modifier

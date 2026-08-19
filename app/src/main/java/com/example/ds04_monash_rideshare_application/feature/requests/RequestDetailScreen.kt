@@ -40,6 +40,7 @@ fun RequestDetailScreen(
     currentUserId: String?,
     myOpenRidesForAccept: List<RideSummary>,
     isActionInFlight: Boolean,
+    actionErrorMessage: String?,
     onAcceptAttached: () -> Unit,
     onAcceptStandalone: (targetRideId: String) -> Unit,
     onCreateRideAndAccept: (seatsTotal: Int) -> Unit,
@@ -106,6 +107,14 @@ fun RequestDetailScreen(
                     request.passenger?.let { passenger -> Text("From ${passenger.displayName}") }
                     request.note?.takeIf { it.isNotBlank() }?.let { Text("Note: $it") }
                 }
+            }
+
+            actionErrorMessage?.let {
+                Text(
+                    text = it,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 12.dp)
+                )
             }
 
             if (request.status == RequestStatus.PENDING) {

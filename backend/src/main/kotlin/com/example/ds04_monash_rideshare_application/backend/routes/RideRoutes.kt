@@ -59,9 +59,8 @@ fun Route.rideRoutes() {
         val radiusMeters = call.request.queryParameters["radiusMeters"]?.toDoubleOrNull() ?: 5_000.0
 
         val (rides, alreadyRequestedRideIds) = transaction {
-            // CONFIRMED (not just OPEN) too - joining is instant now (see RideRequestRoutes.kt's
-            // POST /rides/{rideId}/requests), so a ride flips to CONFIRMED as soon as its first
-            // seat is taken but should keep showing here for everyone else while seats remain.
+            // CONFIRMED rides remain discoverable while seats are available: approval of one
+            // passenger should not hide the remaining seats from other passengers.
             val rows = Rides.selectAll().where { Rides.status inList listOf(RideStatus.OPEN, RideStatus.CONFIRMED) }.toList()
             enrichRideDtos(rows) to callerActiveRequestedRideIds(callerId)
         }

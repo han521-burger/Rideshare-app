@@ -11,6 +11,9 @@
 /.idea/deploymentTargetSelector.xml
 .DS_Store
 /build
+/backend/build/
+/backend/rideshare-backend.db
+/backend/rideshare-backend.db-*
 /captures
 .externalNativeBuild
 .cxx

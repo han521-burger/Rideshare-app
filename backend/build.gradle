@@ -34,7 +34,8 @@ dependencies {
     implementation 'ch.qos.logback:logback-classic:1.5.6'
 
     testImplementation "io.ktor:ktor-server-test-host-jvm:$ktorVersion"
-    testImplementation "org.jetbrains.kotlin:kotlin-test-junit:${libs.versions.kotlin.get()}"
+    testImplementation "org.jetbrains.kotlin:kotlin-test-junit5:${libs.versions.kotlin.get()}"
+    testRuntimeOnly "org.junit.jupiter:junit-jupiter-engine:5.11.0"
 }
 
 kotlin {

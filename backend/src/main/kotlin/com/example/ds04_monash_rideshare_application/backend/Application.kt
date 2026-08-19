@@ -20,11 +20,11 @@ import io.ktor.server.routing.routing
 import kotlinx.serialization.json.Json
 
 fun main() {
-    embeddedServer(Netty, port = 8080, host = "0.0.0.0", module = Application::module).start(wait = true)
+    embeddedServer(Netty, port = 8080, host = "0.0.0.0") { module() }.start(wait = true)
 }
 
-fun Application.module() {
-    initDatabase()
+fun Application.module(databaseUrl: String = "jdbc:sqlite:./rideshare-backend.db") {
+    initDatabase(databaseUrl)
 
     install(ContentNegotiation) {
         json(Json { ignoreUnknownKeys = true; encodeDefaults = true })
