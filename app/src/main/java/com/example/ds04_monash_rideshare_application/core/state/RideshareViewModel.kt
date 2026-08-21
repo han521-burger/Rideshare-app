@@ -77,6 +77,8 @@ class RideshareViewModel : ViewModel() {
         private set
     var searchResults by mutableStateOf(Resource<List<RideSummary>>())
         private set
+    var lastSearchCriteria by mutableStateOf<RideSearchCriteria?>(null)
+        private set
     var rideDetails by mutableStateOf(Resource<RideSummary>())
         private set
     var messages by mutableStateOf(Resource<List<MessageSummary>>())
@@ -167,6 +169,7 @@ class RideshareViewModel : ViewModel() {
                 activeMode = AppMode.PASSENGER
                 profileDetails = Resource(); myDriverRides = Resource(); myRequests = Resource()
                 incomingRequests = Resource(); openRides = Resource(); searchResults = Resource()
+                lastSearchCriteria = null
                 rideDetails = Resource(); messages = Resource(); tripHistory = Resource()
                 dashboard = Resource(); leaderboard = Resource(); ratings = Resource(); favorites = Resource()
                 selectedRideId = null; selectedRequestId = null; requestActionError = null
@@ -229,6 +232,7 @@ class RideshareViewModel : ViewModel() {
     }
 
     fun searchRides(criteria: RideSearchCriteria) {
+        lastSearchCriteria = criteria
         searchResults = Resource(isLoading = true)
         apiService.searchRides(criteria, object : RideApiService.Callback<List<RideSummary>> {
             override fun onSuccess(result: List<RideSummary>) { searchResults = Resource(data = result) }

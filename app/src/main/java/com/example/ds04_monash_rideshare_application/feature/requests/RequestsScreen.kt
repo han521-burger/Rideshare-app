@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Card
+import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -52,6 +53,7 @@ fun RequestsScreen(
     myOffers: List<RideSummary>,
     onOpenRequest: (requestId: String) -> Unit,
     onOpenRide: (rideId: String) -> Unit,
+    onFindRide: () -> Unit,
     onRequestRide: () -> Unit,
     onOfferRide: () -> Unit,
     modifier: Modifier = Modifier
@@ -76,7 +78,7 @@ fun RequestsScreen(
             } else {
                 when (subTab) {
                     TAB_LEFT -> PendingList(myRequests, "No pending rides - tap + to request one!", onOpenRequest)
-                    else -> BrowseRidesList(openRides, onOpenRide)
+                    else -> BrowseRidesList(openRides, onOpenRide, onFindRide)
                 }
             }
         }
@@ -149,7 +151,11 @@ private fun MyOfferRow(ride: RideSummary, onClick: () -> Unit) {
 }
 
 @Composable
-private fun BrowseRidesList(openRides: Resource<List<RideSummary>>, onOpenRide: (rideId: String) -> Unit) {
+private fun BrowseRidesList(
+    openRides: Resource<List<RideSummary>>,
+    onOpenRide: (rideId: String) -> Unit,
+    onFindRide: () -> Unit
+) {
     when {
         openRides.isLoading -> Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
         openRides.errorMessage != null -> Text(openRides.errorMessage, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp))
@@ -160,6 +166,11 @@ private fun BrowseRidesList(openRides: Resource<List<RideSummary>>, onOpenRide: 
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                item {
+                    Button(onClick = onFindRide, modifier = Modifier.fillMaxWidth()) {
+                        Text("Search by route and time")
+                    }
+                }
                 if (rides.isEmpty()) {
                     item { Text("No open rides posted right now - check back soon.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
                 } else {

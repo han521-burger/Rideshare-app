@@ -1,10 +1,18 @@
 package com.example.ds04_monash_rideshare_application.core.ui
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Card
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -12,6 +20,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.example.ds04_monash_rideshare_application.BuildConfig
+import com.example.ds04_monash_rideshare_application.ui.describeLocation
 import com.example.ds04_monash_rideshare_application.ui.haversineMeters
 import com.yandex.mapkit.MapKitFactory
 import com.yandex.mapkit.geometry.Point
@@ -29,6 +39,32 @@ fun RouteMiniMap(
     destinationLng: Double,
     modifier: Modifier = Modifier
 ) {
+    // MapKit throws an AssertionError when it is initialized without an API key. The map-based
+    // ride editor already handles that setup state, and read-only ride details must do the same so
+    // a missing local developer secret never makes an otherwise usable ride/request flow crash.
+    if (BuildConfig.YANDEX_MAPKIT_API_KEY.isBlank()) {
+        Card(modifier = modifier.fillMaxWidth().height(200.dp)) {
+            Column(
+                modifier = Modifier.fillMaxSize().padding(16.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text("Map preview unavailable", style = MaterialTheme.typography.titleMedium)
+                Text(
+                    "${describeLocation(originLat, originLng)} → " +
+                        describeLocation(destinationLat, destinationLng),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    "Add YANDEX_MAPKIT_API_KEY to local.properties to enable maps.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        return
+    }
+
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 

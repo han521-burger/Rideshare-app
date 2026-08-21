@@ -34,6 +34,10 @@ request creation stays `PENDING`, capacity is unchanged before approval, the own
 the request, acceptance changes both request status and available seats, another driver cannot
 respond, and rejection leaves ride capacity unchanged.
 
+`app/src/test/.../FindRideSearchTest.kt` verifies Member A's Week 4 search-form rules: both
+route endpoints are required, pickup and drop-off must differ, a valid form maps to the ranked
+search criteria sent to the backend, and a past preferred time is rejected.
+
 ## Validation test matrix (Week 2 scope)
 
 These are the four validation areas the weekly plan assigns to Member D for Week 2. Fill in

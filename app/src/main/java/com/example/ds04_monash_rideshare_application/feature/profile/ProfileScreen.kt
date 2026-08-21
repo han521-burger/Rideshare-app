@@ -76,7 +76,15 @@ fun ProfileScreen(
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text("Your details", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(profileDetails.data?.emailAccount ?: uiState.email, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text(
+                        "Monash email: ${profileDetails.data?.emailAccount ?: uiState.email}",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        "User ID: ${profileDetails.data?.userId ?: uiState.userId.orEmpty()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
 
                     OutlinedTextField(
                         value = displayName, onValueChange = { displayName = it },

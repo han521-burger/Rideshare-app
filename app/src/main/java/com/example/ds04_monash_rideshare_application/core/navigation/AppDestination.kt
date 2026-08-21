@@ -13,6 +13,8 @@ sealed class AppDestination(val route: String, val title: String) {
 
     data object RideDetail : AppDestination("ride-detail", "Ride Detail")
     data object RequestDetail : AppDestination("request-detail", "Request Detail")
+    // Ranked search for an existing ride: criteria -> matches -> ride detail -> request seat.
+    data object FindRide : AppDestination("find-ride", "Find a Ride")
     // Standalone ask - route + time, no driver picked yet (Search -> When -> Repeat -> Note -> Confirm).
     data object RequestRide : AppDestination("request-ride", "Request a Ride")
     // Requesting a seat on a ride already picked from Home/browsing (Repeat -> Note/Seats -> Confirm).
@@ -28,7 +30,7 @@ sealed class AppDestination(val route: String, val title: String) {
         val allDestinations: List<AppDestination>
             get() = listOf(
                 Splash, Login, Home, Requests, Activity, Profile,
-                RideDetail, RequestDetail, RequestRide, RequestSeat, OfferRide, Messages, Leaderboard
+                RideDetail, RequestDetail, FindRide, RequestRide, RequestSeat, OfferRide, Messages, Leaderboard
             )
 
         fun fromRoute(route: String?): AppDestination? =

@@ -24,6 +24,7 @@ import com.example.ds04_monash_rideshare_application.feature.messages.MessagesSc
 import com.example.ds04_monash_rideshare_application.feature.profile.ProfileScreen
 import com.example.ds04_monash_rideshare_application.feature.requests.RequestDetailScreen
 import com.example.ds04_monash_rideshare_application.feature.requests.RequestsScreen
+import com.example.ds04_monash_rideshare_application.feature.rides.FindRideScreen
 import com.example.ds04_monash_rideshare_application.feature.rides.OfferRideFlowScreen
 import com.example.ds04_monash_rideshare_application.feature.rides.RequestRideFlowScreen
 import com.example.ds04_monash_rideshare_application.feature.rides.RequestSeatFlowScreen
@@ -196,6 +197,7 @@ fun RideshareNavHost(
                             viewModel.selectedRideId = rideId
                             navigate(AppDestination.RideDetail)
                         },
+                        onFindRide = { navigate(AppDestination.FindRide) },
                         onRequestRide = { navigate(AppDestination.RequestRide) },
                         onOfferRide = { navigate(AppDestination.OfferRide) }
                     )
@@ -332,6 +334,19 @@ fun RideshareNavHost(
                 }
             },
             onExit = ::navigateUp,
+            modifier = modifier
+        )
+
+        AppDestination.FindRide -> FindRideScreen(
+            searchResults = viewModel.searchResults,
+            initialCriteria = viewModel.lastSearchCriteria,
+            onSearch = viewModel::searchRides,
+            onOpenRide = { rideId ->
+                viewModel.selectedRideId = rideId
+                navigate(AppDestination.RideDetail)
+            },
+            onPostRequest = { navigate(AppDestination.RequestRide) },
+            onNavigateBack = ::navigateUp,
             modifier = modifier
         )
 
