@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Monash Rideshare — Team Kanban Board</title>
+<style>
+  :root {
+    --asphalt-0: #14171b;
+    --asphalt-1: #1b1f24;
+    --asphalt-2: #21262d;
+    --asphalt-3: #2a3038;
+    --line: #343b44;
+    --line-strong: #454e59;
+    --lane: #f2c14e;
+    --lane-dim: #7a6427;
+    --text-hi: #edecea;
+    --text-mid: #a9afba;
+    --text-low: #6f7683;
+    --member-a: #5eb3f6;
+    --member-b: #7ee787;
+    --member-c: #f2c14e;
+    --member-d: #f78166;
+    --member-team: #c9a7ff;
+    --danger: #f76a6a;
+    --ok: #57d38c;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: var(--asphalt-0);
+    color: var(--text-hi);
+    min-height: 100vh;
+  }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 22px 22px 60px; }
+
+  header.top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+  }
+  h1 {
+    font-size: 20px;
+    font-weight: 600;
+    margin: 0;
+    letter-spacing: 0.2px;
+  }
+  h1 span.route-dot {
+    display: inline-block;
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--lane);
+    margin-right: 9px;
+    vertical-align: 1px;
+  }
+  .sub {
+    color: var(--text-mid);
+    font-size: 12.5px;
+    margin: 4px 0 0;
+  }
+
+  .toolbar {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .toolbar button, .toolbar select {
+    background: var(--asphalt-2);
+    border: 1px solid var(--line);
+    color: var(--text-hi);
+    font-size: 12.5px;
+    padding: 7px 11px;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .toolbar button:hover { border-color: var(--line-strong); }
+  .toolbar select { cursor: pointer; }
+  .toolbar button.primary {
+    background: var(--lane);
+    color: #2a2005;
+    border-color: var(--lane);
+    font-weight: 600;
+  }
+
+  .legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin: 14px 0 18px;
+    padding: 10px 14px;
+    background: var(--asphalt-1);
+    border: 1px solid var(--line);
+    border-radius: 9px;
+    font-size: 12px;
+    color: var(--text-mid);
+  }
+  .legend .item { display: flex; align-items: center; gap: 6px; }
+  .legend .swatch { width: 9px; height: 9px; border-radius: 2px; }
+
+  .progress-rail {
+    display: flex;
+    align-items: center;
+    margin: 16px 0 20px;
+    padding: 0 4px;
+  }
+  .progress-rail .seg {
+    flex: 1;
+    height: 3px;
+    background: var(--line);
+    position: relative;
+  }
+  .progress-rail .seg.filled { background: var(--lane); }
+  .progress-rail .stop {
+    width: 11px; height: 11px;
+    border-radius: 50%;
+    background: var(--asphalt-2);
+    border: 2px solid var(--line-strong);
+    flex-shrink: 0;
+    position: relative;
+    z-index: 1;
+  }
+  .progress-rail .stop.filled { background: var(--lane); border-color: var(--lane); }
+  .progress-rail .stop-label {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: var(--text-low);
+    white-space: nowrap;
+  }
+  .progress-rail .stop-wrap { position: relative; display:flex; flex-direction:column; align-items:center; }
+
+  .board {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(240px, 1fr));
+    gap: 16px;
+    overflow-x: auto;
+    padding-bottom: 10px;
+  }
+  .col {
+    background: var(--asphalt-1);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    min-height: 240px;
+    max-height: calc(100vh - 240px);
+  }
+  .col-head {
+    padding: 14px 16px 12px;
+    border-bottom: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: var(--asphalt-1);
+    border-radius: 12px 12px 0 0;
+  }
+  .col-head .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .col-head .name {
+    font-size: 13.5px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-hi);
+  }
+  .col-head .count {
+    font-size: 11.5px;
+    color: var(--text-low);
+    background: var(--asphalt-3);
+    padding: 2px 8px;
+    border-radius: 20px;
+  }
+  .col-head .desc {
+    font-size: 10.5px;
+    color: var(--text-low);
+    line-height: 1.35;
+  }
+  .col-body {
+    flex: 1;
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    min-height: 140px;
+    overflow-y: auto;
+    transition: background 0.12s;
+  }
+  .col-body.dragover { background: rgba(242,193,78,0.06); }
+  .col[data-col="blocked"] .col-head .name { color: var(--danger); }
+  .col[data-col="done"] .col-head .name { color: var(--ok); }
+
+  .card {
+    background: var(--asphalt-2);
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--member-team);
+    border-radius: 8px;
+    padding: 11px 12px 10px;
+    cursor: grab;
+    font-size: 13px;
+    line-height: 1.45;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+  }
+  .card:hover { border-color: var(--line-strong); }
+  .card:active { cursor: grabbing; }
+  .card.dragging { opacity: 0.4; }
+  .card .title { color: var(--text-hi); margin: 0 0 7px; }
+  .card .meta {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .tag {
+    font-size: 10px;
+    padding: 1.5px 6px;
+    border-radius: 4px;
+    background: var(--asphalt-3);
+    color: var(--text-mid);
+    white-space: nowrap;
+  }
+  .tag.week { color: var(--text-low); }
+  .tag.req { color: var(--lane); background: rgba(242,193,78,0.1); }
+  .member-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 4px;
+  }
+  .card .owner-line {
+    display: flex;
+    align-items: center;
+    font-size: 10.5px;
+    color: var(--text-mid);
+    margin-top: 5px;
+  }
+  .empty-hint {
+    font-size: 11px;
+    color: var(--text-low);
+    text-align: center;
+    padding: 18px 6px;
+  }
+
+  .tag.story { color: var(--ok); background: rgba(87,211,140,0.1); }
+  .tag.tech { color: var(--text-low); }
+
+  .hidden { display: none !important; }
+  footer.note {
+    margin-top: 18px;
+    font-size: 11.5px;
+    color: var(--text-low);
+  }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(10,12,14,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    z-index: 50;
+  }
+  .modal {
+    position: relative;
+    background: var(--asphalt-1);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 480px;
+    max-height: calc(100vh - 60px);
+    overflow-y: auto;
+    padding: 20px 22px 18px;
+  }
+  .modal h2 {
+    font-size: 15px;
+    margin: 0 0 16px;
+    padding-right: 24px;
+    color: var(--text-hi);
+  }
+  .modal-x {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 26px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    color: var(--text-mid);
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    border-radius: 6px;
+  }
+  .modal-x:hover { background: var(--asphalt-3); color: var(--text-hi); }
+  .view-meta {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .owner-line { font-size: 12px; color: var(--text-mid); }
+  .view-story-block { margin-top: 16px; }
+  .view-story-block label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-mid);
+    margin-bottom: 6px;
+  }
+  .view-story-block p {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--text-hi);
+    background: var(--asphalt-2);
+    border: 1px solid var(--line);
+    border-radius: 7px;
+    padding: 10px 12px;
+  }
+  .view-story-block p.technical { color: var(--text-low); font-style: italic; }
+  .field { margin-bottom: 13px; }
+  .field label {
+    display: block;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    color: var(--text-mid);
+    margin-bottom: 5px;
+  }
+  .field input[type="text"],
+  .field select,
+  .field textarea {
+    width: 100%;
+    background: var(--asphalt-2);
+    border: 1px solid var(--line);
+    color: var(--text-hi);
+    font-size: 13px;
+    font-family: inherit;
+    padding: 8px 10px;
+    border-radius: 7px;
+  }
+  .field textarea { resize: vertical; min-height: 60px; line-height: 1.4; }
+  .field-check {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 12px;
+    color: var(--text-mid);
+    margin-bottom: 8px;
+  }
+  .modal-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    margin-top: 6px;
+  }
+  .modal-actions .right { display: flex; gap: 8px; }
+  .modal-actions button {
+    background: var(--asphalt-2);
+    border: 1px solid var(--line);
+    color: var(--text-hi);
+    font-size: 12.5px;
+    padding: 7px 12px;
+    border-radius: 7px;
+    cursor: pointer;
+  }
+  .modal-actions button:hover { border-color: var(--line-strong); }
+  .modal-actions button.primary {
+    background: var(--lane);
+    color: #2a2005;
+    border-color: var(--lane);
+    font-weight: 600;
+  }
+  .modal-actions button.danger {
+    background: transparent;
+    color: var(--danger);
+    border-color: var(--danger);
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div>
+      <h1><span class="route-dot"></span>Monash Rideshare — Team Kanban Board</h1>
+      <p class="sub">Shared team board — drag cards between stations, or click a card to view/edit it. Changes are visible to everyone with this file.</p>
+    </div>
+    <div class="toolbar">
+      <select id="memberFilter">
+        <option value="all">All members</option>
+        <option value="team">Team</option>
+        <option value="a">Keng Hong — Android/UI</option>
+        <option value="b">Zane — Backend/DB</option>
+        <option value="c">Han — Integration</option>
+        <option value="d">Tony — QA/Security</option>
+      </select>
+      <select id="weekFilter">
+        <option value="all">All weeks</option>
+      </select>
+      <button id="resetBtn">Reset board</button>
+      <button id="addBtn" class="primary">+ Add ticket</button>
+    </div>
+  </header>
+
+  <div class="legend">
+    <span class="item"><span class="swatch" style="background:var(--member-team)"></span>Team</span>
+    <span class="item"><span class="swatch" style="background:var(--member-a)"></span>Keng Hong · Android/UI</span>
+    <span class="item"><span class="swatch" style="background:var(--member-b)"></span>Zane · Backend/DB</span>
+    <span class="item"><span class="swatch" style="background:var(--member-c)"></span>Han · Integration</span>
+    <span class="item"><span class="swatch" style="background:var(--member-d)"></span>Tony · QA/Security</span>
+  </div>
+
+  <div class="board" id="board"></div>
+
+  <footer class="note" id="statusLine"></footer>
+</div>
+
+<div class="modal-overlay hidden" id="modalOverlay">
+  <div class="modal">
+    <button type="button" class="modal-x" id="modalClose" aria-label="Close">&times;</button>
+
+    <div id="viewPane">
+      <h2 id="vTitle"></h2>
+      <div class="view-meta">
+        <span class="tag" id="vColumn"></span>
+        <span class="tag week" id="vWeek"></span>
+        <span class="tag req hidden" id="vReq"></span>
+      </div>
+      <div class="owner-line" id="vOwnerLine" style="margin-top:10px;"></div>
+      <div class="view-story-block">
+        <label>User story</label>
+        <p id="vStory"></p>
+      </div>
+      <div class="modal-actions">
+        <button id="viewDelete" class="danger">Delete</button>
+        <div class="right">
+          <button id="viewEdit" class="primary">Edit</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="editPane" class="hidden">
+      <h2 id="modalTitle">Ticket</h2>
+      <div class="field">
+        <label for="fTitle">Title</label>
+        <input type="text" id="fTitle" maxlength="200">
+      </div>
+      <div class="field">
+        <label for="fColumn">Backlog / status</label>
+        <select id="fColumn"></select>
+      </div>
+      <div class="field">
+        <label for="fWeek">Week</label>
+        <input type="text" id="fWeek" placeholder="e.g. Week 3">
+      </div>
+      <div class="field">
+        <label for="fOwner">Owner</label>
+        <select id="fOwner">
+          <option value="team">Team</option>
+          <option value="a">Keng Hong — Android/UI</option>
+          <option value="b">Zane — Backend/DB</option>
+          <option value="c">Han — Integration</option>
+          <option value="d">Tony — QA/Security</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="fReq">Requirement ID (optional)</label>
+        <input type="text" id="fReq" placeholder="e.g. FR-04">
+      </div>
+      <div class="field">
+        <label class="field-check"><input type="checkbox" id="fTechnical"> Technical task (no user story)</label>
+        <label for="fStory">User story</label>
+        <textarea id="fStory" placeholder="As a [role], I want [goal], so that [benefit]."></textarea>
+      </div>
+      <div class="modal-actions">
+        <div></div>
+        <div class="right">
+          <button id="modalCancel">Cancel</button>
+          <button id="modalSave" class="primary">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-app.js";
+import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/10.13.2/firebase-database.js";
+
+// --- Firebase setup ---------------------------------------------------
+// 1. Go to https://console.firebase.google.com -> create a free project.
+// 2. Build > Realtime Database > Create Database (start in "test mode" for now).
+// 3. Project settings > General > "Your apps" > Web app (</>) > copy the config below.
+// 4. Paste your real values here, save, and push this file so every teammate has it.
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyDrPPP5DoAaMUk802g7sJsHSKwhASgqnI8",
+  authDomain: "rideshare-kanban.firebaseapp.com",
+  databaseURL: "https://rideshare-kanban-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "rideshare-kanban",
+  storageBucket: "rideshare-kanban.firebasestorage.app",
+  messagingSenderId: "903744399390",
+  appId: "1:903744399390:web:f31a4be118fa2f266a260f"
+};
+const FIREBASE_CONFIGURED = FIREBASE_CONFIG.apiKey !== "REPLACE_ME";
+
+let boardRef = null;
+if (FIREBASE_CONFIGURED) {
+  const app = initializeApp(FIREBASE_CONFIG);
+  const db = getDatabase(app);
+  boardRef = ref(db, "kanban/state");
+}
+
+const COLUMNS = [
+  { id: "product", name: "Product Backlog", desc: "Everything we could build — not yet committed to a sprint" },
+  { id: "sprint", name: "Sprint Backlog", desc: "Pulled from Product Backlog — committed for the current sprint" },
+  { id: "inprogress", name: "In progress", desc: "Being actively worked on right now" },
+  { id: "done", name: "Done", desc: "Finished and verified" },
+  { id: "blocked", name: "Blocked", desc: "Can't move forward until something else is resolved" }
+];
+
+const MEMBER_INFO = {
+  team: { label: "Team", color: "var(--member-team)" },
+  a: { label: "Keng Hong", color: "var(--member-a)" },
+  b: { label: "Zane", color: "var(--member-b)" },
+  c: { label: "Han", color: "var(--member-c)" },
+  d: { label: "Tony", color: "var(--member-d)" }
+};
+
+const DEFAULT_TASKS = [
+  { id: "t1", title: "Confirm backend technology stack", week: "Week 1", owner: "team", req: "", col: "product", story: "" },
+  { id: "t2", title: "Confirm central database technology", week: "Week 1", owner: "team", req: "FR-08", col: "product", story: "" },
+  { id: "t3", title: "Create GitHub Kanban board + workflow", week: "Week 1", owner: "team", req: "", col: "product", story: "" },
+  { id: "t4", title: "Confirm package architecture (core/feature)", week: "Week 1", owner: "team", req: "", col: "product", story: "" },
+  { id: "t5", title: "Agree branch/PR rules", week: "Week 1", owner: "team", req: "", col: "product", story: "" },
+  { id: "t6", title: "Mark Monash SSO as external dependency until confirmed", week: "Week 1", owner: "team", req: "FR-01", col: "product", story: "" },
+
+  { id: "t7", title: "Create/clean up Android Studio project (Kotlin, Compose, MVVM)", week: "Week 1", owner: "a", req: "", col: "product", story: "" },
+  { id: "t8", title: "Build navigation skeleton (Splash → Login → Role → Home)", week: "Week 1", owner: "a", req: "", col: "product", story: "" },
+  { id: "t9", title: "Add placeholder screens (Profile, Create Ride, Find Ride, etc.)", week: "Week 1", owner: "a", req: "", col: "product", story: "" },
+  { id: "t10", title: "Login UI + Role selection UI", week: "Week 1", owner: "a", req: "FR-01", col: "product", story: "As a Monash student, I want to log in and choose whether I'm using the app as a driver or passenger, so that I see the right experience for my role." },
+  { id: "t11", title: "Passenger Home + Driver Home placeholders", week: "Week 1", owner: "a", req: "", col: "product", story: "" },
+
+  { id: "t12", title: "Create backend repository, decide stack", week: "Week 1", owner: "b", req: "", col: "product", story: "" },
+  { id: "t13", title: "GET /health returns \"API online\"", week: "Week 1", owner: "b", req: "", col: "product", story: "" },
+  { id: "t14", title: "Database connection established", week: "Week 1", owner: "b", req: "FR-08", col: "product", story: "" },
+  { id: "t15", title: "Initial User + Ride models", week: "Week 1", owner: "b", req: "", col: "product", story: "" },
+  { id: "t16", title: "Stub /users/me and /rides endpoints", week: "Week 1", owner: "b", req: "", col: "product", story: "" },
+
+  { id: "t17", title: "Investigate Monash SSO (OAuth/OIDC, redirect URI, approval)", week: "Week 1", owner: "c", req: "FR-01", col: "product", story: "" },
+  { id: "t18", title: "Build FakeAuthenticationProvider interface", week: "Week 1", owner: "c", req: "FR-01", col: "product", story: "" },
+  { id: "t19", title: "Yandex MapKit feasibility spike — map loads, shows Melbourne", week: "Week 1", owner: "c", req: "", col: "product", story: "" },
+  { id: "t20", title: "GreenVehicleGuide / emissions dataset feasibility research", week: "Week 1", owner: "c", req: "", col: "product", story: "" },
+
+  { id: "t21", title: "Set up GitHub board columns + PR template", week: "Week 1", owner: "d", req: "", col: "product", story: "" },
+  { id: "t22", title: "Create issue template with acceptance criteria fields", week: "Week 1", owner: "d", req: "", col: "product", story: "" },
+  { id: "t23", title: "Write first unit test conventions", week: "Week 1", owner: "d", req: "", col: "product", story: "" },
+  { id: "t24", title: "Draft security checklist (NFR-01 basis)", week: "Week 1", owner: "d", req: "NFR-01", col: "product", story: "" },
+  { id: "t66", title: "Populate GitHub Kanban board with Sprint 1 backlog tickets", week: "Week 1", owner: "team", req: "", col: "product", story: "" },
+  { id: "t67", title: "Add Room dependency + create local RoomDatabase/DAO skeleton", week: "Week 1", owner: "c", req: "", col: "product", story: "" },
+  { id: "t68", title: "Set up GitHub Actions CI build check on main", week: "Week 1", owner: "d", req: "", col: "product", story: "" },
+  { id: "t69", title: "Create RTM with development-status tracking column", week: "Week 1", owner: "d", req: "", col: "product", story: "" },
+  { id: "t70", title: "Update risk register based on Week 1 findings", week: "Week 1", owner: "d", req: "", col: "product", story: "" },
+  { id: "t71", title: "Conduct Sprint 1 review + retrospective; full demo (nav + backend ping + map load)", week: "Week 1", owner: "team", req: "", col: "product", story: "" },
+
+  { id: "t25", title: "Profile screen: name, Monash email, preferred name, role, photo", week: "Week 2", owner: "a", req: "", col: "product", story: "As a user, I want to view and edit my profile (name, Monash email, preferred name, role, photo), so that other ride participants know who I am." },
+  { id: "t26", title: "Driver \"Create Ride\" form (origin, destination, seats, time)", week: "Week 2", owner: "a", req: "", col: "product", story: "As a driver, I want to create a ride by entering origin, destination, seat count, and time, so that passengers can find and join my trip." },
+  { id: "t27", title: "Passenger \"Find Ride\" search form", week: "Week 2", owner: "a", req: "", col: "product", story: "As a passenger, I want to search for available rides, so that I can find a trip that matches where and when I need to go." },
+  { id: "t28", title: "Design central DB schema: users, vehicles, rides, ride_requests, messages", week: "Week 2", owner: "b", req: "FR-08", col: "product", story: "" },
+  { id: "t29", title: "Implement User / Ride / RideRequest tables", week: "Week 2", owner: "b", req: "FR-08", col: "product", story: "" },
+  { id: "t30", title: "Yandex: select origin → destination, compute distance + duration", week: "Week 2", owner: "c", req: "", col: "product", story: "As a driver or passenger, I want to see the distance and estimated duration between my origin and destination, so that I understand my trip before confirming it." },
+  { id: "t31", title: "Store lat/lng, distanceMeters, estimatedDurationSeconds", week: "Week 2", owner: "c", req: "", col: "product", story: "" },
+  { id: "t32", title: "Confirm two devices can see the same backend data", week: "Week 2", owner: "d", req: "", col: "product", story: "" },
+
+  { id: "t33", title: "Map-based ride creation flow (origin → map/search → destination → route → publish)", week: "Week 3", owner: "a", req: "", col: "product", story: "As a driver, I want to create a ride using a map to pick my origin, destination, and route, so that I can publish an accurate trip visually instead of typing addresses." },
+  { id: "t34", title: "POST/GET /rides, GET /rides/{id}, GET /users/{id}/rides", week: "Week 3", owner: "b", req: "", col: "product", story: "" },
+  { id: "t35", title: "Ride filtering by date, origin, destination, availability", week: "Week 3", owner: "b", req: "", col: "product", story: "As a passenger, I want to filter rides by date, origin, destination, and seat availability, so that I only see trips relevant to me." },
+  { id: "t36", title: "Room local cache via repository pattern (never expose DAO to UI)", week: "Week 3", owner: "c", req: "", col: "product", story: "" },
+  { id: "t37", title: "Cache user profile, ride list, confirmed rides, trip history", week: "Week 3", owner: "c", req: "", col: "product", story: "As a user, I want my profile, rides, and trip history available even on a poor connection, so that the app stays usable when I'm offline." },
+  { id: "t38", title: "NFR-01 security review: HTTPS, no committed secrets, auth on endpoints", week: "Week 3", owner: "d", req: "NFR-01", col: "product", story: "" },
+  { id: "t39", title: "Emissions prototype: CO2 = distance × emission factor (label as estimate)", week: "Week 3", owner: "d", req: "", col: "product", story: "As an environmentally-conscious user, I want to see an estimated CO2 figure for my trip, so that I understand the environmental impact of sharing a ride." },
+
+  { id: "t40", title: "Passenger search/request UI", week: "Week 4", owner: "a", req: "FR-02", col: "product", story: "As a passenger, I want to send a ride request to a driver from my search results, so that I can secure a seat on a trip I'm interested in." },
+  { id: "t41", title: "Ride-request endpoints + status state machine", week: "Week 4", owner: "b", req: "FR-03", col: "product", story: "" },
+  { id: "t42", title: "Search filters + coordinate/pickup-zone handling", week: "Week 4", owner: "c", req: "FR-02", col: "product", story: "" },
+  { id: "t43", title: "Test every valid/invalid status transition (PENDING→ACCEPTED etc.)", week: "Week 4", owner: "d", req: "", col: "product", story: "" },
+
+  { id: "t44", title: "Matching pipeline: date, seats>0, direction, time, pickup, route", week: "Week 5", owner: "b", req: "FR-04", col: "product", story: "" },
+  { id: "t45", title: "Weighted match score (route 40%, time 30%, pickup 20%, detour 10%)", week: "Week 5", owner: "b", req: "FR-04", col: "product", story: "As a passenger, I want my requests matched to the most compatible drivers by route, time, pickup point, and detour, so that I get better ride suggestions." },
+  { id: "t46", title: "Display match % — driver retains final accept/reject", week: "Week 5", owner: "a", req: "FR-04", col: "product", story: "As a driver, I want to see a match percentage for each ride request along with accept/reject controls, so that I can quickly decide which passengers to take." },
+  { id: "t47", title: "Implement Version 1 fallback: station + time + direction only", week: "Week 5", owner: "c", req: "", col: "product", story: "" },
+
+  { id: "t48", title: "Atomic seat decrement on the backend (prevent overbooking)", week: "Week 6", owner: "b", req: "", col: "product", story: "" },
+  { id: "t49", title: "Minimum messaging: text, timestamp, sender, conversation ID", week: "Week 6", owner: "a", req: "", col: "product", story: "As a driver or passenger, I want to send basic text messages to my ride partner, so that we can coordinate pickup details." },
+  { id: "t50", title: "Trip history storage on ride completion", week: "Week 6", owner: "b", req: "FR-07", col: "product", story: "" },
+  { id: "t51", title: "Safety prototype: report user/ride, safety info, disclaimer", week: "Week 6", owner: "d", req: "", col: "product", story: "As a user, I want to report another user or ride and see basic safety information, so that I feel safe using the app." },
+  { id: "t52", title: "Milestone 3 two-phone demo: create ride → search → request → accept → seats update", week: "Week 6", owner: "team", req: "", col: "product", story: "" },
+
+  { id: "t53", title: "Build RTM testing column, trace FR-01 to FR-09 + NFRs", week: "Week 7", owner: "d", req: "", col: "product", story: "" },
+  { id: "t54", title: "Cross-test: A tests B, B tests C, C tests D, D tests A", week: "Week 7", owner: "team", req: "", col: "product", story: "" },
+
+  { id: "t55", title: "Sustainability dashboard: CO2 avoided, monthly trips, totals", week: "Week 8", owner: "a", req: "FR-07", col: "product", story: "As a user, I want to see a dashboard of CO2 avoided and trip totals over time, so that I can track my positive environmental impact." },
+  { id: "t56", title: "Measure NFR-02 performance (search, matching, request times)", week: "Week 8", owner: "d", req: "NFR-02", col: "product", story: "" },
+  { id: "t57", title: "Handle NFR-03 failure states with friendly retry messaging", week: "Week 8", owner: "b", req: "NFR-03", col: "product", story: "As a user, I want to see a friendly retry message when something fails, so that I'm not confused by technical errors." },
+
+  { id: "t58", title: "Run UAT with non-team testers, record time/errors/confusion", week: "Week 9", owner: "team", req: "", col: "product", story: "" },
+  { id: "t59", title: "Triage issues P0–P3, fix P0/P1 before cosmetic P3", week: "Week 9", owner: "team", req: "", col: "product", story: "" },
+  { id: "t60", title: "Cut release candidate v1.0.0-rc1, run full test suite", week: "Week 9", owner: "d", req: "", col: "product", story: "" },
+  { id: "t61", title: "Prepare final APK + demo accounts", week: "Week 9", owner: "d", req: "", col: "product", story: "" },
+  { id: "t62", title: "Write README + installation instructions", week: "Week 9", owner: "team", req: "", col: "product", story: "" },
+  { id: "t63", title: "Produce final architecture diagram", week: "Week 9", owner: "team", req: "", col: "product", story: "" },
+  { id: "t64", title: "Compile test results summary + known limitations", week: "Week 9", owner: "d", req: "", col: "product", story: "" },
+  { id: "t65", title: "Finalize RTM, risk register, and Gantt chart", week: "Week 9", owner: "team", req: "", col: "product", story: "" }
+];
+
+let state = null;
+let storageOk = true;
+
+async function saveState() {
+  if (!boardRef) {
+    storageOk = false;
+    updateStatusLine();
+    return;
+  }
+  try {
+    await set(boardRef, state);
+    storageOk = true;
+  } catch (e) {
+    storageOk = false;
+  }
+  updateStatusLine();
+}
+
+function updateStatusLine() {
+  const el = document.getElementById("statusLine");
+  if (!FIREBASE_CONFIGURED) {
+    el.textContent = "Firebase isn't set up yet — edit FIREBASE_CONFIG near the top of this file's <script> so the board syncs live for everyone. Right now changes only live in this browser tab.";
+  } else {
+    el.textContent = storageOk
+      ? "Shared team board — connected. Changes sync live for everyone with this file."
+      : "Lost connection to Firebase — edits may not save until it reconnects.";
+  }
+}
+
+function populateWeekFilter() {
+  const weeks = [...new Set(state.tasks.map(t => t.week))].sort();
+  const sel = document.getElementById("weekFilter");
+  weeks.forEach(w => {
+    const opt = document.createElement("option");
+    opt.value = w;
+    opt.textContent = w;
+    sel.appendChild(opt);
+  });
+}
+
+function renderRail() {
+  const doneCount = state.tasks.filter(t => t.col === "done").length;
+  const total = state.tasks.length;
+}
+
+function render() {
+  const memberVal = document.getElementById("memberFilter").value;
+  const weekVal = document.getElementById("weekFilter").value;
+  const board = document.getElementById("board");
+  // Keeps the grid in sync with however many columns actually exist, rather than a number
+  // baked into the CSS - the CSS had drifted out of sync with COLUMNS once before (7 columns
+  // reserved in the grid for what had become a 4-column board), squeezing everything into the
+  // first slots and leaving dead space on the right.
+  board.style.gridTemplateColumns = `repeat(${COLUMNS.length}, minmax(240px, 1fr))`;
+  board.innerHTML = "";
+
+  COLUMNS.forEach(col => {
+    const colEl = document.createElement("div");
+    colEl.className = "col";
+    colEl.dataset.col = col.id;
+
+    const tasksHere = state.tasks.filter(t => {
+      if (t.col !== col.id) return false;
+      if (memberVal !== "all" && t.owner !== memberVal) return false;
+      if (weekVal !== "all" && t.week !== weekVal) return false;
+      return true;
+    });
+
+    colEl.innerHTML = `
+      <div class="col-head">
+        <div class="row">
+          <span class="name">${col.name}</span>
+          <span class="count">${tasksHere.length}</span>
+        </div>
+        ${col.desc ? `<div class="desc">${escapeHtml(col.desc)}</div>` : ""}
+      </div>
+      <div class="col-body" data-col="${col.id}"></div>
+    `;
+    board.appendChild(colEl);
+
+    const body = colEl.querySelector(".col-body");
+    if (tasksHere.length === 0) {
+      body.innerHTML = '<div class="empty-hint">No tickets here</div>';
+    } else {
+      tasksHere.forEach(t => body.appendChild(renderCard(t)));
+    }
+
+    body.addEventListener("dragover", e => {
+      e.preventDefault();
+      body.classList.add("dragover");
+    });
+    body.addEventListener("dragleave", () => body.classList.remove("dragover"));
+    body.addEventListener("drop", async e => {
+      e.preventDefault();
+      body.classList.remove("dragover");
+      const id = e.dataTransfer.getData("text/plain");
+      const task = state.tasks.find(t => t.id === id);
+      if (task) {
+        task.col = col.id;
+        await saveState();
+        render();
+      }
+    });
+  });
+}
+
+function renderCard(t) {
+  const card = document.createElement("div");
+  card.className = "card";
+  card.draggable = true;
+  card.dataset.id = t.id;
+  const m = MEMBER_INFO[t.owner] || MEMBER_INFO.team;
+  card.style.borderLeftColor = m.color;
+  card.innerHTML = `
+    <p class="title">${escapeHtml(t.title)}</p>
+    <div class="meta">
+      <span class="tag week">${escapeHtml(t.week)}</span>
+      ${t.req ? `<span class="tag req">${escapeHtml(t.req)}</span>` : ""}
+      ${t.story ? `<span class="tag story">Story</span>` : `<span class="tag tech">Technical</span>`}
+    </div>
+    <div class="owner-line"><span class="member-dot" style="background:${m.color}"></span>${m.label}</div>
+  `;
+  card.addEventListener("dragstart", e => {
+    e.dataTransfer.setData("text/plain", t.id);
+    card.classList.add("dragging");
+  });
+  card.addEventListener("dragend", () => card.classList.remove("dragging"));
+  card.addEventListener("click", () => openTicketModal(t.id));
+  return card;
+}
+
+// --- Ticket modal (view/edit/create) -----------------------------------
+
+let editingId = null; // null while creating a brand-new ticket
+
+function populateColumnSelect() {
+  const sel = document.getElementById("fColumn");
+  sel.innerHTML = "";
+  COLUMNS.forEach(c => {
+    const opt = document.createElement("option");
+    opt.value = c.id;
+    opt.textContent = c.name;
+    sel.appendChild(opt);
+  });
+}
+
+function columnName(id) {
+  const c = COLUMNS.find(c => c.id === id);
+  return c ? c.name : id;
+}
+
+function openTicketModal(id) {
+  editingId = id || null;
+  const task = id ? state.tasks.find(t => t.id === id) : null;
+
+  document.getElementById("modalOverlay").classList.remove("hidden");
+  if (task) {
+    showViewPane(task);
+  } else {
+    showEditPane(null);
+  }
+}
+
+function showViewPane(task) {
+  const m = MEMBER_INFO[task.owner] || MEMBER_INFO.team;
+  document.getElementById("vTitle").textContent = task.title;
+  document.getElementById("vColumn").textContent = columnName(task.col);
+  document.getElementById("vWeek").textContent = task.week;
+  const vReq = document.getElementById("vReq");
+  vReq.textContent = task.req;
+  vReq.classList.toggle("hidden", !task.req);
+  document.getElementById("vOwnerLine").innerHTML =
+    `<span class="member-dot" style="background:${m.color}"></span>${m.label}`;
+  const vStory = document.getElementById("vStory");
+  if (task.story) {
+    vStory.textContent = task.story;
+    vStory.classList.remove("technical");
+  } else {
+    vStory.textContent = "Technical task — no user story applies.";
+    vStory.classList.add("technical");
+  }
+
+  document.getElementById("viewPane").classList.remove("hidden");
+  document.getElementById("editPane").classList.add("hidden");
+}
+
+function showEditPane(task) {
+  document.getElementById("modalTitle").textContent = task ? "Edit ticket" : "New ticket";
+  document.getElementById("fTitle").value = task ? task.title : "";
+  populateColumnSelect();
+  document.getElementById("fColumn").value = task ? task.col : "product";
+  document.getElementById("fWeek").value = task ? task.week : "";
+  document.getElementById("fOwner").value = task ? task.owner : "team";
+  document.getElementById("fReq").value = task ? task.req : "";
+  document.getElementById("fTechnical").checked = task ? !task.story : false;
+  document.getElementById("fStory").value = task ? task.story : "";
+  document.getElementById("fStory").disabled = document.getElementById("fTechnical").checked;
+
+  document.getElementById("viewPane").classList.add("hidden");
+  document.getElementById("editPane").classList.remove("hidden");
+  document.getElementById("fTitle").focus();
+}
+
+function closeTicketModal() {
+  document.getElementById("modalOverlay").classList.add("hidden");
+  editingId = null;
+}
+
+document.getElementById("fTechnical").addEventListener("change", e => {
+  document.getElementById("fStory").disabled = e.target.checked;
+  if (e.target.checked) document.getElementById("fStory").value = "";
+});
+
+document.getElementById("modalClose").addEventListener("click", closeTicketModal);
+document.getElementById("modalOverlay").addEventListener("click", e => {
+  if (e.target.id === "modalOverlay") closeTicketModal();
+});
+
+document.getElementById("viewEdit").addEventListener("click", () => {
+  const task = state.tasks.find(t => t.id === editingId);
+  showEditPane(task);
+});
+
+document.getElementById("viewDelete").addEventListener("click", async () => {
+  if (!editingId) return;
+  if (!confirm("Delete this ticket for everyone on the team?")) return;
+  state.tasks = state.tasks.filter(t => t.id !== editingId);
+  await saveState();
+  closeTicketModal();
+  render();
+});
+
+document.getElementById("modalCancel").addEventListener("click", () => {
+  const task = editingId ? state.tasks.find(t => t.id === editingId) : null;
+  if (task) {
+    showViewPane(task);
+  } else {
+    closeTicketModal();
+  }
+});
+
+document.getElementById("modalSave").addEventListener("click", async () => {
+  const title = document.getElementById("fTitle").value.trim();
+  if (!title) { document.getElementById("fTitle").focus(); return; }
+  const col = document.getElementById("fColumn").value;
+  const week = document.getElementById("fWeek").value.trim() || "Week 1";
+  const owner = document.getElementById("fOwner").value;
+  const req = document.getElementById("fReq").value.trim();
+  const technical = document.getElementById("fTechnical").checked;
+  const story = technical ? "" : document.getElementById("fStory").value.trim();
+
+  let task;
+  if (editingId) {
+    task = state.tasks.find(t => t.id === editingId);
+    Object.assign(task, { title, col, week, owner, req, story });
+  } else {
+    task = { id: "t" + Date.now(), title, col, week, owner, req, story };
+    state.tasks.push(task);
+    editingId = task.id;
+  }
+  await saveState();
+  render();
+  showViewPane(task);
+});
+
+function escapeHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+document.getElementById("memberFilter").addEventListener("change", render);
+document.getElementById("weekFilter").addEventListener("change", render);
+
+document.getElementById("resetBtn").addEventListener("click", async () => {
+  if (!confirm("This resets the board for everyone on the team, not just you. Continue?")) return;
+  state = { tasks: DEFAULT_TASKS.map(t => ({...t})) };
+  await saveState();
+  render();
+});
+
+document.getElementById("addBtn").addEventListener("click", () => openTicketModal(null));
+
+function init() {
+  if (!boardRef) {
+    state = { tasks: DEFAULT_TASKS.map(t => ({...t})) };
+    populateWeekFilter();
+    updateStatusLine();
+    render();
+    return;
+  }
+
+  onValue(boardRef, snapshot => {
+    const val = snapshot.val();
+    const firstLoad = state === null;
+    if (val && val.tasks) {
+      state = val;
+      // Older saves used a single "backlog" column; the board now splits it into
+      // Product Backlog / Sprint Backlog, so remap any leftover legacy value so
+      // those tickets don't silently disappear from every column.
+      const defaultsById = new Map(DEFAULT_TASKS.map(d => [d.id, d]));
+      let migrated = false;
+      state.tasks.forEach(t => {
+        if (t.col === "backlog") { t.col = "product"; migrated = true; }
+        if (t.story === undefined) {
+          // Backfill from the shipped ticket data when this saved ticket predates
+          // the story field, instead of blanking every pre-existing ticket to "Technical".
+          const d = defaultsById.get(t.id);
+          t.story = d ? d.story : "";
+          migrated = true;
+        }
+      });
+      if (migrated) saveState();
+    } else {
+      state = { tasks: DEFAULT_TASKS.map(t => ({...t})) };
+      set(boardRef, state);
+    }
+    storageOk = true;
+    if (firstLoad) populateWeekFilter();
+    updateStatusLine();
+    render();
+  }, () => {
+    storageOk = false;
+    updateStatusLine();
+  });
+}
+
+init();
+</script>
+</body>
+</html>

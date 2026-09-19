@@ -19,3 +19,6 @@
 .cxx
 local.properties
 .kotlin
+backend/build
+backend/rideshare-backend.db
+.firebase
