@@ -282,6 +282,36 @@ class RideshareViewModel : ViewModel() {
         })
     }
 
+    fun completeRide(rideId: String) {
+        if (actionInFlight) return
+        actionInFlight = true
+        requestActionError = null
+        apiService.completeRide(rideId, object : RideApiService.Callback<RideSummary> {
+            override fun onSuccess(result: RideSummary) {
+                actionInFlight = false
+                if (rideDetails.data?.rideId == rideId) rideDetails = Resource(data = result)
+                loadMyDriverRides()
+                loadIncomingRequests()
+                loadMyRequests()
+                loadTripHistory()
+                loadDashboard()
+            }
+
+            override fun onFailure(error: Exception) {
+                actionInFlight = false
+                requestActionError = error.message ?: "Couldn't complete the ride. Please try again."
+                // Refresh stale terminal state (for example a 409) without discarding the
+                // current detail on a second network failure or hiding the action error.
+                apiService.fetchRide(rideId, object : RideApiService.Callback<RideSummary> {
+                    override fun onSuccess(result: RideSummary) {
+                        if (rideDetails.data?.rideId == rideId) rideDetails = Resource(data = result)
+                    }
+                    override fun onFailure(error: Exception) = Unit
+                })
+            }
+        })
+    }
+
     // "I'm coming" - a status flag, not live GPS (docs/RTM.md / backend Tables.kt).
     fun setDriverEnRoute(rideId: String, enRoute: Boolean, onDone: (String?) -> Unit = {}) {
         apiService.setDriverEnRoute(rideId, enRoute, object : RideApiService.Callback<RideSummary> {

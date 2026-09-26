@@ -262,6 +262,9 @@ fun RideshareNavHost(
             onCancelRide = {
                 viewModel.selectedRideId?.let { viewModel.cancelRide(it) }
             },
+            onCompleteRide = {
+                viewModel.selectedRideId?.let { viewModel.completeRide(it) }
+            },
             onOpenChat = { navigate(AppDestination.Messages) },
             onSubmitRating = { ratedUserId, stars, comment ->
                 viewModel.selectedRideId?.let { rideId ->

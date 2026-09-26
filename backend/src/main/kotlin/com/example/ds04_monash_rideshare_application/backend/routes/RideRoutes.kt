@@ -208,6 +208,25 @@ fun Route.rideRoutes() {
                 ?: throw NotFoundException("Ride not found")
             if (ride[Rides.driverId] != userId) throw ForbiddenException("You don't own this ride")
 
+            val currentStatus = ride[Rides.status]
+            val targetStatus = body.status ?: currentStatus
+            if (targetStatus !in setOf(RideStatus.OPEN, RideStatus.CONFIRMED, RideStatus.CANCELLED, RideStatus.COMPLETED)) {
+                throw ValidationException("Unknown ride status")
+            }
+            if (currentStatus in setOf(RideStatus.CANCELLED, RideStatus.COMPLETED)) {
+                // Preserve HTTP 200 for terminal retries, but ignore all supplied edits.
+                if (body.status == currentStatus) return@transaction
+                throw ConflictException("A $currentStatus ride cannot be changed")
+            }
+            val allowed = when (currentStatus) {
+                RideStatus.OPEN -> setOf(RideStatus.OPEN, RideStatus.CONFIRMED, RideStatus.CANCELLED, RideStatus.COMPLETED)
+                RideStatus.CONFIRMED -> setOf(RideStatus.CONFIRMED, RideStatus.CANCELLED, RideStatus.COMPLETED)
+                else -> emptySet()
+            }
+            if (targetStatus !in allowed) {
+                throw ConflictException("Can't move a ride from $currentStatus to $targetStatus")
+            }
+
             Rides.update({ Rides.rideId eq rideId }) { stmt ->
                 body.departureTime?.let { stmt[departureTime] = it }
                 body.seatsTotal?.let { newTotal ->
@@ -220,6 +239,34 @@ fun Route.rideRoutes() {
                 // "I'm coming" (item: driver home / ride detail) - just a status flag in this
                 // trial, no live position behind it. See Tables.kt's comment on this column.
                 body.driverEnRoute?.let { stmt[driverEnRoute] = it }
+            }
+            if (body.status == RideStatus.CANCELLED) {
+                // Cancel active bookings atomically with this concrete ride. Its remaining
+                // capacity is no longer bookable, so do not restore individual request seats.
+                val cancelledAt = System.currentTimeMillis()
+                RideRequests.update({
+                    (RideRequests.rideId eq rideId) and
+                        (RideRequests.status inList listOf(RideRequestStatus.PENDING, RideRequestStatus.ACCEPTED))
+                }) {
+                    it[status] = RideRequestStatus.CANCELLED
+                    it[respondedAt] = cancelledAt
+                }
+            } else if (body.status == RideStatus.COMPLETED) {
+                // Accepted passengers finish their trip; outstanding asks can no longer be
+                // fulfilled. Preserve terminal request history and the ride's seat counts.
+                val completedAt = System.currentTimeMillis()
+                RideRequests.update({
+                    (RideRequests.rideId eq rideId) and (RideRequests.status eq RideRequestStatus.ACCEPTED)
+                }) {
+                    it[status] = RideRequestStatus.COMPLETED
+                    it[respondedAt] = completedAt
+                }
+                RideRequests.update({
+                    (RideRequests.rideId eq rideId) and (RideRequests.status eq RideRequestStatus.PENDING)
+                }) {
+                    it[status] = RideRequestStatus.CANCELLED
+                    it[respondedAt] = completedAt
+                }
             }
         }
         val dto = transaction {
