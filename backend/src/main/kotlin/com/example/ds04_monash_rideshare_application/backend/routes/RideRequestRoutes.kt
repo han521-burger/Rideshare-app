@@ -350,6 +350,21 @@ fun Route.rideRequestRoutes() {
                         it[status] = newStatus
                         it[respondedAt] = System.currentTimeMillis()
                     }
+                    // Count after cancelling this request, in the same transaction as seat
+                    // restoration. Pending/history rows do not keep an empty ride confirmed.
+                    if (currentStatus == RideRequestStatus.ACCEPTED && existingRideId != null &&
+                        existingRide?.get(Rides.status) == RideStatus.CONFIRMED
+                    ) {
+                        val acceptedRemaining = RideRequests.selectAll().where {
+                            (RideRequests.rideId eq existingRideId) and
+                                (RideRequests.status eq RideRequestStatus.ACCEPTED)
+                        }.count()
+                        if (acceptedRemaining == 0L) {
+                            Rides.update({ (Rides.rideId eq existingRideId) and (Rides.status eq RideStatus.CONFIRMED) }) {
+                                it[status] = RideStatus.OPEN
+                            }
+                        }
+                    }
                 }
                 RideRequestStatus.COMPLETED -> {
                     if (!isPassenger && !isOwningDriver) throw ForbiddenException("Not your request")
