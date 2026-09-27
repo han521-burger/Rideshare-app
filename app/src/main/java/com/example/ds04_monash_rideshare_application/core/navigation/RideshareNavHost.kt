@@ -4,12 +4,18 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.findViewTreeLifecycleOwner
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RequestStatus
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideStatus
 import com.example.ds04_monash_rideshare_application.core.state.AppMode
@@ -84,10 +90,25 @@ fun RideshareNavHost(
     val currentTab = AppDestination.tabDestinations.firstOrNull { it.route == backStack.firstOrNull() }
         ?: AppDestination.Home
 
+    var resumeRefresh by remember { mutableStateOf(0) }
+    val lifecycleOwner = LocalView.current.findViewTreeLifecycleOwner()
+    DisposableEffect(lifecycleOwner) {
+        var paused = false
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_PAUSE) paused = true
+            if (event == Lifecycle.Event.ON_RESUME && paused) {
+                paused = false
+                resumeRefresh++
+            }
+        }
+        lifecycleOwner?.lifecycle?.addObserver(observer)
+        onDispose { lifecycleOwner?.lifecycle?.removeObserver(observer) }
+    }
+
     // Central place to (re)load data whenever a data-driven destination becomes active, so every
     // entry point into it (tab switch, drilling into a ride, mode toggle, etc.) stays in sync
     // without each caller having to remember to trigger the right load itself.
-    LaunchedEffect(currentDestination, viewModel.selectedRideId, viewModel.selectedRequestId, viewModel.activeMode) {
+    LaunchedEffect(currentDestination, viewModel.selectedRideId, viewModel.selectedRequestId, viewModel.activeMode, resumeRefresh) {
         when (currentDestination) {
             AppDestination.Home -> {
                 viewModel.loadMyDriverRides()
@@ -133,7 +154,7 @@ fun RideshareNavHost(
             currentDestination in AppDestination.tabDestinations
         ) {
             while (true) {
-                viewModel.loadIncomingRequests(showLoading = false)
+                viewModel.loadIncomingRequests(showLoading = false, requireFresh = false)
                 delay(8_000)
             }
         }
