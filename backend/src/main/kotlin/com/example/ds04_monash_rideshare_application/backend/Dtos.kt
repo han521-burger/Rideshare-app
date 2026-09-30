@@ -52,7 +52,9 @@ data class VehicleDto(
     val variant: String? = null,
     val registrationMasked: String? = null,
     val seatCapacity: Int,
-    val fuelType: String
+    val fuelType: String,
+    val vehicleType: String,
+    val colour: String
 )
 
 @Serializable
@@ -63,7 +65,25 @@ data class CreateVehicleRequest(
     val variant: String? = null,
     val registrationMasked: String? = null,
     val seatCapacity: Int,
-    val fuelType: String
+    val fuelType: String,
+    val vehicleType: String,
+    val colour: String
+)
+
+// A driver may only ever have one vehicle (see requireSingleVehicle in VehicleRoutes.kt) - this
+// updates it in place, keeping the same vehicleId (and so the same link from any of the driver's
+// existing rides) rather than making them delete and re-register.
+@Serializable
+data class UpdateVehicleRequest(
+    val year: Int,
+    val make: String,
+    val model: String,
+    val variant: String? = null,
+    val registrationMasked: String? = null,
+    val seatCapacity: Int,
+    val fuelType: String,
+    val vehicleType: String,
+    val colour: String
 )
 
 @Serializable
@@ -118,7 +138,6 @@ data class CreateStopInput(
 
 @Serializable
 data class CreateRideRequest(
-    val vehicleId: String? = null,
     val originLat: Double,
     val originLng: Double,
     val destinationLat: Double,

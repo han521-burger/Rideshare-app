@@ -6,6 +6,7 @@ import com.example.ds04_monash_rideshare_application.backend.CreateStandaloneReq
 import com.example.ds04_monash_rideshare_application.backend.ForbiddenException
 import com.example.ds04_monash_rideshare_application.backend.NotFoundException
 import com.example.ds04_monash_rideshare_application.backend.RideRequestStatus
+import com.example.ds04_monash_rideshare_application.backend.requireMonashEndpoint
 import com.example.ds04_monash_rideshare_application.backend.RideRequests
 import com.example.ds04_monash_rideshare_application.backend.RideStatus
 import com.example.ds04_monash_rideshare_application.backend.Rides
@@ -120,6 +121,7 @@ fun Route.rideRequestRoutes() {
         if (!body.isAsap && body.desiredDepartureTime == null) {
             throw ValidationException("desiredDepartureTime is required unless isAsap is true")
         }
+        requireMonashEndpoint(body.originLat, body.originLng, body.destinationLat, body.destinationLng)
 
         val requestId = "req-${UUID.randomUUID()}"
         val now = System.currentTimeMillis()

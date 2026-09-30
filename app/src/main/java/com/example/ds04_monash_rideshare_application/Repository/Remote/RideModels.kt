@@ -16,12 +16,27 @@ data class UserSummary(
 
 data class VehicleSummary(
     val vehicleId: String,
+    val year: Int,
     val make: String,
     val model: String,
     val variant: String?,
     val registrationMasked: String?,
     val fuelType: String,
-    val seatCapacity: Int
+    val seatCapacity: Int,
+    val vehicleType: String,
+    val colour: String
+)
+
+data class CreateVehicleDraft(
+    val year: Int,
+    val make: String,
+    val model: String,
+    val variant: String?,
+    val registrationMasked: String?,
+    val seatCapacity: Int,
+    val fuelType: String,
+    val vehicleType: String,
+    val colour: String
 )
 
 data class RideStop(
@@ -181,7 +196,6 @@ data class UserAccountSummary(
 // Everything a driver fills in on the Offer a Ride flow. driverId/rideId/status/createdAt are
 // all assigned by the backend, not the client.
 data class CreateRideDraft(
-    val vehicleId: String?,
     val originLat: Double,
     val originLng: Double,
     val destinationLat: Double,

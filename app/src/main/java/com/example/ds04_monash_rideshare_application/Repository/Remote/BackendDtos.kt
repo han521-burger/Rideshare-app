@@ -86,13 +86,38 @@ data class VehicleDto(
     val variant: String? = null,
     val registrationMasked: String? = null,
     val seatCapacity: Int,
-    val fuelType: String
+    val fuelType: String,
+    val vehicleType: String,
+    val colour: String
+)
+
+data class CreateVehicleRequestBody(
+    val year: Int,
+    val make: String,
+    val model: String,
+    val variant: String? = null,
+    val registrationMasked: String? = null,
+    val seatCapacity: Int,
+    val fuelType: String,
+    val vehicleType: String,
+    val colour: String
+)
+
+data class UpdateVehicleRequestBody(
+    val year: Int,
+    val make: String,
+    val model: String,
+    val variant: String? = null,
+    val registrationMasked: String? = null,
+    val seatCapacity: Int,
+    val fuelType: String,
+    val vehicleType: String,
+    val colour: String
 )
 
 data class CreateStopInputBody(val lat: Double, val lng: Double, val label: String? = null)
 
 data class CreateRideRequestBody(
-    val vehicleId: String?,
     val originLat: Double,
     val originLng: Double,
     val destinationLat: Double,

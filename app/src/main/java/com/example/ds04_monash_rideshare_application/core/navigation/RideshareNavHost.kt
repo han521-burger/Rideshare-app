@@ -23,6 +23,7 @@ import com.example.ds04_monash_rideshare_application.core.state.RideshareViewMod
 import com.example.ds04_monash_rideshare_application.core.ui.BottomNavScaffold
 import com.example.ds04_monash_rideshare_application.feature.activity.ActivityScreen
 import com.example.ds04_monash_rideshare_application.feature.activity.LeaderboardScreen
+import com.example.ds04_monash_rideshare_application.feature.profile.VehiclesScreen
 import com.example.ds04_monash_rideshare_application.feature.auth.LoginScreen
 import com.example.ds04_monash_rideshare_application.feature.auth.SplashScreen
 import com.example.ds04_monash_rideshare_application.feature.home.HomeScreen
@@ -117,7 +118,14 @@ fun RideshareNavHost(
             AppDestination.Requests -> {
                 viewModel.loadMyRequests()
                 viewModel.loadIncomingRequests()
-                if (viewModel.activeMode == AppMode.PASSENGER) viewModel.loadOpenRides() else viewModel.loadMyDriverRides()
+                if (viewModel.activeMode == AppMode.PASSENGER) {
+                    viewModel.loadOpenRides()
+                } else {
+                    viewModel.loadMyDriverRides()
+                    // Kept fresh here (not just on the Vehicles screen itself) so the Offer-a-Ride
+                    // FAB's "you need a vehicle first" gate has up-to-date data before it's tapped.
+                    viewModel.loadVehicles()
+                }
             }
             AppDestination.Activity -> {
                 viewModel.loadDashboard()
@@ -126,6 +134,7 @@ fun RideshareNavHost(
             AppDestination.Profile -> {
                 viewModel.loadProfile()
                 viewModel.loadFavorites()
+                viewModel.loadVehicles()
             }
             AppDestination.RideDetail -> {
                 viewModel.selectedRideId?.let { viewModel.loadRideDetails(it) }
@@ -142,6 +151,7 @@ fun RideshareNavHost(
             }
             AppDestination.Messages -> viewModel.selectedRideId?.let { viewModel.loadMessages(it) }
             AppDestination.Leaderboard -> viewModel.loadLeaderboard()
+            AppDestination.Vehicles -> viewModel.loadVehicles()
             else -> Unit
         }
     }
@@ -220,7 +230,16 @@ fun RideshareNavHost(
                         },
                         onFindRide = { navigate(AppDestination.FindRide) },
                         onRequestRide = { navigate(AppDestination.RequestRide) },
-                        onOfferRide = { navigate(AppDestination.OfferRide) }
+                        onOfferRide = {
+                            // A driver needs at least one saved vehicle before offering a ride, so
+                            // CO2/fuel-saved figures reflect what they actually drive rather than
+                            // always falling back to the petrol-default estimate.
+                            if (viewModel.vehicles.data.orEmpty().isEmpty()) {
+                                navigate(AppDestination.Vehicles)
+                            } else {
+                                navigate(AppDestination.OfferRide)
+                            }
+                        }
                     )
 
                     AppDestination.Activity -> ActivityScreen(
@@ -239,6 +258,8 @@ fun RideshareNavHost(
                         favorites = viewModel.favorites,
                         onSave = viewModel::updateProfile,
                         onRemoveFavorite = { driverId -> viewModel.toggleFavorite(driverId, currentlyFavorite = true) },
+                        vehicleCount = viewModel.vehicles.data.orEmpty().size,
+                        onOpenVehicles = { navigate(AppDestination.Vehicles) },
                         onSignOut = ::returnToLogin
                     )
 
@@ -394,6 +415,7 @@ fun RideshareNavHost(
 
         AppDestination.OfferRide -> OfferRideFlowScreen(
             isPublishing = viewModel.actionInFlight,
+            maxSeats = viewModel.vehicles.data.orEmpty().firstOrNull()?.seatCapacity ?: 1,
             onPublish = { draft, onSuccess, onError ->
                 viewModel.createRide(draft, onSuccess, onError)
             },
@@ -423,6 +445,16 @@ fun RideshareNavHost(
         AppDestination.Leaderboard -> LeaderboardScreen(
             leaderboard = viewModel.leaderboard,
             currentUserId = uiState.userId,
+            onNavigateBack = ::navigateUp,
+            modifier = modifier
+        )
+
+        AppDestination.Vehicles -> VehiclesScreen(
+            vehicles = viewModel.vehicles,
+            isSaving = viewModel.actionInFlight,
+            onAddVehicle = { draft, onDone -> viewModel.createVehicle(draft, onDone) },
+            onUpdateVehicle = { vehicleId, draft, onDone -> viewModel.updateVehicle(vehicleId, draft, onDone) },
+            onDeleteVehicle = { vehicleId -> viewModel.deleteVehicle(vehicleId) {} },
             onNavigateBack = ::navigateUp,
             modifier = modifier
         )

@@ -46,6 +46,8 @@ fun ProfileScreen(
         onDone: (String?) -> Unit
     ) -> Unit,
     onRemoveFavorite: (driverId: String) -> Unit,
+    vehicleCount: Int,
+    onOpenVehicles: () -> Unit,
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -110,6 +112,26 @@ fun ProfileScreen(
                         }
                         Switch(checked = passengerEnabled, onCheckedChange = { passengerEnabled = it })
                     }
+                }
+            }
+        }
+
+        item {
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text("My vehicles", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            if (vehicleCount == 0) "None saved yet - required before offering a ride" else "$vehicleCount saved",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    OutlinedButton(onClick = onOpenVehicles) { Text("Manage") }
                 }
             }
         }

@@ -84,6 +84,8 @@ private fun seedDemoDataIfEmpty() {
         it[registrationMasked] = "1XX·YY2"
         it[seatCapacity] = 4
         it[fuelType] = "Hybrid"
+        it[vehicleType] = "SEDAN"
+        it[colour] = "Silver"
     }
     Vehicles.insert {
         it[vehicleId] = "demo-vehicle-002"
@@ -95,6 +97,8 @@ private fun seedDemoDataIfEmpty() {
         it[registrationMasked] = "2YY·ZZ3"
         it[seatCapacity] = 4
         it[fuelType] = "Electric"
+        it[vehicleType] = "SEDAN"
+        it[colour] = "White"
     }
     Vehicles.insert {
         it[vehicleId] = "demo-vehicle-003"
@@ -106,6 +110,8 @@ private fun seedDemoDataIfEmpty() {
         it[registrationMasked] = "3AA·BB4"
         it[seatCapacity] = 4
         it[fuelType] = "Petrol"
+        it[vehicleType] = "SUV"
+        it[colour] = "Red"
     }
 
     // Approximate commute corridor between Melbourne CBD and Monash Clayton, so both the map's

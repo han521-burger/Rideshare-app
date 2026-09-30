@@ -77,7 +77,6 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
 
     override fun createRide(draft: CreateRideDraft, callback: RideApiService.Callback<RideSummary>) {
         val body = CreateRideRequestBody(
-            vehicleId = draft.vehicleId,
             originLat = draft.originLat,
             originLng = draft.originLng,
             destinationLat = draft.destinationLat,
@@ -198,6 +197,44 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         api.removeFavorite(driverId).dispatch(callback) { it["favorited"] ?: false }
     }
 
+    override fun fetchMyVehicles(callback: RideApiService.Callback<List<VehicleSummary>>) {
+        api.getMyVehicles().dispatch(callback) { it.map(::toVehicleSummary) }
+    }
+
+    override fun createVehicle(draft: CreateVehicleDraft, callback: RideApiService.Callback<VehicleSummary>) {
+        val body = CreateVehicleRequestBody(
+            year = draft.year,
+            make = draft.make,
+            model = draft.model,
+            variant = draft.variant,
+            registrationMasked = draft.registrationMasked,
+            seatCapacity = draft.seatCapacity,
+            fuelType = draft.fuelType,
+            vehicleType = draft.vehicleType,
+            colour = draft.colour
+        )
+        api.createVehicle(body).dispatch(callback, ::toVehicleSummary)
+    }
+
+    override fun updateVehicle(vehicleId: String, draft: CreateVehicleDraft, callback: RideApiService.Callback<VehicleSummary>) {
+        val body = UpdateVehicleRequestBody(
+            year = draft.year,
+            make = draft.make,
+            model = draft.model,
+            variant = draft.variant,
+            registrationMasked = draft.registrationMasked,
+            seatCapacity = draft.seatCapacity,
+            fuelType = draft.fuelType,
+            vehicleType = draft.vehicleType,
+            colour = draft.colour
+        )
+        api.updateVehicle(vehicleId, body).dispatch(callback, ::toVehicleSummary)
+    }
+
+    override fun deleteVehicle(vehicleId: String, callback: RideApiService.Callback<Boolean>) {
+        api.deleteVehicle(vehicleId).dispatch(callback) { it["deleted"] ?: false }
+    }
+
     private fun toUserAccountSummary(dto: UserDto) = UserAccountSummary(
         userId = dto.userId,
         displayName = dto.displayName,
@@ -214,7 +251,8 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         UserSummary(dto.userId, dto.displayName, dto.photoRef, dto.phoneNumber, dto.averageRating, dto.ratingCount)
 
     private fun toVehicleSummary(dto: VehicleDto) = VehicleSummary(
-        dto.vehicleId, dto.make, dto.model, dto.variant, dto.registrationMasked, dto.fuelType, dto.seatCapacity
+        dto.vehicleId, dto.year, dto.make, dto.model, dto.variant, dto.registrationMasked, dto.fuelType, dto.seatCapacity,
+        dto.vehicleType, dto.colour
     )
 
     private fun toRideStop(dto: RideStopDto) = RideStop(dto.stopId, dto.sequence, dto.lat, dto.lng, dto.label)

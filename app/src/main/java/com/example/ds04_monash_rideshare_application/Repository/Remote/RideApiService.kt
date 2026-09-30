@@ -59,4 +59,9 @@ interface RideApiService {
     fun fetchFavorites(callback: Callback<List<FavoriteDriverSummary>>)
     fun addFavorite(driverId: String, callback: Callback<Boolean>)
     fun removeFavorite(driverId: String, callback: Callback<Boolean>)
+
+    fun fetchMyVehicles(callback: Callback<List<VehicleSummary>>)
+    fun createVehicle(draft: CreateVehicleDraft, callback: Callback<VehicleSummary>)
+    fun updateVehicle(vehicleId: String, draft: CreateVehicleDraft, callback: Callback<VehicleSummary>)
+    fun deleteVehicle(vehicleId: String, callback: Callback<Boolean>)
 }

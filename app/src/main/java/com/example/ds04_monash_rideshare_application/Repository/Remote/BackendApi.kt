@@ -93,4 +93,16 @@ interface BackendApi {
 
     @DELETE("favorites/{driverId}")
     fun removeFavorite(@Path("driverId") driverId: String): Call<Map<String, Boolean>>
+
+    @GET("vehicles/mine")
+    fun getMyVehicles(): Call<List<VehicleDto>>
+
+    @POST("vehicles")
+    fun createVehicle(@Body body: CreateVehicleRequestBody): Call<VehicleDto>
+
+    @PUT("vehicles/{id}")
+    fun updateVehicle(@Path("id") vehicleId: String, @Body body: UpdateVehicleRequestBody): Call<VehicleDto>
+
+    @DELETE("vehicles/{id}")
+    fun deleteVehicle(@Path("id") vehicleId: String): Call<Map<String, Boolean>>
 }

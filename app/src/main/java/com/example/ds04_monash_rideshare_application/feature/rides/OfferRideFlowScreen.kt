@@ -32,15 +32,14 @@ import androidx.compose.ui.unit.dp
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateRideDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.StopInput
+import com.example.ds04_monash_rideshare_application.core.ui.CampusRoutePicker
 import com.example.ds04_monash_rideshare_application.core.ui.DatePickerField
+import com.example.ds04_monash_rideshare_application.core.ui.RoutePickerResult
 import com.example.ds04_monash_rideshare_application.core.ui.StepWizardScaffold
 import com.example.ds04_monash_rideshare_application.core.ui.TimePickerField
 import com.example.ds04_monash_rideshare_application.core.ui.combineDateAndTime
-import com.example.ds04_monash_rideshare_application.ui.MapScreen
-import com.example.ds04_monash_rideshare_application.ui.NAMED_LOCATIONS
+import com.example.ds04_monash_rideshare_application.ui.FIXED_POINTS
 import com.example.ds04_monash_rideshare_application.ui.NamedLocation
-import com.example.ds04_monash_rideshare_application.ui.RouteQueryResult
-import com.example.ds04_monash_rideshare_application.ui.describeLocation
 import java.text.SimpleDateFormat
 import java.time.DayOfWeek
 import java.time.LocalDate
@@ -59,26 +58,29 @@ private val WEEK_DAYS = listOf(
 @Composable
 fun OfferRideFlowScreen(
     isPublishing: Boolean,
+    // The driver's one registered vehicle caps how many seats they can offer - Offer-a-Ride is
+    // gated behind having a vehicle at all (see RideshareNavHost.kt), so this is always > 0 here.
+    maxSeats: Int,
     onPublish: (CreateRideDraft, onSuccess: (RideSummary) -> Unit, onError: (String) -> Unit) -> Unit,
     onExit: () -> Unit,
     onPublished: (RideSummary) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var step by rememberSaveable { mutableStateOf(0) }
-    var routeResult by remember { mutableStateOf<RouteQueryResult?>(null) }
+    var routePickerResult by remember { mutableStateOf<RoutePickerResult?>(null) }
     var selectedStops by remember { mutableStateOf<List<NamedLocation>>(emptyList()) }
     var date by remember { mutableStateOf<LocalDate?>(null) }
     var time by remember { mutableStateOf<LocalTime?>(null) }
     var repeatDays by remember { mutableStateOf<Set<DayOfWeek>>(emptySet()) }
     var repeatWeeks by remember { mutableStateOf(4) }
-    var seatsTotal by remember { mutableStateOf(3) }
+    var seatsTotal by remember { mutableStateOf(minOf(3, maxSeats)) }
     var notes by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     val canGoNext = when (step) {
-        0 -> routeResult != null
+        0 -> routePickerResult != null
         1 -> date != null && time != null
-        3 -> seatsTotal >= 1
+        3 -> seatsTotal in 1..maxSeats
         else -> true
     }
 
@@ -94,12 +96,11 @@ fun OfferRideFlowScreen(
                 step++
                 return@StepWizardScaffold
             }
-            val route = routeResult ?: return@StepWizardScaffold
+            val route = routePickerResult ?: return@StepWizardScaffold
             val departureTime = combineDateAndTime(date, time) ?: return@StepWizardScaffold
             val draft = CreateRideDraft(
-                vehicleId = null,
-                originLat = route.originLat, originLng = route.originLng,
-                destinationLat = route.destinationLat, destinationLng = route.destinationLng,
+                originLat = route.origin.point.latitude, originLng = route.origin.point.longitude,
+                destinationLat = route.destination.point.latitude, destinationLng = route.destination.point.longitude,
                 distanceMeters = route.distanceMeters,
                 estimatedDurationSeconds = route.estimatedDurationSeconds,
                 departureTime = departureTime,
@@ -123,8 +124,8 @@ fun OfferRideFlowScreen(
         ) {
             when (step) {
                 0 -> RouteStep(
-                    routeResult = routeResult,
-                    onRouteConfirmed = { routeResult = it },
+                    routePickerResult = routePickerResult,
+                    onRouteChange = { routePickerResult = it },
                     selectedStops = selectedStops,
                     onToggleStop = { location ->
                         selectedStops = if (selectedStops.contains(location)) {
@@ -136,8 +137,8 @@ fun OfferRideFlowScreen(
                 )
                 1 -> WhenStep(date, time, onDateChange = { date = it }, onTimeChange = { time = it })
                 2 -> RepeatStep(repeatDays, repeatWeeks, onDaysChange = { repeatDays = it }, onWeeksChange = { repeatWeeks = it })
-                3 -> SeatsStep(seatsTotal, notes, onSeatsChange = { seatsTotal = it }, onNotesChange = { notes = it })
-                else -> ConfirmOfferStep(routeResult, date, time, selectedStops, repeatDays, repeatWeeks, seatsTotal, notes)
+                3 -> SeatsStep(seatsTotal, maxSeats, notes, onSeatsChange = { seatsTotal = it }, onNotesChange = { notes = it })
+                else -> ConfirmOfferStep(routePickerResult, date, time, selectedStops, repeatDays, repeatWeeks, seatsTotal, notes)
             }
             errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 12.dp)) }
         }
@@ -146,24 +147,17 @@ fun OfferRideFlowScreen(
 
 @Composable
 private fun RouteStep(
-    routeResult: RouteQueryResult?,
-    onRouteConfirmed: (RouteQueryResult) -> Unit,
+    routePickerResult: RoutePickerResult?,
+    onRouteChange: (RoutePickerResult?) -> Unit,
     selectedStops: List<NamedLocation>,
     onToggleStop: (NamedLocation) -> Unit
 ) {
     Column {
-        Text("Tap the map to set your origin, then your destination.", style = MaterialTheme.typography.bodyMedium)
-        Box(modifier = Modifier.fillMaxWidth().height(320.dp).padding(vertical = 8.dp)) {
-            MapScreen(onRouteConfirmed = onRouteConfirmed)
-        }
-        if (routeResult != null) {
-            Text(
-                "%.1f km, about %d min".format(routeResult.distanceMeters / 1000.0, routeResult.estimatedDurationSeconds / 60),
-                fontWeight = FontWeight.SemiBold
-            )
-            Text("Optional stops along the way", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 12.dp))
+        CampusRoutePicker(onResult = onRouteChange)
+        if (routePickerResult != null) {
+            Text("Optional stops along the way", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp))
             LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                items(NAMED_LOCATIONS, key = { it.name }) { location ->
+                items(FIXED_POINTS, key = { it.name }) { location ->
                     FilterChip(
                         selected = selectedStops.contains(location),
                         onClick = { onToggleStop(location) },
@@ -228,13 +222,18 @@ private fun RepeatStep(
 }
 
 @Composable
-private fun SeatsStep(seatsTotal: Int, notes: String, onSeatsChange: (Int) -> Unit, onNotesChange: (String) -> Unit) {
+private fun SeatsStep(seatsTotal: Int, maxSeats: Int, notes: String, onSeatsChange: (Int) -> Unit, onNotesChange: (String) -> Unit) {
     Column {
         Text("How many seats are you offering?", fontWeight = FontWeight.SemiBold)
+        Text(
+            "Up to $maxSeats - your registered vehicle's seat capacity.",
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
         Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
             OutlinedButton(onClick = { if (seatsTotal > 1) onSeatsChange(seatsTotal - 1) }) { Text("-") }
             Text(seatsTotal.toString(), modifier = Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleMedium)
-            OutlinedButton(onClick = { if (seatsTotal < 8) onSeatsChange(seatsTotal + 1) }) { Text("+") }
+            OutlinedButton(onClick = { if (seatsTotal < maxSeats) onSeatsChange(seatsTotal + 1) }) { Text("+") }
         }
         OutlinedTextField(
             value = notes,
@@ -247,7 +246,7 @@ private fun SeatsStep(seatsTotal: Int, notes: String, onSeatsChange: (Int) -> Un
 
 @Composable
 private fun ConfirmOfferStep(
-    routeResult: RouteQueryResult?,
+    routePickerResult: RoutePickerResult?,
     date: LocalDate?,
     time: LocalTime?,
     stops: List<NamedLocation>,
@@ -256,11 +255,11 @@ private fun ConfirmOfferStep(
     seatsTotal: Int,
     notes: String
 ) {
-    val route = routeResult ?: return
+    val route = routePickerResult ?: return
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
             Text("Review your ride", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text("${describeLocation(route.originLat, route.originLng)} → ${describeLocation(route.destinationLat, route.destinationLng)}")
+            Text("${route.origin.name} → ${route.destination.name}")
             if (stops.isNotEmpty()) Text("Via: " + stops.joinToString(", ") { it.name })
             val departure = combineDateAndTime(date, time)
             if (departure != null) Text(SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault()).format(Date(departure)))

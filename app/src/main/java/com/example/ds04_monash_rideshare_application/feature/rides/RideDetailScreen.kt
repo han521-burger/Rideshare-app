@@ -267,8 +267,11 @@ private fun DriverInfoCard(ride: RideSummary) {
                 Text("%.1f / 5 (${driver.ratingCount} rating(s))".format(averageRating), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             ride.vehicle?.let { vehicle ->
-                Text("${vehicle.make} ${vehicle.model}${vehicle.variant?.let { " ($it)" } ?: ""}")
-                vehicle.registrationMasked?.let { Text(it, color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                Text("${vehicle.colour} ${vehicle.make} ${vehicle.model}${vehicle.variant?.let { " ($it)" } ?: ""}")
+                Text(
+                    listOfNotNull(vehicle.vehicleType, vehicle.registrationMasked).joinToString(" • "),
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
             if (ride.driverEnRoute) {
                 Text("Driver is on the way", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)

@@ -125,4 +125,20 @@ class FakeRideApiService : RideApiService {
     override fun removeFavorite(driverId: String, callback: RideApiService.Callback<Boolean>) {
         callback.onFailure(unavailable)
     }
+
+    override fun fetchMyVehicles(callback: RideApiService.Callback<List<VehicleSummary>>) {
+        callback.onSuccess(emptyList())
+    }
+
+    override fun createVehicle(draft: CreateVehicleDraft, callback: RideApiService.Callback<VehicleSummary>) {
+        callback.onFailure(unavailable)
+    }
+
+    override fun updateVehicle(vehicleId: String, draft: CreateVehicleDraft, callback: RideApiService.Callback<VehicleSummary>) {
+        callback.onFailure(unavailable)
+    }
+
+    override fun deleteVehicle(vehicleId: String, callback: RideApiService.Callback<Boolean>) {
+        callback.onFailure(unavailable)
+    }
 }

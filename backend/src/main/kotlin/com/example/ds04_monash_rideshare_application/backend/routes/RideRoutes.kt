@@ -7,6 +7,7 @@ import com.example.ds04_monash_rideshare_application.backend.ForbiddenException
 import com.example.ds04_monash_rideshare_application.backend.MatchSearchResponse
 import com.example.ds04_monash_rideshare_application.backend.NotFoundException
 import com.example.ds04_monash_rideshare_application.backend.Ratings
+import com.example.ds04_monash_rideshare_application.backend.requireMonashEndpoint
 import com.example.ds04_monash_rideshare_application.backend.RideDto
 import com.example.ds04_monash_rideshare_application.backend.RideRequestStatus
 import com.example.ds04_monash_rideshare_application.backend.RideRequests
@@ -141,13 +142,17 @@ fun Route.rideRoutes() {
         if (body.departureTime <= System.currentTimeMillis()) {
             throw ValidationException("departureTime must be in the future")
         }
-        if (body.vehicleId != null) {
-            val ownsVehicle = transaction {
-                Vehicles.selectAll()
-                    .where { (Vehicles.vehicleId eq body.vehicleId) and (Vehicles.ownerId eq driverId) }
-                    .count() > 0
+        requireMonashEndpoint(body.originLat, body.originLng, body.destinationLat, body.destinationLng)
+
+        // A driver has exactly one registered vehicle (VehicleRoutes.kt) - it's attached
+        // automatically, never chosen per ride, and its seat capacity caps what can be offered.
+        val vehicleId = transaction {
+            val vehicle = Vehicles.selectAll().where { Vehicles.ownerId eq driverId }.firstOrNull()
+                ?: throw ValidationException("Register a vehicle before offering a ride")
+            if (body.seatsTotal > vehicle[Vehicles.seatCapacity]) {
+                throw ValidationException("Your vehicle only seats ${vehicle[Vehicles.seatCapacity]}")
             }
-            if (!ownsVehicle) throw ForbiddenException("You don't own that vehicle")
+            vehicle[Vehicles.vehicleId]
         }
 
         val rideId = "ride-${UUID.randomUUID()}"
@@ -155,7 +160,7 @@ fun Route.rideRoutes() {
         val groupId = if (body.repeatDaysOfWeek.isNotEmpty()) "recur-${UUID.randomUUID()}" else null
 
         transaction {
-            insertRide(rideId, driverId, body, groupId, now)
+            insertRide(rideId, driverId, vehicleId, body, groupId, now)
             insertStops(rideId, body.stops)
 
             // "Repeat this route every Mon/Wed" - generate concrete sibling rides for the next
@@ -175,7 +180,7 @@ fun Route.rideRoutes() {
                         val siblingDeparture = date.atTime(timeOfDay).atZone(zone).toInstant().toEpochMilli()
                         if (siblingDeparture > System.currentTimeMillis()) {
                             val siblingId = "ride-${UUID.randomUUID()}"
-                            insertRide(siblingId, driverId, body, groupId, now, departureOverride = siblingDeparture)
+                            insertRide(siblingId, driverId, vehicleId, body, groupId, now, departureOverride = siblingDeparture)
                             insertStops(siblingId, body.stops)
                         }
                     }
@@ -353,6 +358,7 @@ internal fun enrichRideDtos(rows: List<ResultRow>): List<RideDto> {
 private fun insertRide(
     rideId: String,
     driverId: String,
+    vehicleId: String,
     body: CreateRideRequest,
     groupId: String?,
     createdAt: Long,
@@ -361,7 +367,7 @@ private fun insertRide(
     Rides.insert {
         it[Rides.rideId] = rideId
         it[Rides.driverId] = driverId
-        it[Rides.vehicleId] = body.vehicleId
+        it[Rides.vehicleId] = vehicleId
         it[originLat] = body.originLat
         it[originLng] = body.originLng
         it[destinationLat] = body.destinationLat

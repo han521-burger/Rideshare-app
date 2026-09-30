@@ -22,6 +22,7 @@ sealed class AppDestination(val route: String, val title: String) {
     data object OfferRide : AppDestination("offer-ride", "Offer a Ride")
     data object Messages : AppDestination("messages", "Messages")
     data object Leaderboard : AppDestination("leaderboard", "Leaderboard")
+    data object Vehicles : AppDestination("vehicles", "My Vehicles")
 
     companion object {
         val tabDestinations: List<AppDestination>
@@ -30,7 +31,7 @@ sealed class AppDestination(val route: String, val title: String) {
         val allDestinations: List<AppDestination>
             get() = listOf(
                 Splash, Login, Home, Requests, Activity, Profile,
-                RideDetail, RequestDetail, FindRide, RequestRide, RequestSeat, OfferRide, Messages, Leaderboard
+                RideDetail, RequestDetail, FindRide, RequestRide, RequestSeat, OfferRide, Messages, Leaderboard, Vehicles
             )
 
         fun fromRoute(route: String?): AppDestination? =

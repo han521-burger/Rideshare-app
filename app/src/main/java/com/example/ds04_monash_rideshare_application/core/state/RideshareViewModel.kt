@@ -10,6 +10,7 @@ import com.example.ds04_monash_rideshare_application.Auth.AuthenticationProvider
 import com.example.ds04_monash_rideshare_application.Auth.FakeAuthenticationProvider
 import com.example.ds04_monash_rideshare_application.Auth.TestIdentity
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateRideDraft
+import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateVehicleDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.DashboardSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.FavoriteDriverSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.LeaderboardResult
@@ -24,6 +25,7 @@ import com.example.ds04_monash_rideshare_application.Repository.Remote.RideStatu
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.StandaloneRequestDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.UserAccountSummary
+import com.example.ds04_monash_rideshare_application.Repository.Remote.VehicleSummary
 
 enum class AppMode { PASSENGER, DRIVER }
 
@@ -92,6 +94,8 @@ class RideshareViewModel : ViewModel() {
     var ratings by mutableStateOf(Resource<List<RatingSummary>>())
         private set
     var favorites by mutableStateOf(Resource<List<FavoriteDriverSummary>>())
+        private set
+    var vehicles by mutableStateOf(Resource<List<VehicleSummary>>())
         private set
     var actionInFlight by mutableStateOf(false)
         private set
@@ -175,6 +179,7 @@ class RideshareViewModel : ViewModel() {
                 lastSearchCriteria = null
                 rideDetails = Resource(); messages = Resource(); tripHistory = Resource()
                 dashboard = Resource(); leaderboard = Resource(); ratings = Resource(); favorites = Resource()
+                vehicles = Resource()
                 selectedRideId = null; selectedRequestId = null; requestActionError = null
                 actionInFlight = false; incomingRequestRefresh = RequestRefreshGate(); lastCreatedRide = null
                 rideDetailsVersion++; myRequestsVersion++; driverRidesVersion++
@@ -539,5 +544,34 @@ class RideshareViewModel : ViewModel() {
             override fun onFailure(error: Exception) { onDone(error.message ?: "Couldn't update favorites. Please try again.") }
         }
         if (currentlyFavorite) apiService.removeFavorite(driverId, callback) else apiService.addFavorite(driverId, callback)
+    }
+
+    fun loadVehicles() {
+        vehicles = Resource(isLoading = true)
+        apiService.fetchMyVehicles(object : RideApiService.Callback<List<VehicleSummary>> {
+            override fun onSuccess(result: List<VehicleSummary>) { vehicles = Resource(data = result) }
+            override fun onFailure(error: Exception) { vehicles = Resource(errorMessage = error.message) }
+        })
+    }
+
+    fun createVehicle(draft: CreateVehicleDraft, onDone: (String?) -> Unit) {
+        apiService.createVehicle(draft, object : RideApiService.Callback<VehicleSummary> {
+            override fun onSuccess(result: VehicleSummary) { loadVehicles(); onDone(null) }
+            override fun onFailure(error: Exception) { onDone(error.message ?: "Couldn't save that vehicle. Please try again.") }
+        })
+    }
+
+    fun updateVehicle(vehicleId: String, draft: CreateVehicleDraft, onDone: (String?) -> Unit) {
+        apiService.updateVehicle(vehicleId, draft, object : RideApiService.Callback<VehicleSummary> {
+            override fun onSuccess(result: VehicleSummary) { loadVehicles(); onDone(null) }
+            override fun onFailure(error: Exception) { onDone(error.message ?: "Couldn't save that vehicle. Please try again.") }
+        })
+    }
+
+    fun deleteVehicle(vehicleId: String, onDone: (String?) -> Unit) {
+        apiService.deleteVehicle(vehicleId, object : RideApiService.Callback<Boolean> {
+            override fun onSuccess(result: Boolean) { loadVehicles(); onDone(null) }
+            override fun onFailure(error: Exception) { onDone(error.message ?: "Couldn't remove that vehicle. Please try again.") }
+        })
     }
 }

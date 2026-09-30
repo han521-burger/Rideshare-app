@@ -23,6 +23,10 @@ object Users : Table("users") {
     override val primaryKey = PrimaryKey(userId)
 }
 
+// One row per owner (RTM: a driver registers exactly one vehicle - see requireSingleVehicle in
+// VehicleRoutes.kt). ownerId isn't a unique index here only because Exposed's
+// createMissingTablesAndColumns can't add one to a table with existing rows in place; the "one
+// vehicle per user" rule is enforced at the route layer instead.
 object Vehicles : Table("vehicles") {
     val vehicleId = varchar("vehicle_id", 64)
     val ownerId = varchar("owner_id", 64).references(Users.userId)
@@ -33,6 +37,10 @@ object Vehicles : Table("vehicles") {
     val registrationMasked = varchar("registration_masked", 32).nullable()
     val seatCapacity = integer("seat_capacity")
     val fuelType = varchar("fuel_type", 32)
+    // Body style (SEDAN/SUV/HATCHBACK/WAGON/VAN/UTE/COUPE/OTHER) and colour - shown to a passenger
+    // on an accepted ride so they can identify the car (RideDetailScreen.kt's DriverInfoCard).
+    val vehicleType = varchar("vehicle_type", 32).default("SEDAN")
+    val colour = varchar("colour", 32).default("White")
 
     override val primaryKey = PrimaryKey(vehicleId)
 }
