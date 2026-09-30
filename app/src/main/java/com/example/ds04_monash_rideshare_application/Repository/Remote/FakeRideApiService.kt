@@ -42,6 +42,10 @@ class FakeRideApiService : RideApiService {
         callback.onFailure(unavailable)
     }
 
+    override fun completeRide(rideId: String, callback: RideApiService.Callback<RideSummary>) {
+        callback.onFailure(unavailable)
+    }
+
     override fun setDriverEnRoute(rideId: String, enRoute: Boolean, callback: RideApiService.Callback<RideSummary>) {
         callback.onFailure(unavailable)
     }

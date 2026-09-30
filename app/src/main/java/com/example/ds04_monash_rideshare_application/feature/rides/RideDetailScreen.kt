@@ -64,6 +64,7 @@ fun RideDetailScreen(
     onRejectRequest: (requestId: String) -> Unit,
     onSetEnRoute: (Boolean) -> Unit,
     onCancelRide: () -> Unit,
+    onCompleteRide: () -> Unit,
     onOpenChat: () -> Unit,
     onSubmitRating: (ratedUserId: String, stars: Int, comment: String?) -> Unit,
     onNavigateBack: () -> Unit,
@@ -128,6 +129,10 @@ fun RideDetailScreen(
                     }
 
                     if (isDriver) {
+                        item {
+                            CompleteRideAction(ride.rideId, ride.driverId, currentUserId, ride.status,
+                                isActionInFlight, onCompleteRide)
+                        }
                         item {
                             DriverEnRouteCard(
                                 enRoute = ride.driverEnRoute,

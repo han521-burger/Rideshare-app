@@ -99,7 +99,10 @@ class RideshareViewModel : ViewModel() {
         private set
     var lastCreatedRide by mutableStateOf<RideSummary?>(null)
         private set
-    private var incomingRequestRefreshInFlight = false
+    private var incomingRequestRefresh = RequestRefreshGate()
+    private var rideDetailsVersion = 0
+    private var myRequestsVersion = 0
+    private var driverRidesVersion = 0
 
     // Rides upcoming, already locked in - driving (CONFIRMED) or riding (your request ACCEPTED).
     // Computed client-side from data already loaded for Home/Requests rather than a dedicated
@@ -173,7 +176,8 @@ class RideshareViewModel : ViewModel() {
                 rideDetails = Resource(); messages = Resource(); tripHistory = Resource()
                 dashboard = Resource(); leaderboard = Resource(); ratings = Resource(); favorites = Resource()
                 selectedRideId = null; selectedRequestId = null; requestActionError = null
-                actionInFlight = false; incomingRequestRefreshInFlight = false; lastCreatedRide = null
+                actionInFlight = false; incomingRequestRefresh = RequestRefreshGate(); lastCreatedRide = null
+                rideDetailsVersion++; myRequestsVersion++; driverRidesVersion++
                 onComplete()
             }
 
@@ -241,10 +245,16 @@ class RideshareViewModel : ViewModel() {
     }
 
     fun loadRideDetails(rideId: String) {
-        rideDetails = Resource(isLoading = true)
+        val version = ++rideDetailsVersion
+        val previous = rideDetails.data?.takeIf { it.rideId == rideId }
+        rideDetails = Resource(isLoading = true, data = previous)
         apiService.fetchRide(rideId, object : RideApiService.Callback<RideSummary> {
-            override fun onSuccess(result: RideSummary) { rideDetails = Resource(data = result) }
-            override fun onFailure(error: Exception) { rideDetails = Resource(errorMessage = error.message) }
+            override fun onSuccess(result: RideSummary) {
+                if (version == rideDetailsVersion) rideDetails = Resource(data = result)
+            }
+            override fun onFailure(error: Exception) {
+                if (version == rideDetailsVersion) rideDetails = Resource(data = previous, errorMessage = error.message)
+            }
         })
     }
 
@@ -270,14 +280,46 @@ class RideshareViewModel : ViewModel() {
         apiService.cancelRide(rideId, object : RideApiService.Callback<RideSummary> {
             override fun onSuccess(result: RideSummary) {
                 actionInFlight = false
-                rideDetails = Resource(data = result)
-                loadMyDriverRides()
+                refreshRideLifecycleState(rideId, updatedRide = result)
                 onDone(null)
             }
 
             override fun onFailure(error: Exception) {
                 actionInFlight = false
                 onDone(error.message ?: "Couldn't cancel the ride. Please try again.")
+            }
+        })
+    }
+
+    fun completeRide(rideId: String) {
+        if (actionInFlight) return
+        actionInFlight = true
+        requestActionError = null
+        apiService.completeRide(rideId, object : RideApiService.Callback<RideSummary> {
+            override fun onSuccess(result: RideSummary) {
+                actionInFlight = false
+                refreshRideLifecycleState(rideId, updatedRide = result, refreshActivity = true)
+            }
+
+            override fun onFailure(error: Exception) {
+                actionInFlight = false
+                requestActionError = error.message ?: "Couldn't complete the ride. Please try again."
+                // Refresh stale terminal state (for example a 409) without discarding the
+                // current detail on a second network failure or hiding the action error.
+                if (selectedRideId != rideId) return
+                val version = ++rideDetailsVersion
+                apiService.fetchRide(rideId, object : RideApiService.Callback<RideSummary> {
+                    override fun onSuccess(result: RideSummary) {
+                        if (version == rideDetailsVersion && selectedRideId == rideId) {
+                            rideDetails = Resource(data = result)
+                        }
+                    }
+                    override fun onFailure(error: Exception) {
+                        if (version == rideDetailsVersion) {
+                            rideDetails = rideDetails.copy(isLoading = false)
+                        }
+                    }
+                })
             }
         })
     }
@@ -298,10 +340,15 @@ class RideshareViewModel : ViewModel() {
     }
 
     fun loadMyDriverRides() {
-        myDriverRides = Resource(isLoading = true)
+        val version = ++driverRidesVersion
+        myDriverRides = Resource(isLoading = true, data = myDriverRides.data)
         apiService.fetchMyDriverRides(object : RideApiService.Callback<List<RideSummary>> {
-            override fun onSuccess(result: List<RideSummary>) { myDriverRides = Resource(data = result) }
-            override fun onFailure(error: Exception) { myDriverRides = Resource(errorMessage = error.message) }
+            override fun onSuccess(result: List<RideSummary>) {
+                if (version == driverRidesVersion) myDriverRides = Resource(data = result)
+            }
+            override fun onFailure(error: Exception) {
+                if (version == driverRidesVersion) myDriverRides = Resource(data = myDriverRides.data, errorMessage = error.message)
+            }
         })
     }
 
@@ -346,28 +393,57 @@ class RideshareViewModel : ViewModel() {
     }
 
     fun loadMyRequests() {
-        myRequests = Resource(isLoading = true)
+        val version = ++myRequestsVersion
+        myRequests = Resource(isLoading = true, data = myRequests.data)
         apiService.fetchMyRequests(object : RideApiService.Callback<List<RideRequestSummary>> {
-            override fun onSuccess(result: List<RideRequestSummary>) { myRequests = Resource(data = result) }
-            override fun onFailure(error: Exception) { myRequests = Resource(errorMessage = error.message) }
+            override fun onSuccess(result: List<RideRequestSummary>) {
+                if (version == myRequestsVersion) myRequests = Resource(data = result)
+            }
+            override fun onFailure(error: Exception) {
+                if (version == myRequestsVersion) myRequests = Resource(data = myRequests.data, errorMessage = error.message)
+            }
         })
     }
 
-    fun loadIncomingRequests(showLoading: Boolean = true) {
-        if (incomingRequestRefreshInFlight) return
-        incomingRequestRefreshInFlight = true
+    fun loadIncomingRequests(showLoading: Boolean = true, requireFresh: Boolean = true) {
+        val refresh = incomingRequestRefresh
+        if (!refresh.start(requireFresh)) return
         if (showLoading) incomingRequests = Resource(isLoading = true, data = incomingRequests.data)
         apiService.fetchIncomingRequests(object : RideApiService.Callback<List<RideRequestSummary>> {
             override fun onSuccess(result: List<RideRequestSummary>) {
-                incomingRequestRefreshInFlight = false
-                incomingRequests = Resource(data = result)
+                if (refresh !== incomingRequestRefresh) return
+                if (refresh.finish()) loadIncomingRequests(showLoading = false)
+                else incomingRequests = Resource(data = result)
             }
 
             override fun onFailure(error: Exception) {
-                incomingRequestRefreshInFlight = false
-                incomingRequests = Resource(data = incomingRequests.data, errorMessage = error.message)
+                if (refresh !== incomingRequestRefresh) return
+                if (refresh.finish()) loadIncomingRequests(showLoading = false)
+                else incomingRequests = Resource(data = incomingRequests.data, errorMessage = error.message)
             }
         })
+    }
+
+    private fun refreshRideLifecycleState(
+        rideId: String?,
+        updatedRide: RideSummary? = null,
+        refreshRide: Boolean = true,
+        refreshActivity: Boolean = false
+    ) {
+        // Mutation responses already contain the authoritative ride; do not fetch it again.
+        if (rideId != null && rideId == selectedRideId) {
+            if (updatedRide != null) {
+                rideDetailsVersion++ // An older GET must not overwrite successful terminal state.
+                rideDetails = Resource(data = updatedRide)
+            } else if (refreshRide) loadRideDetails(rideId)
+        }
+        loadIncomingRequests()
+        loadMyRequests()
+        if (refreshRide) loadMyDriverRides()
+        if (refreshActivity) {
+            loadTripHistory()
+            loadDashboard()
+        }
     }
 
     fun clearRequestActionError() {
@@ -386,10 +462,11 @@ class RideshareViewModel : ViewModel() {
         apiService.respondToRequest(requestId, newStatus, targetRideId, newRideSeatsTotal, object : RideApiService.Callback<RideRequestSummary> {
             override fun onSuccess(result: RideRequestSummary) {
                 actionInFlight = false
-                loadIncomingRequests()
-                loadMyDriverRides()
-                loadMyRequests()
-                result.rideId?.takeIf { it == selectedRideId }?.let(::loadRideDetails)
+                refreshRideLifecycleState(
+                    result.rideId,
+                    refreshRide = newStatus != RequestStatus.REJECTED,
+                    refreshActivity = newStatus == RequestStatus.COMPLETED
+                )
                 onDone(true, null)
             }
 

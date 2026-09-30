@@ -98,6 +98,10 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         api.updateRide(rideId, UpdateRideRequestBody(status = "CANCELLED")).dispatch(callback, ::toRideSummary)
     }
 
+    override fun completeRide(rideId: String, callback: RideApiService.Callback<RideSummary>) {
+        api.updateRide(rideId, UpdateRideRequestBody(status = RideStatus.COMPLETED)).dispatch(callback, ::toRideSummary)
+    }
+
     override fun setDriverEnRoute(rideId: String, enRoute: Boolean, callback: RideApiService.Callback<RideSummary>) {
         api.updateRide(rideId, UpdateRideRequestBody(driverEnRoute = enRoute)).dispatch(callback, ::toRideSummary)
     }

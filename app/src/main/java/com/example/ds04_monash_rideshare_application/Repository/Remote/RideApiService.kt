@@ -24,6 +24,7 @@ interface RideApiService {
     fun fetchRide(rideId: String, callback: Callback<RideSummary>)
     fun createRide(draft: CreateRideDraft, callback: Callback<RideSummary>)
     fun cancelRide(rideId: String, callback: Callback<RideSummary>)
+    fun completeRide(rideId: String, callback: Callback<RideSummary>)
     fun setDriverEnRoute(rideId: String, enRoute: Boolean, callback: Callback<RideSummary>)
     fun fetchMyDriverRides(callback: Callback<List<RideSummary>>)
     fun fetchTripHistory(callback: Callback<List<RideSummary>>)

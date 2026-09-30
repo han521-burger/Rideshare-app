@@ -49,7 +49,7 @@ private fun haversineMeters(lat1: Double, lng1: Double, lat2: Double, lng2: Doub
 object MatchingEngine {
 
     fun rank(criteria: SearchCriteria, candidates: List<RideCandidate>): List<MatchResult> {
-        return candidates
+        return eligibleCandidates(criteria, candidates)
             .filter { passesGates(criteria, it) }
             .map { MatchResult(it, score(criteria, it)) }
             .sortedByDescending { it.score.total }
@@ -58,7 +58,7 @@ object MatchingEngine {
     // Simple fallback per the spec: if the full pipeline yields nothing, relax to just
     // station/pickup + time + direction (i.e. drop the detour/route-shape weighting).
     fun fallback(criteria: SearchCriteria, candidates: List<RideCandidate>): List<MatchResult> {
-        return candidates
+        return eligibleCandidates(criteria, candidates)
             .filter { sameDirection(criteria, it) && withinTimeWindow(criteria, it) }
             .map { ride ->
                 val pickup = pickupScore(criteria, ride)
@@ -70,8 +70,11 @@ object MatchingEngine {
             .sortedByDescending { it.score.total }
     }
 
+    // Capacity is mandatory even when fallback relaxes the ranking gates.
+    private fun eligibleCandidates(criteria: SearchCriteria, candidates: List<RideCandidate>): List<RideCandidate> =
+        candidates.filter { criteria.seatsNeeded > 0 && it.seatsAvailable >= criteria.seatsNeeded }
+
     private fun passesGates(criteria: SearchCriteria, ride: RideCandidate): Boolean {
-        if (ride.seatsAvailable < criteria.seatsNeeded) return false
         if (!sameDirection(criteria, ride)) return false
         if (!withinTimeWindow(criteria, ride)) return false
         val pickupDistance = haversineMeters(
