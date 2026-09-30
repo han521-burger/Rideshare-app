@@ -11,15 +11,20 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.NotificationsActive
+import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +40,7 @@ import java.util.Locale
 // An in-app notification for the active driver. It is intentionally a compact Monash-styled
 // banner rather than a copy of any commercial rideshare card: enough context to make a safe
 // decision, with the full request still one tap away.
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DriverRequestNotification(
     request: RideRequestSummary,
@@ -44,7 +50,69 @@ fun DriverRequestNotification(
     onReview: () -> Unit,
     onAccept: () -> Unit,
     onDecline: () -> Unit,
+    // Swiping only hides this banner locally - it does not decline the request, which stays
+    // PENDING and reachable from the Requests tab.
+    onSwipeDismiss: () -> Unit,
     modifier: Modifier = Modifier
+) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value != SwipeToDismissBoxValue.Settled) {
+                onSwipeDismiss()
+                true
+            } else {
+                false
+            }
+        }
+    )
+
+    SwipeToDismissBox(
+        state = dismissState,
+        modifier = modifier.fillMaxWidth(),
+        backgroundContent = {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(22.dp),
+                color = MaterialTheme.colorScheme.surfaceVariant
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalArrangement = when (dismissState.dismissDirection) {
+                        SwipeToDismissBoxValue.EndToStart -> Arrangement.End
+                        else -> Arrangement.Start
+                    },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.VisibilityOff,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "Hide",
+                        modifier = Modifier.padding(horizontal = 8.dp),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+            }
+        }
+    ) {
+        DriverRequestNotificationCard(request, totalWaiting, isActionInFlight, errorMessage, onReview, onAccept, onDecline)
+    }
+}
+
+@Composable
+private fun DriverRequestNotificationCard(
+    request: RideRequestSummary,
+    totalWaiting: Int,
+    isActionInFlight: Boolean,
+    errorMessage: String?,
+    onReview: () -> Unit,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit
 ) {
     val ride = request.ride
     val routeLabel = when {
@@ -58,7 +126,7 @@ fun DriverRequestNotification(
     val canQuickRespond = request.rideId != null
 
     ElevatedCard(
-        modifier = modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(22.dp),
         colors = CardDefaults.elevatedCardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.elevatedCardElevation(defaultElevation = 10.dp)

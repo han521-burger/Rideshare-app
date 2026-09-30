@@ -77,6 +77,9 @@ fun BottomNavScaffold(
     val accent = modeAccent(activeMode)
     val colorScheme = MaterialTheme.colorScheme.copy(primary = accent, secondary = accent)
     var displayedRequest by remember { mutableStateOf(driverRequest) }
+    // Swiping the banner away only hides it locally for this request id - the request itself
+    // stays PENDING. A different (or re-fetched later) request id shows the banner again.
+    var dismissedRequestId by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(driverRequest) {
         if (driverRequest != null) displayedRequest = driverRequest
@@ -145,7 +148,8 @@ fun BottomNavScaffold(
             )
 
             AnimatedVisibility(
-                visible = activeMode == AppMode.DRIVER && driverRequest != null,
+                visible = activeMode == AppMode.DRIVER && driverRequest != null &&
+                    driverRequest.requestId != dismissedRequestId,
                 enter = fadeIn(tween(350)) + slideInVertically(tween(350)) { -it / 2 },
                 exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { -it / 3 },
                 modifier = Modifier
@@ -163,7 +167,8 @@ fun BottomNavScaffold(
                         errorMessage = requestActionError,
                         onReview = { onReviewDriverRequest(request.requestId) },
                         onAccept = { onAcceptDriverRequest(request.requestId) },
-                        onDecline = { onDeclineDriverRequest(request.requestId) }
+                        onDecline = { onDeclineDriverRequest(request.requestId) },
+                        onSwipeDismiss = { dismissedRequestId = request.requestId }
                     )
                 }
             }
