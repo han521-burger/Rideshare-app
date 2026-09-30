@@ -39,7 +39,8 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
 
-private val STEP_LABELS = listOf("Search", "When", "Repeat", "Note", "Confirm")
+private val ASAP_STEP_LABELS = listOf("Search", "When", "Note", "Confirm")
+private val SCHEDULED_STEP_LABELS = listOf("Search", "When", "Repeat", "Note", "Confirm")
 private val WEEK_DAYS = listOf(
     DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY,
     DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY
@@ -67,6 +68,10 @@ fun RequestRideFlowScreen(
     var note by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
+    // ASAP has no scheduling concept, so the Repeat step (and any days already picked there)
+    // never applies to it - drop straight from When to Note.
+    val stepLabels = if (isAsap) ASAP_STEP_LABELS else SCHEDULED_STEP_LABELS
+
     val canGoNext = when (step) {
         0 -> origin != null && destination != null
         1 -> isAsap || (date != null && time != null)
@@ -75,13 +80,13 @@ fun RequestRideFlowScreen(
 
     StepWizardScaffold(
         title = "Request a ride",
-        stepLabels = STEP_LABELS,
+        stepLabels = stepLabels,
         currentStep = step,
         canGoNext = canGoNext,
         isSubmitting = isSubmitting,
         onBackStep = { step-- },
         onNextStep = {
-            if (step < STEP_LABELS.lastIndex) {
+            if (step < stepLabels.lastIndex) {
                 step++
                 return@StepWizardScaffold
             }
@@ -109,11 +114,21 @@ fun RequestRideFlowScreen(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
         ) {
-            when (step) {
-                0 -> SearchStep(origin, destination, onOriginChange = { origin = it }, onDestinationChange = { destination = it })
-                1 -> WhenStep(isAsap, date, time, onAsapChange = { isAsap = it }, onDateChange = { date = it }, onTimeChange = { time = it })
-                2 -> RepeatStep(repeatDays, repeatWeeks, onDaysChange = { repeatDays = it }, onWeeksChange = { repeatWeeks = it })
-                3 -> NoteStep(seats, note, onSeatsChange = { seats = it }, onNoteChange = { note = it })
+            when (stepLabels.getOrNull(step)) {
+                "Search" -> SearchStep(origin, destination, onOriginChange = { origin = it }, onDestinationChange = { destination = it })
+                "When" -> WhenStep(
+                    isAsap, date, time,
+                    onAsapChange = { checked ->
+                        isAsap = checked
+                        // Clear any days picked before switching to ASAP so a stale selection
+                        // can't leak into the submitted draft or the Confirm summary.
+                        if (checked) repeatDays = emptySet()
+                    },
+                    onDateChange = { date = it },
+                    onTimeChange = { time = it }
+                )
+                "Repeat" -> RepeatStep(repeatDays, repeatWeeks, onDaysChange = { repeatDays = it }, onWeeksChange = { repeatWeeks = it })
+                "Note" -> NoteStep(seats, note, onSeatsChange = { seats = it }, onNoteChange = { note = it })
                 else -> ConfirmStep(origin, destination, isAsap, date, time, repeatDays, repeatWeeks, seats, note)
             }
             errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 12.dp)) }

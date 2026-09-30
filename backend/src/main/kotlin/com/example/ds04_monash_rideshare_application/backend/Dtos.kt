@@ -56,6 +56,17 @@ data class VehicleDto(
 )
 
 @Serializable
+data class CreateVehicleRequest(
+    val year: Int,
+    val make: String,
+    val model: String,
+    val variant: String? = null,
+    val registrationMasked: String? = null,
+    val seatCapacity: Int,
+    val fuelType: String
+)
+
+@Serializable
 data class RideStopDto(
     val stopId: String,
     val sequence: Int,

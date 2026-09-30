@@ -31,6 +31,8 @@ import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
+import java.time.Instant
+import java.time.ZoneId
 import java.util.UUID
 
 fun Route.rideRequestRoutes() {
@@ -105,7 +107,12 @@ fun Route.rideRequestRoutes() {
 
     // Passenger posts a standalone request - a route + time with no driver picked yet. Sits as
     // PENDING with rideId == null until some driver accepts it (see PUT /requests/{id} below),
-    // attaching one of their own rides at that point.
+    // attaching one of their own rides at that point. If repeatDaysOfWeek is set, one additional
+    // standalone PENDING request is generated per matching day for the next repeatWeeks weeks
+    // (mirrors the driver "repeat this route" fan-out in RideRoutes.kt's POST /rides) - each day
+    // is then its own request with its own status, so a driver can accept some days and leave
+    // others for someone else, instead of one accept locking every day at once. ASAP has no
+    // scheduling concept, so repeat days never apply when isAsap is true.
     post("/requests") {
         val passengerId = call.requireUserId()
         val body = call.receive<CreateStandaloneRequestBody>()
@@ -117,22 +124,27 @@ fun Route.rideRequestRoutes() {
         val requestId = "req-${UUID.randomUUID()}"
         val now = System.currentTimeMillis()
         transaction {
-            RideRequests.insert {
-                it[RideRequests.requestId] = requestId
-                it[rideId] = null
-                it[RideRequests.passengerId] = passengerId
-                it[seatsRequested] = body.seatsRequested
-                it[status] = RideRequestStatus.PENDING
-                it[note] = body.note
-                it[originLat] = body.originLat
-                it[originLng] = body.originLng
-                it[destinationLat] = body.destinationLat
-                it[destinationLng] = body.destinationLng
-                it[isAsap] = body.isAsap
-                it[desiredDepartureTime] = body.desiredDepartureTime
-                it[repeatDaysOfWeek] = body.repeatDaysOfWeek.takeIf { days -> days.isNotEmpty() }?.joinToString(",")
-                it[repeatWeeks] = body.repeatWeeks
-                it[createdAt] = now
+            insertStandaloneRequest(requestId, passengerId, body, body.desiredDepartureTime, now)
+
+            val startDeparture = body.desiredDepartureTime
+            if (!body.isAsap && startDeparture != null && body.repeatDaysOfWeek.isNotEmpty()) {
+                val zone = ZoneId.systemDefault()
+                val startInstant = Instant.ofEpochMilli(startDeparture).atZone(zone)
+                val startDate = startInstant.toLocalDate()
+                val timeOfDay = startInstant.toLocalTime()
+                val weeks = (body.repeatWeeks ?: 4).coerceIn(1, 12)
+                val endDate = startDate.plusWeeks(weeks.toLong())
+
+                var date = startDate.plusDays(1)
+                while (date.isBefore(endDate)) {
+                    if (date.dayOfWeek.value in body.repeatDaysOfWeek) {
+                        val siblingDeparture = date.atTime(timeOfDay).atZone(zone).toInstant().toEpochMilli()
+                        if (siblingDeparture > System.currentTimeMillis()) {
+                            insertStandaloneRequest("req-${UUID.randomUUID()}", passengerId, body, siblingDeparture, now)
+                        }
+                    }
+                    date = date.plusDays(1)
+                }
             }
         }
         val dto = transaction {
@@ -311,11 +323,14 @@ fun Route.rideRequestRoutes() {
                         throw ConflictException("That ride isn't open")
                     }
 
-                    // Re-read seatsAvailable inside this same transaction right before writing -
-                    // SQLite serialises writers at the connection/file level, so this
-                    // check-then-write is safe here. On a multi-writer DB (e.g. Postgres) this
-                    // select would need SELECT ... FOR UPDATE to hold the same guarantee.
-                    val freshRide = Rides.selectAll().where { Rides.rideId eq targetRideId }.first()
+                    // Re-read seatsAvailable inside this same transaction right before writing,
+                    // holding a row lock (forUpdate) so two drivers racing to accept can't both
+                    // pass this check for the same seat. SQLite has no row-level locking - this
+                    // is a no-op there and the check-then-write is safe only because SQLite
+                    // serialises writers at the connection/file level - but on a multi-writer DB
+                    // (e.g. Postgres) forUpdate blocks the second transaction here until the
+                    // first commits, so it re-reads the now-updated count instead of racing it.
+                    val freshRide = Rides.selectAll().where { Rides.rideId eq targetRideId }.forUpdate().first()
                     if (freshRide[Rides.seatsAvailable] < request[RideRequests.seatsRequested]) {
                         throw ConflictException("Not enough seats left - someone else was just accepted")
                     }
@@ -381,5 +396,29 @@ fun Route.rideRequestRoutes() {
             RideRequests.selectAll().where { RideRequests.requestId eq requestId }.map { it.toRideRequestDto() }.first()
         }
         call.respond(dto)
+    }
+}
+
+private fun insertStandaloneRequest(
+    requestId: String,
+    passengerId: String,
+    body: CreateStandaloneRequestBody,
+    departureTime: Long?,
+    createdAt: Long
+) {
+    RideRequests.insert {
+        it[RideRequests.requestId] = requestId
+        it[rideId] = null
+        it[RideRequests.passengerId] = passengerId
+        it[seatsRequested] = body.seatsRequested
+        it[status] = RideRequestStatus.PENDING
+        it[note] = body.note
+        it[originLat] = body.originLat
+        it[originLng] = body.originLng
+        it[destinationLat] = body.destinationLat
+        it[destinationLng] = body.destinationLng
+        it[isAsap] = body.isAsap
+        it[desiredDepartureTime] = departureTime
+        it[RideRequests.createdAt] = createdAt
     }
 }

@@ -126,9 +126,11 @@ object RideRequests : Table("ride_requests") {
     val destinationLng = double("destination_lng").nullable()
     val isAsap = bool("is_asap").default(false)
     val desiredDepartureTime = long("desired_departure_time").nullable()
-    // "Also wants this on Mon/Wed" - informational only for a standalone request. There's no
-    // scheduler in this trial (see Rides.recurringGroupId), so this isn't exploded into further
-    // requests; a driver just sees it as a note when deciding whether to accept.
+    // Unused by new rows - kept only so a pre-existing row's stored note still deserialises.
+    // "Also wants this on Mon/Wed" used to sit here as text only; it's now exploded into one
+    // additional standalone PENDING request per matching day at creation time (see POST /requests
+    // in RideRequestRoutes.kt), each with its own status so a driver can accept days
+    // independently instead of one accept locking every day at once.
     val repeatDaysOfWeek = varchar("repeat_days_of_week", 32).nullable()
     val repeatWeeks = integer("repeat_weeks").nullable()
     val createdAt = long("created_at")
