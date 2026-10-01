@@ -51,6 +51,7 @@ interface RideApiService {
     fun sendMessage(rideId: String, body: String, callback: Callback<MessageSummary>)
 
     fun fetchDashboard(callback: Callback<DashboardSummary>)
+    fun fetchAnalytics(callback: Callback<AnalyticsSummary>)
     fun fetchLeaderboard(limit: Int, callback: Callback<LeaderboardResult>)
 
     fun submitRating(rideId: String, ratedUserId: String, stars: Int, tags: List<String>, comment: String?, callback: Callback<RatingSummary>)

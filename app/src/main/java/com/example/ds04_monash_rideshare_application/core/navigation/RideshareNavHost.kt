@@ -140,6 +140,7 @@ fun RideshareNavHost(
             AppDestination.Activity -> {
                 viewModel.loadDashboard()
                 viewModel.loadTripHistory()
+                viewModel.loadAnalytics()
             }
             AppDestination.Profile -> {
                 viewModel.loadProfile()
@@ -198,9 +199,11 @@ fun RideshareNavHost(
             activeMode = viewModel.activeMode,
             onModeChange = { mode ->
                 viewModel.clearRequestActionError()
+                // Mirrors Driver -> Passenger: stay on whichever tab you're already on. Only the
+                // post-registration flow below (coming from the Vehicles screen, not a tab) jumps
+                // to Home, since there's nothing meaningful to return to there.
                 viewModel.updateActiveMode(mode,
-                    onRegistrationRequired = { registeringForDriver = true; navigate(AppDestination.Vehicles) },
-                    onDriverActivated = { replaceStack(AppDestination.Home) })
+                    onRegistrationRequired = { registeringForDriver = true; navigate(AppDestination.Vehicles) })
             },
             currentTab = currentTab,
             onTabSelected = ::switchTab,
@@ -266,7 +269,9 @@ fun RideshareNavHost(
                     )
 
                     AppDestination.Activity -> ActivityScreen(
+                        currentUserId = uiState.userId,
                         dashboard = viewModel.dashboard,
+                        analytics = viewModel.analytics,
                         tripHistory = viewModel.tripHistory,
                         onOpenLeaderboard = { navigate(AppDestination.Leaderboard) },
                         onOpenRide = { rideId ->

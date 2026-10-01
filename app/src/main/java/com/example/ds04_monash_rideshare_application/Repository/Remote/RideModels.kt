@@ -181,6 +181,30 @@ data class DashboardSummary(
     val monthlyTripSummary: List<MonthlyTripSummary>
 )
 
+data class RequestFunnelCounts(
+    val pending: Int,
+    val accepted: Int,
+    val rejected: Int,
+    val cancelled: Int,
+    val completed: Int
+) {
+    val total: Int get() = pending + accepted + rejected + cancelled + completed
+}
+
+data class HotzoneEntry(val locationName: String, val count: Int)
+
+data class RouteFrequency(val originLabel: String, val destinationLabel: String, val count: Int)
+
+data class AnalyticsSummary(
+    val passengerFunnel: RequestFunnelCounts,
+    val driverFunnel: RequestFunnelCounts,
+    val averageDriverResponseMinutes: Double?,
+    val hotzones: List<HotzoneEntry>,
+    val tripsByDayOfWeek: List<Int>,
+    val mostUsedRoute: RouteFrequency?,
+    val averageSeatFillRatePercent: Double?
+)
+
 data class UserAccountSummary(
     val userId: String,
     val displayName: String,

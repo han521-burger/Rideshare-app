@@ -171,6 +171,10 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         api.getDashboard().dispatch(callback, ::toDashboardSummary)
     }
 
+    override fun fetchAnalytics(callback: RideApiService.Callback<AnalyticsSummary>) {
+        api.getAnalytics().dispatch(callback, ::toAnalyticsSummary)
+    }
+
     override fun fetchLeaderboard(limit: Int, callback: RideApiService.Callback<LeaderboardResult>) {
         api.getLeaderboard(limit).dispatch(callback) { dto ->
             LeaderboardResult(dto.top.map(::toLeaderboardEntry), dto.me?.let(::toLeaderboardEntry))
@@ -313,6 +317,19 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
     )
 
     private fun toLeaderboardEntry(dto: LeaderboardEntryDto) = LeaderboardEntry(dto.userId, dto.displayName, dto.totalCo2AvoidedKg, dto.rank)
+
+    private fun toFunnelCounts(dto: RequestFunnelCountsDto) =
+        RequestFunnelCounts(dto.pending, dto.accepted, dto.rejected, dto.cancelled, dto.completed)
+
+    private fun toAnalyticsSummary(dto: AnalyticsResponseDto) = AnalyticsSummary(
+        passengerFunnel = toFunnelCounts(dto.passengerFunnel),
+        driverFunnel = toFunnelCounts(dto.driverFunnel),
+        averageDriverResponseMinutes = dto.averageDriverResponseMinutes,
+        hotzones = dto.hotzones.map { HotzoneEntry(it.locationName, it.count) },
+        tripsByDayOfWeek = dto.tripsByDayOfWeek,
+        mostUsedRoute = dto.mostUsedRoute?.let { RouteFrequency(it.originLabel, it.destinationLabel, it.count) },
+        averageSeatFillRatePercent = dto.averageSeatFillRatePercent
+    )
 
     private fun toRatingSummary(dto: RatingDto) = RatingSummary(
         dto.ratingId, dto.rideId, dto.raterId, dto.ratedUserId, dto.stars, dto.tags, dto.comment, dto.createdAt

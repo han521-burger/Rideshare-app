@@ -247,3 +247,25 @@ data class LeaderboardResponseDto(
     val top: List<LeaderboardEntryDto>,
     val me: LeaderboardEntryDto? = null
 )
+
+data class RequestFunnelCountsDto(
+    val pending: Int = 0,
+    val accepted: Int = 0,
+    val rejected: Int = 0,
+    val cancelled: Int = 0,
+    val completed: Int = 0
+)
+
+data class HotzoneEntryDto(val locationName: String, val count: Int)
+
+data class RouteFrequencyDto(val originLabel: String, val destinationLabel: String, val count: Int)
+
+data class AnalyticsResponseDto(
+    val passengerFunnel: RequestFunnelCountsDto,
+    val driverFunnel: RequestFunnelCountsDto,
+    val averageDriverResponseMinutes: Double? = null,
+    val hotzones: List<HotzoneEntryDto> = emptyList(),
+    val tripsByDayOfWeek: List<Int> = List(7) { 0 },
+    val mostUsedRoute: RouteFrequencyDto? = null,
+    val averageSeatFillRatePercent: Double? = null
+)

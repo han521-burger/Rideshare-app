@@ -76,6 +76,9 @@ interface BackendApi {
     @GET("users/me/dashboard")
     fun getDashboard(): Call<DashboardResponseDto>
 
+    @GET("users/me/analytics")
+    fun getAnalytics(): Call<AnalyticsResponseDto>
+
     @GET("leaderboard")
     fun getLeaderboard(@Query("limit") limit: Int = 10): Call<LeaderboardResponseDto>
 

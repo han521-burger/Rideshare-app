@@ -36,6 +36,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -77,9 +78,11 @@ fun BottomNavScaffold(
     val accent = modeAccent(activeMode)
     val colorScheme = MaterialTheme.colorScheme.copy(primary = accent, secondary = accent)
     var displayedRequest by remember { mutableStateOf(driverRequest) }
-    // Swiping the banner away only hides it locally for this request id - the request itself
-    // stays PENDING. A different (or re-fetched later) request id shows the banner again.
-    var dismissedRequestId by remember { mutableStateOf<String?>(null) }
+    // Swiping a banner away hides it for good (like a real notification) - it stays dismissed
+    // across mode switches and app restarts, tracked by id rather than just "the last one swiped"
+    // so dismissing a second request doesn't un-hide the first. The request itself stays PENDING;
+    // only a genuinely different (or later re-opened) request id shows a banner again.
+    var dismissedRequestIds by rememberSaveable { mutableStateOf(setOf<String>()) }
 
     LaunchedEffect(driverRequest) {
         if (driverRequest != null) displayedRequest = driverRequest
@@ -149,7 +152,7 @@ fun BottomNavScaffold(
 
             AnimatedVisibility(
                 visible = activeMode == AppMode.DRIVER && driverRequest != null &&
-                    driverRequest.requestId != dismissedRequestId,
+                    driverRequest.requestId !in dismissedRequestIds,
                 enter = fadeIn(tween(350)) + slideInVertically(tween(350)) { -it / 2 },
                 exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { -it / 3 },
                 modifier = Modifier
@@ -168,7 +171,7 @@ fun BottomNavScaffold(
                         onReview = { onReviewDriverRequest(request.requestId) },
                         onAccept = { onAcceptDriverRequest(request.requestId) },
                         onDecline = { onDeclineDriverRequest(request.requestId) },
-                        onSwipeDismiss = { dismissedRequestId = request.requestId }
+                        onSwipeDismiss = { dismissedRequestIds = dismissedRequestIds + request.requestId }
                     )
                 }
             }

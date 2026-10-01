@@ -312,5 +312,43 @@ data class LeaderboardResponse(
     val me: LeaderboardEntryDto? = null
 )
 
+// Rule-based analytics computed on the fly from existing tables (docs/FEATURE_PROPOSALS.md item
+// 5) - deliberately no ML/training, same spirit as MatchingEngine.kt. Everything here is scoped
+// to the caller's own activity except hotzones, which is campus-wide (it's meant to help a driver
+// decide where to offer a ride, not just reflect on one they already took).
+@Serializable
+data class RequestFunnelCounts(
+    val pending: Int = 0,
+    val accepted: Int = 0,
+    val rejected: Int = 0,
+    val cancelled: Int = 0,
+    val completed: Int = 0
+)
+
+@Serializable
+data class HotzoneEntryDto(val locationName: String, val count: Int)
+
+@Serializable
+data class RouteFrequencyDto(val originLabel: String, val destinationLabel: String, val count: Int)
+
+@Serializable
+data class AnalyticsDto(
+    // Your own sent requests, by outcome.
+    val passengerFunnel: RequestFunnelCounts,
+    // Requests sent to rides you drive, by outcome.
+    val driverFunnel: RequestFunnelCounts,
+    // How long you personally take to respond to a request once it arrives - null if you've
+    // never responded to one yet.
+    val averageDriverResponseMinutes: Double? = null,
+    // Busiest pickup/drop-off points campus-wide this week - helps decide where to offer a ride.
+    val hotzones: List<HotzoneEntryDto> = emptyList(),
+    // Completed trips (driving + riding) by day of week, index 0 = Monday .. 6 = Sunday.
+    val tripsByDayOfWeek: List<Int> = List(7) { 0 },
+    val mostUsedRoute: RouteFrequencyDto? = null,
+    // Drivers only - average (seatsTotal - seatsAvailable) / seatsTotal across your completed
+    // rides, null if you've never completed one as a driver.
+    val averageSeatFillRatePercent: Double? = null
+)
+
 @Serializable
 data class ErrorResponse(val error: String)

@@ -11,6 +11,7 @@ import com.example.ds04_monash_rideshare_application.Auth.FakeAuthenticationProv
 import com.example.ds04_monash_rideshare_application.Auth.TestIdentity
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateRideDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateVehicleDraft
+import com.example.ds04_monash_rideshare_application.Repository.Remote.AnalyticsSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.DashboardSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.FavoriteDriverSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.LeaderboardResult
@@ -95,6 +96,8 @@ class RideshareViewModel : ViewModel() {
     var tripHistory by mutableStateOf(Resource<List<RideSummary>>())
         private set
     var dashboard by mutableStateOf(Resource<DashboardSummary>())
+        private set
+    var analytics by mutableStateOf(Resource<AnalyticsSummary>())
         private set
     var leaderboard by mutableStateOf(Resource<LeaderboardResult>())
         private set
@@ -217,7 +220,7 @@ class RideshareViewModel : ViewModel() {
                 incomingRequests = Resource(); openRides = Resource(); searchResults = Resource()
                 lastSearchCriteria = null
                 rideDetails = Resource(); messages = Resource(); tripHistory = Resource()
-                dashboard = Resource(); leaderboard = Resource(); ratings = Resource(); favorites = Resource()
+                dashboard = Resource(); analytics = Resource(); leaderboard = Resource(); ratings = Resource(); favorites = Resource()
                 vehicles = Resource()
                 selectedRideId = null; selectedRequestId = null; requestActionError = null
                 actionInFlight = false; incomingRequestRefresh = RequestRefreshGate(); lastCreatedRide = null
@@ -543,6 +546,14 @@ class RideshareViewModel : ViewModel() {
         apiService.fetchDashboard(object : RideApiService.Callback<DashboardSummary> {
             override fun onSuccess(result: DashboardSummary) { dashboard = Resource(data = result) }
             override fun onFailure(error: Exception) { dashboard = Resource(errorMessage = error.message) }
+        })
+    }
+
+    fun loadAnalytics() {
+        analytics = Resource(isLoading = true)
+        apiService.fetchAnalytics(object : RideApiService.Callback<AnalyticsSummary> {
+            override fun onSuccess(result: AnalyticsSummary) { analytics = Resource(data = result) }
+            override fun onFailure(error: Exception) { analytics = Resource(errorMessage = error.message) }
         })
     }
 
