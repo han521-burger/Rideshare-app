@@ -46,7 +46,7 @@ fun ProfileScreen(
         onDone: (String?) -> Unit
     ) -> Unit,
     onRemoveFavorite: (driverId: String) -> Unit,
-    vehicleCount: Int,
+    vehicle: com.example.ds04_monash_rideshare_application.Repository.Remote.VehicleSummary?,
     onOpenVehicles: () -> Unit,
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier
@@ -124,9 +124,9 @@ fun ProfileScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Column {
-                        Text("My vehicles", fontWeight = FontWeight.SemiBold)
+                        Text("My vehicle", fontWeight = FontWeight.SemiBold)
                         Text(
-                            if (vehicleCount == 0) "None saved yet - required before offering a ride" else "$vehicleCount saved",
+                            vehicle?.let(::vehicleSummary) ?: "Register your vehicle to offer rides",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

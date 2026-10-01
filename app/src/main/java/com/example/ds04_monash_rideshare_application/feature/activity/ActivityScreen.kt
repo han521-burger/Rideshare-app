@@ -75,7 +75,7 @@ private fun DashboardCard(dashboard: DashboardSummary, onOpenLeaderboard: () -> 
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 StatColumn("${dashboard.totalRidesCompleted}", "Trips shared")
-                StatColumn("%.1f kg".format(dashboard.totalCo2AvoidedKg), "CO2 avoided")
+                StatColumn("%.1f kg".format(dashboard.totalCo2AvoidedKg), "Estimated CO₂ avoided")
                 StatColumn("%.1f L".format(dashboard.totalFuelSavedLitres), "Fuel saved")
             }
 

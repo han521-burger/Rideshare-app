@@ -18,6 +18,7 @@ import com.example.ds04_monash_rideshare_application.backend.UpdateRideRequest
 import com.example.ds04_monash_rideshare_application.backend.Users
 import com.example.ds04_monash_rideshare_application.backend.ValidationException
 import com.example.ds04_monash_rideshare_application.backend.Vehicles
+import com.example.ds04_monash_rideshare_application.backend.requireDriverVehicle
 import com.example.ds04_monash_rideshare_application.backend.matching.MatchingEngine
 import com.example.ds04_monash_rideshare_application.backend.matching.RideCandidate
 import com.example.ds04_monash_rideshare_application.backend.matching.SearchCriteria
@@ -144,22 +145,12 @@ fun Route.rideRoutes() {
         }
         requireMonashEndpoint(body.originLat, body.originLng, body.destinationLat, body.destinationLng)
 
-        // A driver has exactly one registered vehicle (VehicleRoutes.kt) - it's attached
-        // automatically, never chosen per ride, and its seat capacity caps what can be offered.
-        val vehicleId = transaction {
-            val vehicle = Vehicles.selectAll().where { Vehicles.ownerId eq driverId }.firstOrNull()
-                ?: throw ValidationException("Register a vehicle before offering a ride")
-            if (body.seatsTotal > vehicle[Vehicles.seatCapacity]) {
-                throw ValidationException("Your vehicle only seats ${vehicle[Vehicles.seatCapacity]}")
-            }
-            vehicle[Vehicles.vehicleId]
-        }
-
         val rideId = "ride-${UUID.randomUUID()}"
         val now = System.currentTimeMillis()
         val groupId = if (body.repeatDaysOfWeek.isNotEmpty()) "recur-${UUID.randomUUID()}" else null
 
         transaction {
+            val vehicleId = requireDriverVehicle(driverId, body.seatsTotal)[Vehicles.vehicleId]
             insertRide(rideId, driverId, vehicleId, body, groupId, now)
             insertStops(rideId, body.stops)
 
@@ -235,6 +226,10 @@ fun Route.rideRoutes() {
             Rides.update({ Rides.rideId eq rideId }) { stmt ->
                 body.departureTime?.let { stmt[departureTime] = it }
                 body.seatsTotal?.let { newTotal ->
+                    requireDriverVehicle(userId, newTotal)
+                    if (newTotal < ride[Rides.seatsTotal] - ride[Rides.seatsAvailable]) {
+                        throw ValidationException("Cannot remove seats already booked by passengers")
+                    }
                     val delta = newTotal - ride[Rides.seatsTotal]
                     stmt[seatsTotal] = newTotal
                     stmt[seatsAvailable] = (ride[Rides.seatsAvailable] + delta).coerceAtLeast(0)

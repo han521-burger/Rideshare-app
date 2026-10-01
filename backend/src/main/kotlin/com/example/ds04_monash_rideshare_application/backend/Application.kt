@@ -8,6 +8,7 @@ import com.example.ds04_monash_rideshare_application.backend.routes.ratingRoutes
 import com.example.ds04_monash_rideshare_application.backend.routes.rideRequestRoutes
 import com.example.ds04_monash_rideshare_application.backend.routes.rideRoutes
 import com.example.ds04_monash_rideshare_application.backend.routes.userRoutes
+import com.example.ds04_monash_rideshare_application.backend.routes.vehicleRoutes
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
@@ -40,6 +41,7 @@ fun Application.module(databaseUrl: String = "jdbc:sqlite:./rideshare-backend.db
     routing {
         healthRoutes()
         userRoutes()
+        vehicleRoutes()
         rideRoutes()
         rideRequestRoutes()
         messageRoutes()

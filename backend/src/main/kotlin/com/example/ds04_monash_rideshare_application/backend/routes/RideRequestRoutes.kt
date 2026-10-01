@@ -12,6 +12,8 @@ import com.example.ds04_monash_rideshare_application.backend.RideStatus
 import com.example.ds04_monash_rideshare_application.backend.Rides
 import com.example.ds04_monash_rideshare_application.backend.UpdateRideRequestStatusBody
 import com.example.ds04_monash_rideshare_application.backend.Users
+import com.example.ds04_monash_rideshare_application.backend.Vehicles
+import com.example.ds04_monash_rideshare_application.backend.requireDriverVehicle
 import com.example.ds04_monash_rideshare_application.backend.ValidationException
 import com.example.ds04_monash_rideshare_application.backend.matching.MatchingEngine
 import com.example.ds04_monash_rideshare_application.backend.matching.RideCandidate
@@ -286,6 +288,7 @@ fun Route.rideRequestRoutes() {
                         }
                         val seatsTotal = (body.newRideSeatsTotal ?: request[RideRequests.seatsRequested])
                             .coerceAtLeast(request[RideRequests.seatsRequested])
+                        val vehicle = requireDriverVehicle(userId, seatsTotal)
                         val distanceMeters = haversine(originLat, originLng, destinationLat, destinationLng)
                         // Straight-line estimate at a typical urban driving speed (40 km/h) - a
                         // standalone request never had a real Yandex route computed for it (see
@@ -295,7 +298,7 @@ fun Route.rideRequestRoutes() {
                         Rides.insert {
                             it[rideId] = newRideId
                             it[driverId] = userId
-                            it[vehicleId] = null
+                            it[vehicleId] = vehicle[Vehicles.vehicleId]
                             it[Rides.originLat] = originLat
                             it[Rides.originLng] = originLng
                             it[Rides.destinationLat] = destinationLat
@@ -315,7 +318,11 @@ fun Route.rideRequestRoutes() {
                     val targetRide = Rides.selectAll().where { Rides.rideId eq targetRideId }.firstOrNull()
                         ?: throw NotFoundException("Target ride not found")
                     if (targetRide[Rides.driverId] != userId) throw ForbiddenException("You don't own that ride")
-                    if (existingRideId != null && existingRideId != targetRideId) {
+                    if (
+                        existingRideId != null &&
+                        body.targetRideId != null &&
+                        existingRideId != body.targetRideId
+                    ) {
                         throw ValidationException("This request is already tied to a different ride")
                     }
                     // CONFIRMED (not just OPEN) is fine here too - a ride with other confirmed

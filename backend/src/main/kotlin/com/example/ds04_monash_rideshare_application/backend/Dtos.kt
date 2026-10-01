@@ -54,12 +54,14 @@ data class VehicleDto(
     val seatCapacity: Int,
     val fuelType: String,
     val vehicleType: String,
-    val colour: String
+    val colour: String,
+    val createdAt: Long,
+    val updatedAt: Long
 )
 
 @Serializable
 data class CreateVehicleRequest(
-    val year: Int,
+    val year: Int = 0,
     val make: String,
     val model: String,
     val variant: String? = null,
@@ -75,7 +77,7 @@ data class CreateVehicleRequest(
 // existing rides) rather than making them delete and re-register.
 @Serializable
 data class UpdateVehicleRequest(
-    val year: Int,
+    val year: Int = 0,
     val make: String,
     val model: String,
     val variant: String? = null,

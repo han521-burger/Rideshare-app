@@ -3,6 +3,10 @@ package com.example.ds04_monash_rideshare_application.core.navigation
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -48,6 +52,8 @@ fun RideshareNavHost(
         mutableStateOf(listOf(AppDestination.Splash.route))
     }
 
+    var registeringForDriver by rememberSaveable { mutableStateOf(false) }
+
     fun navigate(destination: AppDestination) {
         if (backStack.lastOrNull() != destination.route) {
             backStack = backStack + destination.route
@@ -59,6 +65,10 @@ fun RideshareNavHost(
     }
 
     fun navigateUp() {
+        if (backStack.lastOrNull() == AppDestination.Vehicles.route && registeringForDriver) {
+            registeringForDriver = false
+            viewModel.cancelDriverRegistration()
+        }
         if (backStack.size > 1) {
             backStack = backStack.dropLast(1)
         }
@@ -170,6 +180,17 @@ fun RideshareNavHost(
         }
     }
 
+    if (viewModel.driverAccess.checking) {
+        AlertDialog(onDismissRequest = viewModel::cancelDriverRegistration,
+            title = { Text("Checking your vehicle") }, text = { CircularProgressIndicator() },
+            confirmButton = { TextButton(onClick = viewModel::cancelDriverRegistration) { Text("Cancel") } })
+    }
+    viewModel.driverModeError?.let { error ->
+        AlertDialog(onDismissRequest = viewModel::clearDriverModeError,
+            title = { Text("Unable to switch to Driver") }, text = { Text(error) },
+            confirmButton = { TextButton(onClick = viewModel::clearDriverModeError) { Text("OK") } })
+    }
+
     if (currentDestination in AppDestination.tabDestinations) {
         val pendingDriverRequests = viewModel.incomingPendingRequests
         val newestDriverRequest = pendingDriverRequests.maxByOrNull { it.createdAt }
@@ -177,7 +198,9 @@ fun RideshareNavHost(
             activeMode = viewModel.activeMode,
             onModeChange = { mode ->
                 viewModel.clearRequestActionError()
-                viewModel.updateActiveMode(mode)
+                viewModel.updateActiveMode(mode,
+                    onRegistrationRequired = { registeringForDriver = true; navigate(AppDestination.Vehicles) },
+                    onDriverActivated = { replaceStack(AppDestination.Home) })
             },
             currentTab = currentTab,
             onTabSelected = ::switchTab,
@@ -258,7 +281,7 @@ fun RideshareNavHost(
                         favorites = viewModel.favorites,
                         onSave = viewModel::updateProfile,
                         onRemoveFavorite = { driverId -> viewModel.toggleFavorite(driverId, currentlyFavorite = true) },
-                        vehicleCount = viewModel.vehicles.data.orEmpty().size,
+                        vehicle = viewModel.vehicles.data.orEmpty().firstOrNull(),
                         onOpenVehicles = { navigate(AppDestination.Vehicles) },
                         onSignOut = ::returnToLogin
                     )
@@ -415,7 +438,7 @@ fun RideshareNavHost(
 
         AppDestination.OfferRide -> OfferRideFlowScreen(
             isPublishing = viewModel.actionInFlight,
-            maxSeats = viewModel.vehicles.data.orEmpty().firstOrNull()?.seatCapacity ?: 1,
+            maxSeats = viewModel.vehicles.data.orEmpty().firstOrNull()?.let { it.seatCapacity - 1 } ?: 1,
             onPublish = { draft, onSuccess, onError ->
                 viewModel.createRide(draft, onSuccess, onError)
             },
@@ -451,10 +474,17 @@ fun RideshareNavHost(
 
         AppDestination.Vehicles -> VehiclesScreen(
             vehicles = viewModel.vehicles,
-            isSaving = viewModel.actionInFlight,
-            onAddVehicle = { draft, onDone -> viewModel.createVehicle(draft, onDone) },
+            isSaving = viewModel.vehicleSaving,
+            onAddVehicle = { draft, onDone ->
+                viewModel.createVehicle(draft) { error ->
+                    onDone(error)
+                    if (error == null && registeringForDriver) {
+                        viewModel.updateActiveMode(AppMode.DRIVER,
+                            onDriverActivated = { registeringForDriver = false; replaceStack(AppDestination.Home) })
+                    }
+                }
+            },
             onUpdateVehicle = { vehicleId, draft, onDone -> viewModel.updateVehicle(vehicleId, draft, onDone) },
-            onDeleteVehicle = { vehicleId -> viewModel.deleteVehicle(vehicleId) {} },
             onNavigateBack = ::navigateUp,
             modifier = modifier
         )

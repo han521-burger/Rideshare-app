@@ -9,8 +9,14 @@ import org.jetbrains.exposed.sql.transactions.transaction
 // SQLite file DB for local trial/dev use - see build.gradle header for why, and swap this for a
 // hosted Postgres connection once the team picks real hosting (RTM FR-08).
 fun initDatabase(jdbcUrl: String = "jdbc:sqlite:./rideshare-backend.db") {
-    Database.connect(jdbcUrl, driver = "org.sqlite.JDBC")
-    transaction {
+    val database = Database.connect(jdbcUrl, driver = "org.sqlite.JDBC")
+    transaction(database) {
+        // Refuse an ambiguous legacy migration rather than deleting or merging vehicles.
+        val hasVehicles = exec("SELECT name FROM sqlite_master WHERE type='table' AND name='vehicles'") { it.next() } == true
+        if (hasVehicles) {
+            val duplicates = exec("SELECT owner_id FROM vehicles GROUP BY owner_id HAVING COUNT(*) > 1") { it.next() } == true
+            check(!duplicates) { "Vehicle migration requires resolving duplicate owners; existing data was not changed" }
+        }
         // createMissingTablesAndColumns (not create) so a local dev DB from before a schema
         // change - a new nullable/defaulted column, a new table - gets migrated in place via
         // ALTER TABLE instead of silently keeping the old shape and erroring at query time.

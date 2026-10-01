@@ -61,8 +61,15 @@ class RideshareViewModel : ViewModel() {
 
     // In-app toggle (Passenger teal / Driver amber) - not a login-time choice, and doesn't
     // partition data: a single account can be driving one ride and riding another at once.
-    var activeMode by mutableStateOf(AppMode.PASSENGER)
+    internal var driverAccess by mutableStateOf(DriverAccessState())
         private set
+    val activeMode: AppMode get() = driverAccess.mode
+    var driverModeError by mutableStateOf<String?>(null)
+        private set
+    var vehicleSaving by mutableStateOf(false)
+        private set
+    private var driverAttempt = 0
+    private var vehicleVersion = 0
 
     var selectedRideId by mutableStateOf<String?>(null)
     var selectedRequestId by mutableStateOf<String?>(null)
@@ -127,9 +134,36 @@ class RideshareViewModel : ViewModel() {
     val incomingPendingRequests: List<RideRequestSummary>
         get() = incomingRequests.data.orEmpty().filter { it.status == RequestStatus.PENDING }
 
-    fun updateActiveMode(mode: AppMode) {
-        activeMode = mode
+    fun updateActiveMode(mode: AppMode, onRegistrationRequired: () -> Unit = {}, onDriverActivated: () -> Unit = {}) {
+        if (mode == AppMode.PASSENGER) { cancelDriverRegistration(); return }
+        if (driverAccess.checking) return
+        val user = uiState.userId ?: return
+        val attempt = ++driverAttempt
+        val version = ++vehicleVersion
+        driverAccess = driverAccess.beginCheck()
+        driverModeError = null
+        apiService.fetchMyVehicles(object : RideApiService.Callback<List<VehicleSummary>> {
+            override fun onSuccess(result: List<VehicleSummary>) {
+                if (attempt != driverAttempt || uiState.userId != user) return
+                if (version == vehicleVersion) vehicles = Resource(data = result)
+                driverAccess = driverAccess.resolve(result.isNotEmpty())
+                if (driverAccess.needsRegistration) onRegistrationRequired() else onDriverActivated()
+            }
+            override fun onFailure(error: Exception) {
+                if (attempt != driverAttempt || uiState.userId != user) return
+                driverAccess = driverAccess.cancel()
+                driverModeError = "Couldn't check your vehicle. Please try Driver again."
+            }
+        })
     }
+
+    fun cancelDriverRegistration() {
+        driverAttempt++
+        driverAccess = driverAccess.cancel()
+        driverModeError = null
+    }
+
+    fun clearDriverModeError() { driverModeError = null }
 
     fun signIn(email: String? = null, onSuccess: () -> Unit = {}) {
         if (uiState.isSigningIn) return
@@ -157,6 +191,9 @@ class RideshareViewModel : ViewModel() {
     }
 
     private fun applySignedInUser(user: AuthenticatedUser, emailOverride: String?) {
+        cancelDriverRegistration()
+        vehicleVersion++
+        vehicles = Resource()
         AuthSession.currentUserId = user.userId
         uiState = uiState.copy(
             isSigningIn = false,
@@ -173,7 +210,9 @@ class RideshareViewModel : ViewModel() {
             override fun onSuccess(user: AuthenticatedUser?) {
                 AuthSession.currentUserId = null
                 uiState = RideshareUiState()
-                activeMode = AppMode.PASSENGER
+                cancelDriverRegistration()
+                vehicleVersion++
+                vehicleSaving = false
                 profileDetails = Resource(); myDriverRides = Resource(); myRequests = Resource()
                 incomingRequests = Resource(); openRides = Resource(); searchResults = Resource()
                 lastSearchCriteria = null
@@ -546,26 +585,50 @@ class RideshareViewModel : ViewModel() {
         if (currentlyFavorite) apiService.removeFavorite(driverId, callback) else apiService.addFavorite(driverId, callback)
     }
 
-    fun loadVehicles() {
-        vehicles = Resource(isLoading = true)
+    fun loadVehicles(onDone: (String?) -> Unit = {}) {
+        val version = ++vehicleVersion
+        val user = uiState.userId
+        vehicles = Resource(isLoading = true, data = vehicles.data)
         apiService.fetchMyVehicles(object : RideApiService.Callback<List<VehicleSummary>> {
-            override fun onSuccess(result: List<VehicleSummary>) { vehicles = Resource(data = result) }
-            override fun onFailure(error: Exception) { vehicles = Resource(errorMessage = error.message) }
+            override fun onSuccess(result: List<VehicleSummary>) {
+                if (uiState.userId != user) return
+                if (version == vehicleVersion) vehicles = Resource(data = result)
+                onDone(null)
+            }
+            override fun onFailure(error: Exception) {
+                if (uiState.userId != user) return
+                val message = error.message ?: "Couldn't load your vehicle. Please try again."
+                if (version == vehicleVersion) vehicles = Resource(data = vehicles.data, errorMessage = message)
+                onDone(message)
+            }
         })
     }
 
-    fun createVehicle(draft: CreateVehicleDraft, onDone: (String?) -> Unit) {
-        apiService.createVehicle(draft, object : RideApiService.Callback<VehicleSummary> {
-            override fun onSuccess(result: VehicleSummary) { loadVehicles(); onDone(null) }
-            override fun onFailure(error: Exception) { onDone(error.message ?: "Couldn't save that vehicle. Please try again.") }
-        })
-    }
+    fun createVehicle(draft: CreateVehicleDraft, onDone: (String?) -> Unit) = saveVehicle(null, draft, onDone)
 
-    fun updateVehicle(vehicleId: String, draft: CreateVehicleDraft, onDone: (String?) -> Unit) {
-        apiService.updateVehicle(vehicleId, draft, object : RideApiService.Callback<VehicleSummary> {
-            override fun onSuccess(result: VehicleSummary) { loadVehicles(); onDone(null) }
-            override fun onFailure(error: Exception) { onDone(error.message ?: "Couldn't save that vehicle. Please try again.") }
-        })
+    fun updateVehicle(vehicleId: String, draft: CreateVehicleDraft, onDone: (String?) -> Unit) = saveVehicle(vehicleId, draft, onDone)
+
+    private fun saveVehicle(vehicleId: String?, draft: CreateVehicleDraft, onDone: (String?) -> Unit) {
+        if (vehicleSaving) return
+        val user = uiState.userId ?: return
+        vehicleSaving = true
+        val callback = object : RideApiService.Callback<VehicleSummary> {
+            override fun onSuccess(result: VehicleSummary) {
+                if (uiState.userId != user) return
+                vehicles = Resource(data = listOf(result))
+                loadVehicles { error ->
+                    vehicleSaving = false
+                    onDone(error)
+                }
+            }
+            override fun onFailure(error: Exception) {
+                if (uiState.userId != user) return
+                vehicleSaving = false
+                onDone(error.message ?: "Couldn't save your vehicle. Please try again.")
+            }
+        }
+        if (vehicleId == null) apiService.createVehicle(draft, callback)
+        else apiService.updateVehicle(vehicleId, draft, callback)
     }
 
     fun deleteVehicle(vehicleId: String, onDone: (String?) -> Unit) {

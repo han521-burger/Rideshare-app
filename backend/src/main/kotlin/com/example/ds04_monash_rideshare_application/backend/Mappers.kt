@@ -37,7 +37,9 @@ fun ResultRow.toVehicleDto() = VehicleDto(
     seatCapacity = this[Vehicles.seatCapacity],
     fuelType = this[Vehicles.fuelType],
     vehicleType = this[Vehicles.vehicleType],
-    colour = this[Vehicles.colour]
+    colour = this[Vehicles.colour],
+    createdAt = this[Vehicles.createdAt],
+    updatedAt = this[Vehicles.updatedAt]
 )
 
 fun ResultRow.toRideStopDto() = RideStopDto(

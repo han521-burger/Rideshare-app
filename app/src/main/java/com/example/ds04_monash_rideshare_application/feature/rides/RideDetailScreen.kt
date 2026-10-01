@@ -267,11 +267,7 @@ private fun DriverInfoCard(ride: RideSummary) {
                 Text("%.1f / 5 (${driver.ratingCount} rating(s))".format(averageRating), color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
             ride.vehicle?.let { vehicle ->
-                Text("${vehicle.colour} ${vehicle.make} ${vehicle.model}${vehicle.variant?.let { " ($it)" } ?: ""}")
-                Text(
-                    listOfNotNull(vehicle.vehicleType, vehicle.registrationMasked).joinToString(" • "),
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Text(com.example.ds04_monash_rideshare_application.feature.profile.vehicleSummary(vehicle))
             }
             if (ride.driverEnRoute) {
                 Text("Driver is on the way", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)

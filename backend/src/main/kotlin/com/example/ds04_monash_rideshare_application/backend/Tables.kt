@@ -23,13 +23,10 @@ object Users : Table("users") {
     override val primaryKey = PrimaryKey(userId)
 }
 
-// One row per owner (RTM: a driver registers exactly one vehicle - see requireSingleVehicle in
-// VehicleRoutes.kt). ownerId isn't a unique index here only because Exposed's
-// createMissingTablesAndColumns can't add one to a table with existing rows in place; the "one
-// vehicle per user" rule is enforced at the route layer instead.
+// One registered vehicle per account, also enforced by a database unique index.
 object Vehicles : Table("vehicles") {
     val vehicleId = varchar("vehicle_id", 64)
-    val ownerId = varchar("owner_id", 64).references(Users.userId)
+    val ownerId = varchar("owner_id", 64).references(Users.userId).uniqueIndex("vehicles_owner_unique")
     val year = integer("year")
     val make = varchar("make", 64)
     val model = varchar("model", 64)
@@ -41,6 +38,9 @@ object Vehicles : Table("vehicles") {
     // on an accepted ride so they can identify the car (RideDetailScreen.kt's DriverInfoCard).
     val vehicleType = varchar("vehicle_type", 32).default("SEDAN")
     val colour = varchar("colour", 32).default("White")
+    // Zero denotes an unknown timestamp on legacy rows. New registrations set both.
+    val createdAt = long("created_at").default(0)
+    val updatedAt = long("updated_at").default(0)
 
     override val primaryKey = PrimaryKey(vehicleId)
 }
