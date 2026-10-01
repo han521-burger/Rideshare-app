@@ -23,7 +23,6 @@ import androidx.lifecycle.LifecycleEventObserver
 import com.example.ds04_monash_rideshare_application.BuildConfig
 import com.example.ds04_monash_rideshare_application.ui.describeLocation
 import com.example.ds04_monash_rideshare_application.ui.haversineMeters
-import com.yandex.mapkit.MapKitFactory
 import com.yandex.mapkit.geometry.Point
 import com.yandex.mapkit.map.CameraPosition
 import com.yandex.mapkit.mapview.MapView
@@ -69,7 +68,6 @@ fun RouteMiniMap(
     val lifecycleOwner = LocalLifecycleOwner.current
 
     val mapView = remember(originLat, originLng, destinationLat, destinationLng) {
-        MapKitFactory.initialize(context)
         val origin = Point(originLat, originLng)
         val destination = Point(destinationLat, destinationLng)
         val midpoint = Point((originLat + destinationLat) / 2.0, (originLng + destinationLng) / 2.0)
@@ -89,21 +87,17 @@ fun RouteMiniMap(
     }
 
     DisposableEffect(lifecycleOwner, mapView) {
+        var started = false
+        fun stopMap() { if (started) { mapView.onStop(); started = false } }
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> {
-                    MapKitFactory.getInstance().onStart()
-                    mapView.onStart()
-                }
-                Lifecycle.Event.ON_STOP -> {
-                    mapView.onStop()
-                    MapKitFactory.getInstance().onStop()
-                }
+                Lifecycle.Event.ON_START -> if (!started) { mapView.onStart(); started = true }
+                Lifecycle.Event.ON_STOP -> stopMap()
                 else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer); stopMap() }
     }
 
     AndroidView(

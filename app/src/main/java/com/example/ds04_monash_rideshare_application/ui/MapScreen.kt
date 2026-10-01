@@ -30,7 +30,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.ds04_monash_rideshare_application.BuildConfig
-import com.yandex.mapkit.MapKitFactory
 import com.yandex.mapkit.RequestPoint
 import com.yandex.mapkit.RequestPointType
 import com.yandex.mapkit.directions.DirectionsFactory
@@ -98,7 +97,6 @@ fun MapScreen(
     var statusMessage by remember { mutableStateOf("Tap the map to select your origin") }
 
     val mapView = remember {
-        MapKitFactory.initialize(context)
         MapView(context).apply {
             map.move(CameraPosition(MELBOURNE_CBD, MELBOURNE_ZOOM, 0.0f, 0.0f))
         }
@@ -209,25 +207,30 @@ fun MapScreen(
         }
     }
 
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, mapView) {
+        var started = false
+        fun stopMap() {
+            if (started) {
+                mapView.map.removeInputListener(inputListenerReference)
+                mapView.onStop()
+                started = false
+            }
+        }
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_START -> {
-                    MapKitFactory.getInstance().onStart()
+                Lifecycle.Event.ON_START -> if (!started) {
                     mapView.onStart()
                     mapView.map.addInputListener(inputListenerReference)
+                    started = true
                 }
-                Lifecycle.Event.ON_STOP -> {
-                    mapView.map.removeInputListener(inputListenerReference)
-                    mapView.onStop()
-                    MapKitFactory.getInstance().onStop()
-                }
+                Lifecycle.Event.ON_STOP -> stopMap()
                 else -> Unit
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
+            stopMap()
             drivingSession?.cancel()
         }
     }
