@@ -238,7 +238,10 @@ data class UpdateRideRequestStatusBody(
     // driver's; newRideSeatsTotal instead creates a brand new ride from the request's own
     // route/time, so a driver doesn't need to have already posted a matching ride to accept.
     val targetRideId: String? = null,
-    val newRideSeatsTotal: Int? = null
+    val newRideSeatsTotal: Int? = null,
+    // The driver confirmed "drive this passenger instead" - cancel the driver's own overlapping
+    // ride requests as part of the accept (see CONFLICT_OWN_PENDING_REQUEST in Lifecycle.kt).
+    val cancelMyConflictingRequests: Boolean = false
 )
 
 @Serializable
@@ -351,4 +354,4 @@ data class AnalyticsDto(
 )
 
 @Serializable
-data class ErrorResponse(val error: String)
+data class ErrorResponse(val error: String, val code: String? = null)

@@ -51,6 +51,8 @@ object RideStatus {
     const val CONFIRMED = "CONFIRMED"
     const val COMPLETED = "COMPLETED"
     const val CANCELLED = "CANCELLED"
+    // Departure passed with nobody on board - set automatically (Lifecycle.kt).
+    const val EXPIRED = "EXPIRED"
 }
 
 object Rides : Table("rides") {
@@ -101,6 +103,9 @@ object RideRequestStatus {
     const val REJECTED = "REJECTED"
     const val CANCELLED = "CANCELLED"
     const val COMPLETED = "COMPLETED"
+    // Still PENDING when its time passed (or 30 min after an ASAP ask) - set automatically by
+    // Lifecycle.kt, never by a client.
+    const val EXPIRED = "EXPIRED"
 
     // Allowed transitions - anything not listed here is rejected by the state machine.
     val transitions: Map<String, Set<String>> = mapOf(
@@ -108,7 +113,8 @@ object RideRequestStatus {
         ACCEPTED to setOf(COMPLETED, CANCELLED),
         REJECTED to emptySet(),
         CANCELLED to emptySet(),
-        COMPLETED to emptySet()
+        COMPLETED to emptySet(),
+        EXPIRED to emptySet()
     )
 }
 

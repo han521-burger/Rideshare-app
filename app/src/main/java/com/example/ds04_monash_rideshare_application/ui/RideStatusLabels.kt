@@ -11,6 +11,7 @@ fun rideStatusLabel(status: String): String = when (status) {
     RideStatus.CONFIRMED -> "Confirmed"
     RideStatus.COMPLETED -> "Completed"
     RideStatus.CANCELLED -> "Cancelled"
+    RideStatus.EXPIRED -> "Expired - nobody joined"
     else -> status
 }
 
@@ -20,5 +21,6 @@ fun requestStatusLabel(status: String): String = when (status) {
     RequestStatus.REJECTED -> "Declined"
     RequestStatus.CANCELLED -> "Cancelled"
     RequestStatus.COMPLETED -> "Completed"
+    RequestStatus.EXPIRED -> "Expired - no driver accepted in time"
     else -> status
 }

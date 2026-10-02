@@ -9,6 +9,8 @@ import com.example.ds04_monash_rideshare_application.Auth.AuthenticatedUser
 import com.example.ds04_monash_rideshare_application.Auth.AuthenticationProvider
 import com.example.ds04_monash_rideshare_application.Auth.FakeAuthenticationProvider
 import com.example.ds04_monash_rideshare_application.Auth.TestIdentity
+import com.example.ds04_monash_rideshare_application.Repository.Remote.BackendException
+import com.example.ds04_monash_rideshare_application.Repository.Remote.CONFLICT_OWN_PENDING_REQUEST
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateRideDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateVehicleDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.AnalyticsSummary
@@ -111,6 +113,13 @@ class RideshareViewModel : ViewModel() {
         private set
     var requestActionError by mutableStateOf<String?>(null)
         private set
+    // Accept refused because the driver has their own ride request around then - the UI asks
+    // "drive this passenger instead?" and confirmAcceptConflict() retries, cancelling that request.
+    var acceptConflict by mutableStateOf<AcceptConflict?>(null)
+        private set
+    // The request just accepted, while the UI still offers Undo for it.
+    var undoableAcceptRequestId by mutableStateOf<String?>(null)
+        private set
     var lastCreatedRide by mutableStateOf<RideSummary?>(null)
         private set
     private var incomingRequestRefresh = RequestRefreshGate()
@@ -129,6 +138,17 @@ class RideshareViewModel : ViewModel() {
                 .mapNotNull { it.ride }
                 .filter { it.status == RideStatus.CONFIRMED }
             return (driving + riding).distinctBy { it.rideId }.sortedBy { it.departureTime }
+        }
+
+    // Passenger's Pending tab: still-waiting asks plus ones that expired in the last day, so they
+    // can see what happened and ask again instead of the request silently disappearing.
+    val myPendingAndRecentlyExpiredRequests: List<RideRequestSummary>
+        get() {
+            val cutoff = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
+            return myRequests.data.orEmpty().filter {
+                it.status == RequestStatus.PENDING ||
+                    (it.status == RequestStatus.EXPIRED && (it.respondedAt ?: 0L) >= cutoff)
+            }
         }
 
     val myPendingRequests: List<RideRequestSummary>
@@ -224,6 +244,7 @@ class RideshareViewModel : ViewModel() {
         dashboard = Resource(); analytics = Resource(); leaderboard = Resource(); ratings = Resource(); favorites = Resource()
         vehicles = Resource()
         selectedRideId = null; selectedRequestId = null; requestActionError = null
+        acceptConflict = null; undoableAcceptRequestId = null
         actionInFlight = false; incomingRequestRefresh = RequestRefreshGate(); lastCreatedRide = null
         rideDetailsVersion++; myRequestsVersion++; driverRidesVersion++
     }
@@ -512,13 +533,18 @@ class RideshareViewModel : ViewModel() {
         newStatus: String,
         targetRideId: String? = null,
         newRideSeatsTotal: Int? = null,
+        cancelMyConflictingRequests: Boolean = false,
         onDone: (Boolean, String?) -> Unit = { _, _ -> }
     ) {
         requestActionError = null
         actionInFlight = true
-        apiService.respondToRequest(requestId, newStatus, targetRideId, newRideSeatsTotal, object : RideApiService.Callback<RideRequestSummary> {
+        apiService.respondToRequest(requestId, newStatus, targetRideId, newRideSeatsTotal, cancelMyConflictingRequests, object : RideApiService.Callback<RideRequestSummary> {
             override fun onSuccess(result: RideRequestSummary) {
                 actionInFlight = false
+                // A deliberate "drive instead" was already confirmed in a dialog - no Undo for it.
+                if (newStatus == RequestStatus.ACCEPTED && !cancelMyConflictingRequests) {
+                    undoableAcceptRequestId = result.requestId
+                }
                 refreshRideLifecycleState(
                     result.rideId,
                     refreshRide = newStatus != RequestStatus.REJECTED,
@@ -529,9 +555,47 @@ class RideshareViewModel : ViewModel() {
 
             override fun onFailure(error: Exception) {
                 actionInFlight = false
+                if (newStatus == RequestStatus.ACCEPTED && (error as? BackendException)?.code == CONFLICT_OWN_PENDING_REQUEST) {
+                    acceptConflict = AcceptConflict(requestId, targetRideId, newRideSeatsTotal, error.message.orEmpty(), onDone)
+                    return
+                }
                 val message = error.message ?: "Couldn't update that request. Please try again."
                 requestActionError = message
                 onDone(false, message)
+            }
+        })
+    }
+
+    fun confirmAcceptConflict() {
+        val conflict = acceptConflict ?: return
+        acceptConflict = null
+        respondToRequest(
+            conflict.requestId, RequestStatus.ACCEPTED, conflict.targetRideId, conflict.newRideSeatsTotal,
+            cancelMyConflictingRequests = true, onDone = conflict.onDone
+        )
+    }
+
+    fun dismissAcceptConflict() {
+        val conflict = acceptConflict ?: return
+        acceptConflict = null
+        conflict.onDone(false, null)
+    }
+
+    fun clearUndoableAccept() { undoableAcceptRequestId = null }
+
+    fun undoAccept() {
+        val requestId = undoableAcceptRequestId ?: return
+        undoableAcceptRequestId = null
+        actionInFlight = true
+        apiService.undoAccept(requestId, object : RideApiService.Callback<RideRequestSummary> {
+            override fun onSuccess(result: RideRequestSummary) {
+                actionInFlight = false
+                refreshRideLifecycleState(result.rideId)
+            }
+
+            override fun onFailure(error: Exception) {
+                actionInFlight = false
+                requestActionError = error.message ?: "Couldn't undo that. Please try again."
             }
         })
     }
@@ -659,3 +723,11 @@ class RideshareViewModel : ViewModel() {
         })
     }
 }
+
+data class AcceptConflict(
+    val requestId: String,
+    val targetRideId: String?,
+    val newRideSeatsTotal: Int?,
+    val message: String,
+    val onDone: (Boolean, String?) -> Unit
+)

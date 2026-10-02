@@ -186,7 +186,12 @@ data class CreateStandaloneRequestBody(
     val repeatWeeks: Int? = null
 )
 
-data class UpdateRequestStatusBody(val status: String, val targetRideId: String? = null, val newRideSeatsTotal: Int? = null)
+data class UpdateRequestStatusBody(
+    val status: String,
+    val targetRideId: String? = null,
+    val newRideSeatsTotal: Int? = null,
+    val cancelMyConflictingRequests: Boolean = false
+)
 
 data class MessageDto(
     val messageId: String,

@@ -7,6 +7,7 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Snackbar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -15,7 +16,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Popup
 import androidx.compose.ui.platform.LocalView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -186,6 +190,27 @@ fun RideshareNavHost(
             title = { Text("Checking your vehicle") }, text = { CircularProgressIndicator() },
             confirmButton = { TextButton(onClick = viewModel::cancelDriverRegistration) { Text("Cancel") } })
     }
+    // Accepting clashed with the driver's own ride request around the same time (backend
+    // Lifecycle.kt) - let them choose to drive this passenger instead.
+    viewModel.acceptConflict?.let { conflict ->
+        AlertDialog(onDismissRequest = viewModel::dismissAcceptConflict,
+            title = { Text("You have your own ride request then") }, text = { Text(conflict.message) },
+            confirmButton = { TextButton(onClick = viewModel::confirmAcceptConflict) { Text("Drive them instead") } },
+            dismissButton = { TextButton(onClick = viewModel::dismissAcceptConflict) { Text("Keep my request") } })
+    }
+    // A few seconds to take back an accidental Accept (e.g. a mis-tap on the banner).
+    viewModel.undoableAcceptRequestId?.let { requestId ->
+        LaunchedEffect(requestId) {
+            delay(5_000)
+            viewModel.clearUndoableAccept()
+        }
+        Popup(alignment = Alignment.BottomCenter) {
+            Snackbar(
+                action = { TextButton(onClick = viewModel::undoAccept) { Text("Undo") } },
+                modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 96.dp)
+            ) { Text("Request accepted") }
+        }
+    }
     viewModel.driverModeError?.let { error ->
         AlertDialog(onDismissRequest = viewModel::clearDriverModeError,
             title = { Text("Unable to switch to Driver") }, text = { Text(error) },
@@ -243,7 +268,7 @@ fun RideshareNavHost(
                         activeMode = viewModel.activeMode,
                         // Pending requests remain here until the driver accepts, rejects, or the
                         // passenger cancels. Accepted requests move to the Home confirmed list.
-                        myRequests = viewModel.myRequests.data.orEmpty().filter { it.status == RequestStatus.PENDING },
+                        myRequests = viewModel.myPendingAndRecentlyExpiredRequests,
                         incomingRequests = viewModel.incomingPendingRequests,
                         openRides = viewModel.openRides,
                         // OPEN offers wait for their first approved passenger; confirmed rides

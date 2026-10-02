@@ -67,6 +67,9 @@ interface BackendApi {
     @PUT("requests/{requestId}")
     fun updateRequestStatus(@Path("requestId") requestId: String, @Body body: UpdateRequestStatusBody): Call<RideRequestDto>
 
+    @POST("requests/{requestId}/undo-accept")
+    fun undoAccept(@Path("requestId") requestId: String): Call<RideRequestDto>
+
     @GET("rides/{rideId}/messages")
     fun getMessages(@Path("rideId") rideId: String): Call<List<MessageDto>>
 

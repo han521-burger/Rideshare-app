@@ -157,7 +157,7 @@ fun RideDetailScreen(
                                 }
                             )
                         }
-                        if (ride.status != RideStatus.CANCELLED && ride.status != RideStatus.COMPLETED) {
+                        if (ride.status in setOf(RideStatus.OPEN, RideStatus.CONFIRMED)) {
                             item {
                                 OutlinedButton(onClick = onCancelRide, enabled = !isActionInFlight, modifier = Modifier.fillMaxWidth()) {
                                     Text("Cancel this ride")

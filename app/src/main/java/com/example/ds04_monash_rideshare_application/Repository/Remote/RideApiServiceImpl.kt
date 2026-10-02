@@ -153,10 +153,17 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         newStatus: String,
         targetRideId: String?,
         newRideSeatsTotal: Int?,
+        cancelMyConflictingRequests: Boolean,
         callback: RideApiService.Callback<RideRequestSummary>
     ) {
-        api.updateRequestStatus(requestId, UpdateRequestStatusBody(newStatus, targetRideId, newRideSeatsTotal))
-            .dispatch(callback, ::toRideRequestSummary)
+        api.updateRequestStatus(
+            requestId,
+            UpdateRequestStatusBody(newStatus, targetRideId, newRideSeatsTotal, cancelMyConflictingRequests)
+        ).dispatch(callback, ::toRideRequestSummary)
+    }
+
+    override fun undoAccept(requestId: String, callback: RideApiService.Callback<RideRequestSummary>) {
+        api.undoAccept(requestId).dispatch(callback, ::toRideRequestSummary)
     }
 
     override fun fetchMessages(rideId: String, callback: RideApiService.Callback<List<MessageSummary>>) {

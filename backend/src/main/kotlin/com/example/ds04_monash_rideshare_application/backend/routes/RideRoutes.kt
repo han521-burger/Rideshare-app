@@ -18,6 +18,9 @@ import com.example.ds04_monash_rideshare_application.backend.UpdateRideRequest
 import com.example.ds04_monash_rideshare_application.backend.Users
 import com.example.ds04_monash_rideshare_application.backend.ValidationException
 import com.example.ds04_monash_rideshare_application.backend.requireBookableDeparture
+import com.example.ds04_monash_rideshare_application.backend.findTripConflicts
+import com.example.ds04_monash_rideshare_application.backend.formatTripTime
+import com.example.ds04_monash_rideshare_application.backend.tripWindow
 import com.example.ds04_monash_rideshare_application.backend.Vehicles
 import com.example.ds04_monash_rideshare_application.backend.requireDriverVehicle
 import com.example.ds04_monash_rideshare_application.backend.matching.MatchingEngine
@@ -150,6 +153,15 @@ fun Route.rideRoutes() {
 
         transaction {
             val vehicleId = requireDriverVehicle(driverId, body.seatsTotal)[Vehicles.vehicleId]
+            // A driver can't be in two trips at once (Lifecycle.kt). Their own waiting ride
+            // requests block too - otherwise one could be accepted for the same time.
+            fun conflictAt(departure: Long): String? {
+                val conflicts = findTripConflicts(driverId, tripWindow(departure, body.estimatedDurationSeconds))
+                return conflicts.blocking ?: conflicts.pendingRequestIds.firstOrNull()?.let {
+                    "you have your own ride request around ${formatTripTime(departure)} - cancel it first"
+                }
+            }
+            conflictAt(body.departureTime)?.let { throw ConflictException("You can't offer this ride - $it.") }
             insertRide(rideId, driverId, vehicleId, body, groupId, now)
             insertStops(rideId, body.stops)
 
@@ -168,7 +180,8 @@ fun Route.rideRoutes() {
                 while (date.isBefore(endDate)) {
                     if (date.dayOfWeek.value in body.repeatDaysOfWeek) {
                         val siblingDeparture = date.atTime(timeOfDay).atZone(zone).toInstant().toEpochMilli()
-                        if (siblingDeparture > System.currentTimeMillis()) {
+                        // Days you already have a trip are skipped rather than failing the lot.
+                        if (siblingDeparture > System.currentTimeMillis() && conflictAt(siblingDeparture) == null) {
                             val siblingId = "ride-${UUID.randomUUID()}"
                             insertRide(siblingId, driverId, vehicleId, body, groupId, now, departureOverride = siblingDeparture)
                             insertStops(siblingId, body.stops)
@@ -208,7 +221,7 @@ fun Route.rideRoutes() {
             if (targetStatus !in setOf(RideStatus.OPEN, RideStatus.CONFIRMED, RideStatus.CANCELLED, RideStatus.COMPLETED)) {
                 throw ValidationException("Unknown ride status")
             }
-            if (currentStatus in setOf(RideStatus.CANCELLED, RideStatus.COMPLETED)) {
+            if (currentStatus in setOf(RideStatus.CANCELLED, RideStatus.COMPLETED, RideStatus.EXPIRED)) {
                 // Preserve HTTP 200 for terminal retries, but ignore all supplied edits.
                 if (body.status == currentStatus) return@transaction
                 throw ConflictException("A $currentStatus ride cannot be changed")

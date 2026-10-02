@@ -212,7 +212,7 @@ class RideCancellationPropagationTest {
                 it[destinationLat] = -37.8988
                 it[destinationLng] = 145.0906
                 it[isAsap] = true
-                it[createdAt] = oldTimestamp
+                it[createdAt] = System.currentTimeMillis() // fresh, so the ASAP ask hasn't expired
             }
         }
         verifyCancellation()

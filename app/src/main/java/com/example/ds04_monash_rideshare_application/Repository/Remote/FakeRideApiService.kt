@@ -85,8 +85,13 @@ class FakeRideApiService : RideApiService {
         newStatus: String,
         targetRideId: String?,
         newRideSeatsTotal: Int?,
+        cancelMyConflictingRequests: Boolean,
         callback: RideApiService.Callback<RideRequestSummary>
     ) {
+        callback.onFailure(unavailable)
+    }
+
+    override fun undoAccept(requestId: String, callback: RideApiService.Callback<RideRequestSummary>) {
         callback.onFailure(unavailable)
     }
 

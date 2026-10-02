@@ -37,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.ds04_monash_rideshare_application.Repository.Remote.RequestStatus
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideRequestSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
 import com.example.ds04_monash_rideshare_application.core.location.geocodeText
@@ -92,7 +93,7 @@ fun RequestsScreen(
                 }
             } else {
                 when (subTab) {
-                    TAB_LEFT -> PendingList(myRequests, "No pending rides - tap + to request one!", onOpenRequest)
+                    TAB_LEFT -> PendingList(myRequests, "No pending rides - tap + to request one!", onOpenRequest, onRequestRide)
                     else -> BrowseRidesList(openRides, onOpenRide, onFindRide)
                 }
             }
@@ -108,7 +109,12 @@ fun RequestsScreen(
 }
 
 @Composable
-private fun PendingList(requests: List<RideRequestSummary>, emptyMessage: String, onOpenRequest: (requestId: String) -> Unit) {
+private fun PendingList(
+    requests: List<RideRequestSummary>,
+    emptyMessage: String,
+    onOpenRequest: (requestId: String) -> Unit,
+    onRequestAgain: () -> Unit
+) {
     if (requests.isEmpty()) {
         Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
             Text(emptyMessage, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -122,7 +128,7 @@ private fun PendingList(requests: List<RideRequestSummary>, emptyMessage: String
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         items(requests, key = { it.requestId }) { request ->
-            RequestRow(request, onClick = { onOpenRequest(request.requestId) })
+            RequestRow(request, onClick = { onOpenRequest(request.requestId) }, onRequestAgain = onRequestAgain)
         }
         item {} // trailing space so the FAB doesn't sit on top of the last card
     }
@@ -348,7 +354,12 @@ private fun OpenRideRow(ride: RideSummary, onClick: () -> Unit) {
 }
 
 @Composable
-private fun RequestRow(request: RideRequestSummary, onClick: () -> Unit, distanceLabel: String? = null) {
+private fun RequestRow(
+    request: RideRequestSummary,
+    onClick: () -> Unit,
+    distanceLabel: String? = null,
+    onRequestAgain: (() -> Unit)? = null
+) {
     Card(modifier = Modifier.fillMaxWidth(), onClick = onClick) {
         Column(modifier = Modifier.padding(16.dp)) {
             val ride = request.ride
@@ -388,6 +399,9 @@ private fun RequestRow(request: RideRequestSummary, onClick: () -> Unit, distanc
                 }
             }
             request.note?.takeIf { it.isNotBlank() }?.let { Text("\"$it\"") }
+            if (request.status == RequestStatus.EXPIRED && onRequestAgain != null) {
+                TextButton(onClick = onRequestAgain) { Text("Request again") }
+            }
         }
     }
 }

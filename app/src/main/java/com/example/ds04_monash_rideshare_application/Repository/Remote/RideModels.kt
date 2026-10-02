@@ -52,6 +52,7 @@ object RideStatus {
     const val CONFIRMED = "CONFIRMED"
     const val COMPLETED = "COMPLETED"
     const val CANCELLED = "CANCELLED"
+    const val EXPIRED = "EXPIRED"
 }
 
 object RequestStatus {
@@ -60,6 +61,8 @@ object RequestStatus {
     const val REJECTED = "REJECTED"
     const val CANCELLED = "CANCELLED"
     const val COMPLETED = "COMPLETED"
+    // Set by the backend when nobody accepted before the departure time (Lifecycle.kt).
+    const val EXPIRED = "EXPIRED"
 }
 
 data class RideSummary(

@@ -44,8 +44,10 @@ interface RideApiService {
         newStatus: String,
         targetRideId: String?,
         newRideSeatsTotal: Int?,
+        cancelMyConflictingRequests: Boolean,
         callback: Callback<RideRequestSummary>
     )
+    fun undoAccept(requestId: String, callback: Callback<RideRequestSummary>)
 
     fun fetchMessages(rideId: String, callback: Callback<List<MessageSummary>>)
     fun sendMessage(rideId: String, body: String, callback: Callback<MessageSummary>)

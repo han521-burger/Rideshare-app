@@ -1,6 +1,14 @@
 package com.example.ds04_monash_rideshare_application.backend.routes
 
+import com.example.ds04_monash_rideshare_application.backend.CONFLICT_OWN_PENDING_REQUEST
 import com.example.ds04_monash_rideshare_application.backend.ConflictException
+import com.example.ds04_monash_rideshare_application.backend.RideStops
+import com.example.ds04_monash_rideshare_application.backend.cancelRequests
+import com.example.ds04_monash_rideshare_application.backend.estimatedTripWindow
+import com.example.ds04_monash_rideshare_application.backend.findTripConflicts
+import com.example.ds04_monash_rideshare_application.backend.formatTripTime
+import com.example.ds04_monash_rideshare_application.backend.requestWindow
+import com.example.ds04_monash_rideshare_application.backend.rideWindow
 import com.example.ds04_monash_rideshare_application.backend.CreateRideRequestBody
 import com.example.ds04_monash_rideshare_application.backend.CreateStandaloneRequestBody
 import com.example.ds04_monash_rideshare_application.backend.ForbiddenException
@@ -31,6 +39,7 @@ import io.ktor.server.routing.post
 import io.ktor.server.routing.put
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
@@ -51,6 +60,7 @@ fun Route.rideRequestRoutes() {
         if (body.seatsRequested <= 0) throw ValidationException("seatsRequested must be positive")
 
         val createdIds = mutableListOf<String>()
+        var blockedReason: String? = null
         val now = System.currentTimeMillis()
         val joinableStatuses = setOf(RideStatus.OPEN, RideStatus.CONFIRMED)
         transaction {
@@ -70,6 +80,12 @@ fun Route.rideRequestRoutes() {
                 val targetRideId = target[Rides.rideId]
                 if (target[Rides.driverId] == passengerId) continue // skip your own ride silently
                 if (target[Rides.status] !in joinableStatuses) continue
+                // You can't ride in a car while driving (or riding in) another one at that time.
+                val blocking = findTripConflicts(passengerId, rideWindow(target), ignoreRideId = targetRideId).blocking
+                if (blocking != null) {
+                    blockedReason = blocking
+                    continue
+                }
 
                 val alreadyRequested = RideRequests.selectAll()
                     .where {
@@ -97,6 +113,7 @@ fun Route.rideRequestRoutes() {
                 createdIds += requestId
             }
             if (createdIds.isEmpty()) {
+                blockedReason?.let { throw ConflictException("You can't request this ride - $it.") }
                 throw ConflictException("Couldn't request this ride - it may be full, unavailable, already requested, or your own")
             }
         }
@@ -129,7 +146,15 @@ fun Route.rideRequestRoutes() {
 
         val requestId = "req-${UUID.randomUUID()}"
         val now = System.currentTimeMillis()
+        // You can't ask for a ride while you're driving (or already booked) at that time.
+        fun blockedAt(start: Long) = findTripConflicts(
+            passengerId,
+            estimatedTripWindow(start, body.originLat, body.originLng, body.destinationLat, body.destinationLng)
+        ).blocking
         transaction {
+            blockedAt(if (body.isAsap) now else body.desiredDepartureTime!!)?.let {
+                throw ConflictException("You can't request a ride then - $it.")
+            }
             insertStandaloneRequest(requestId, passengerId, body, body.desiredDepartureTime, now)
 
             val startDeparture = body.desiredDepartureTime
@@ -145,7 +170,8 @@ fun Route.rideRequestRoutes() {
                 while (date.isBefore(endDate)) {
                     if (date.dayOfWeek.value in body.repeatDaysOfWeek) {
                         val siblingDeparture = date.atTime(timeOfDay).atZone(zone).toInstant().toEpochMilli()
-                        if (siblingDeparture > System.currentTimeMillis()) {
+                        // Days you're already driving/booked are skipped rather than failing the lot.
+                        if (siblingDeparture > System.currentTimeMillis() && blockedAt(siblingDeparture) == null) {
                             insertStandaloneRequest("req-${UUID.randomUUID()}", passengerId, body, siblingDeparture, now)
                         }
                     }
@@ -270,6 +296,9 @@ fun Route.rideRequestRoutes() {
             val isOwningDriver = existingRide != null && existingRide[Rides.driverId] == userId
 
             val currentStatus = request[RideRequests.status]
+            if (currentStatus == RideRequestStatus.EXPIRED) {
+                throw ConflictException("This request has expired - its time has already passed")
+            }
             val allowed = RideRequestStatus.transitions[currentStatus].orEmpty()
             if (newStatus !in allowed) {
                 throw ConflictException("Can't move a request from $currentStatus to $newStatus")
@@ -277,6 +306,38 @@ fun Route.rideRequestRoutes() {
 
             when (newStatus) {
                 RideRequestStatus.ACCEPTED -> {
+                    val acceptedAt = System.currentTimeMillis()
+                    if (existingRide != null && !isOwningDriver) throw ForbiddenException("You don't own that ride")
+                    // Nobody can be in two trips at once (Lifecycle.kt): check both the accepting
+                    // driver and the passenger before anything is written.
+                    val plannedRideId = existingRideId ?: body.targetRideId
+                    val window = plannedRideId
+                        ?.let { rid -> Rides.selectAll().where { Rides.rideId eq rid }.firstOrNull()?.let(::rideWindow) }
+                        ?: requestWindow(request)
+                    if (window != null) {
+                        val driverConflicts = findTripConflicts(userId, window, ignoreRideId = plannedRideId)
+                        driverConflicts.blocking?.let { throw ConflictException("You can't accept this - $it.") }
+                        if (driverConflicts.pendingRequestIds.isNotEmpty()) {
+                            if (!body.cancelMyConflictingRequests) {
+                                throw ConflictException(
+                                    "You have your own ride request around ${formatTripTime(window.start)}. " +
+                                        "Drive this passenger instead? Your request will be cancelled.",
+                                    CONFLICT_OWN_PENDING_REQUEST
+                                )
+                            }
+                            cancelRequests(driverConflicts.pendingRequestIds, acceptedAt)
+                        }
+                        val passengerConflicts = findTripConflicts(
+                            request[RideRequests.passengerId], window,
+                            ignoreRideId = plannedRideId, ignoreRequestId = requestId
+                        )
+                        passengerConflicts.blocking?.let {
+                            throw ConflictException("This passenger already has another trip around then")
+                        }
+                        // They're booked now - their other asks for the same time would only
+                        // double-book them. Same timestamp as the accept so undo can restore them.
+                        cancelRequests(passengerConflicts.pendingRequestIds, acceptedAt)
+                    }
                     val targetRideId = existingRideId ?: body.targetRideId ?: run {
                         // No existing ride to attach to and none picked - create one from the
                         // request's own route/time, so a driver can accept without having
@@ -313,7 +374,8 @@ fun Route.rideRequestRoutes() {
                             it[notes] = null
                             it[status] = RideStatus.OPEN
                             it[recurringGroupId] = null
-                            it[Rides.createdAt] = System.currentTimeMillis()
+                            // Same as respondedAt below - undo uses it to spot a ride made only for this accept.
+                            it[Rides.createdAt] = acceptedAt
                         }
                         newRideId
                     }
@@ -352,7 +414,7 @@ fun Route.rideRequestRoutes() {
                     RideRequests.update({ RideRequests.requestId eq requestId }) {
                         it[rideId] = targetRideId
                         it[status] = newStatus
-                        it[respondedAt] = System.currentTimeMillis()
+                        it[respondedAt] = acceptedAt
                     }
                 }
                 RideRequestStatus.REJECTED -> {
@@ -408,7 +470,64 @@ fun Route.rideRequestRoutes() {
         }
         call.respond(dto)
     }
+
+    // Undo a just-made accept (the app offers Undo for a few seconds after accepting). Puts the
+    // request back to PENDING, gives the seat back, removes a ride that was created only for
+    // this accept, and restores any asks the accept auto-cancelled (same timestamp, see PUT above).
+    post("/requests/{requestId}/undo-accept") {
+        val userId = call.requireUserId()
+        val requestId = call.parameters["requestId"] ?: throw NotFoundException()
+        transaction {
+            val request = RideRequests.selectAll().where { RideRequests.requestId eq requestId }.firstOrNull()
+                ?: throw NotFoundException("Request not found")
+            val rideId = request[RideRequests.rideId]
+            val ride = rideId?.let { rid -> Rides.selectAll().where { Rides.rideId eq rid }.firstOrNull() }
+            if (rideId == null || ride == null || ride[Rides.driverId] != userId) {
+                throw ForbiddenException("Only the driver who accepted can undo it")
+            }
+            if (request[RideRequests.status] != RideRequestStatus.ACCEPTED) {
+                throw ConflictException("This request is no longer accepted")
+            }
+            val acceptedAt = request[RideRequests.respondedAt] ?: throw ConflictException("Too late to undo")
+            if (System.currentTimeMillis() - acceptedAt > UNDO_ACCEPT_WINDOW_MILLIS) {
+                throw ConflictException("Too late to undo - cancel the trip instead")
+            }
+            val isStandalone = request[RideRequests.originLat] != null
+            RideRequests.update({ RideRequests.requestId eq requestId }) {
+                it[status] = RideRequestStatus.PENDING
+                it[respondedAt] = null
+                if (isStandalone) it[RideRequests.rideId] = null
+            }
+            val othersOnRide = RideRequests.selectAll().where { RideRequests.rideId eq rideId }
+                .filter { it[RideRequests.requestId] != requestId }
+            if (isStandalone && ride[Rides.createdAt] == acceptedAt && othersOnRide.isEmpty()) {
+                RideStops.deleteWhere { RideStops.rideId eq rideId }
+                Rides.deleteWhere { Rides.rideId eq rideId }
+            } else {
+                val stillAccepted = othersOnRide.any { it[RideRequests.status] == RideRequestStatus.ACCEPTED }
+                Rides.update({ Rides.rideId eq rideId }) {
+                    it[seatsAvailable] = ride[Rides.seatsAvailable] + request[RideRequests.seatsRequested]
+                    if (!stillAccepted && ride[Rides.status] == RideStatus.CONFIRMED) it[status] = RideStatus.OPEN
+                }
+            }
+            RideRequests.update({
+                (RideRequests.status eq RideRequestStatus.CANCELLED) and
+                    (RideRequests.respondedAt eq acceptedAt) and
+                    (RideRequests.passengerId inList listOf(userId, request[RideRequests.passengerId]))
+            }) {
+                it[status] = RideRequestStatus.PENDING
+                it[respondedAt] = null
+            }
+        }
+        val dto = transaction {
+            RideRequests.selectAll().where { RideRequests.requestId eq requestId }.map { it.toRideRequestDto() }.first()
+        }
+        call.respond(dto)
+    }
 }
+
+// Server-side limit for undo - comfortably longer than the app's few-second Undo snackbar.
+private const val UNDO_ACCEPT_WINDOW_MILLIS = 60_000L
 
 private fun insertStandaloneRequest(
     requestId: String,

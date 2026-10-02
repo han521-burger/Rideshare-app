@@ -168,11 +168,12 @@ private fun seedDemoDataIfEmpty() {
     )
 
     // fake-user-001's own OPEN ride as a driver, with a still-PENDING request from Priya -
-    // exercises RideRequestsScreen's accept/reject immediately.
+    // exercises RideRequestsScreen's accept/reject immediately. Kept well apart from the open
+    // rides above so fake-user-001 can still request those without a trip-time clash (Lifecycle.kt).
     ride(
         "ride-mine-open", "fake-user-001", "demo-vehicle-003",
         glenWaverley, monashClayton, 7400.0, 1080,
-        now + DAY_MS + 8 * HOUR_MS, 3, 3,
+        now + DAY_MS + 14 * HOUR_MS, 3, 3,
         "Leaving from Glen Waverley station.", RideStatus.OPEN, now - 12 * HOUR_MS
     )
     RideRequests.insert {
