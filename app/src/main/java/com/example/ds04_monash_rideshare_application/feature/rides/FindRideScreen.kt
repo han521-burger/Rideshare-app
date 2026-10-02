@@ -196,7 +196,7 @@ fun FindRideScreen(
                             onSelected = { destination = it }
                         )
 
-                        DatePickerField("Travel date", date, onDateSelected = { date = it })
+                        DatePickerField("Travel date", date, onDateSelected = { date = it }, allowPastDates = false)
                         TimePickerField("Preferred pickup time", time, onTimeSelected = { time = it })
 
                         Text("Passengers", fontWeight = FontWeight.SemiBold)

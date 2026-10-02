@@ -244,7 +244,7 @@ fun RideshareNavHost(
                         // Pending requests remain here until the driver accepts, rejects, or the
                         // passenger cancels. Accepted requests move to the Home confirmed list.
                         myRequests = viewModel.myRequests.data.orEmpty().filter { it.status == RequestStatus.PENDING },
-                        incomingRequests = viewModel.incomingRequests.data.orEmpty().filter { it.status == RequestStatus.PENDING },
+                        incomingRequests = viewModel.incomingPendingRequests,
                         openRides = viewModel.openRides,
                         // OPEN offers wait for their first approved passenger; confirmed rides
                         // already appear on Home and remain reachable from there.

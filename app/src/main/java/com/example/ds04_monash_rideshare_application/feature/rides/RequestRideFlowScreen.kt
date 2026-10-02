@@ -35,6 +35,8 @@ import com.example.ds04_monash_rideshare_application.core.ui.RoutePickerResult
 import com.example.ds04_monash_rideshare_application.core.ui.StepWizardScaffold
 import com.example.ds04_monash_rideshare_application.core.ui.TimePickerField
 import com.example.ds04_monash_rideshare_application.core.ui.combineDateAndTime
+import com.example.ds04_monash_rideshare_application.core.ui.departureTooSoonMessage
+import com.example.ds04_monash_rideshare_application.core.ui.isBookableDeparture
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
@@ -61,6 +63,7 @@ fun RequestRideFlowScreen(
     var isAsap by remember { mutableStateOf(true) }
     var date by remember { mutableStateOf<LocalDate?>(null) }
     var time by remember { mutableStateOf<LocalTime?>(null) }
+    var repeatWeekly by remember { mutableStateOf(false) }
     var repeatDays by remember { mutableStateOf<Set<DayOfWeek>>(emptySet()) }
     var repeatWeeks by remember { mutableStateOf(4) }
     var seats by remember { mutableStateOf(1) }
@@ -71,9 +74,10 @@ fun RequestRideFlowScreen(
     // never applies to it - drop straight from When to Note.
     val stepLabels = if (isAsap) ASAP_STEP_LABELS else SCHEDULED_STEP_LABELS
 
-    val canGoNext = when (step) {
-        0 -> routePickerResult != null
-        1 -> isAsap || (date != null && time != null)
+    val canGoNext = when (stepLabels.getOrNull(step)) {
+        "Route" -> routePickerResult != null
+        "When" -> isAsap || isBookableDeparture(combineDateAndTime(date, time))
+        "Repeat" -> !repeatWeekly || repeatDays.isNotEmpty()
         else -> true
     }
 
@@ -90,6 +94,11 @@ fun RequestRideFlowScreen(
                 return@StepWizardScaffold
             }
             val route = routePickerResult ?: return@StepWizardScaffold
+            // The clock keeps moving while the passenger fills in later steps - re-check at submit.
+            if (!isAsap && !isBookableDeparture(combineDateAndTime(date, time))) {
+                errorMessage = departureTooSoonMessage() + " Go back to When to change it."
+                return@StepWizardScaffold
+            }
             val draft = StandaloneRequestDraft(
                 originLat = route.origin.point.latitude, originLng = route.origin.point.longitude,
                 destinationLat = route.destination.point.latitude, destinationLng = route.destination.point.longitude,
@@ -120,12 +129,23 @@ fun RequestRideFlowScreen(
                         isAsap = checked
                         // Clear any days picked before switching to ASAP so a stale selection
                         // can't leak into the submitted draft or the Confirm summary.
-                        if (checked) repeatDays = emptySet()
+                        if (checked) {
+                            repeatWeekly = false
+                            repeatDays = emptySet()
+                        }
                     },
                     onDateChange = { date = it },
                     onTimeChange = { time = it }
                 )
-                "Repeat" -> RepeatStep(repeatDays, repeatWeeks, onDaysChange = { repeatDays = it }, onWeeksChange = { repeatWeeks = it })
+                "Repeat" -> RepeatStep(
+                    repeatWeekly, repeatDays, repeatWeeks,
+                    onRepeatWeeklyChange = { weekly ->
+                        repeatWeekly = weekly
+                        if (!weekly) repeatDays = emptySet()
+                    },
+                    onDaysChange = { repeatDays = it },
+                    onWeeksChange = { repeatWeeks = it }
+                )
                 "Note" -> NoteStep(seats, note, onSeatsChange = { seats = it }, onNoteChange = { note = it })
                 else -> ConfirmStep(routePickerResult, isAsap, date, time, repeatDays, repeatWeeks, seats, note)
             }
@@ -153,23 +173,34 @@ private fun WhenStep(
             Switch(checked = isAsap, onCheckedChange = onAsapChange)
         }
         if (!isAsap) {
-            DatePickerField("Pick a date", date, onDateChange, modifier = Modifier.padding(top = 12.dp))
+            DatePickerField("Pick a date", date, onDateChange, modifier = Modifier.padding(top = 12.dp), allowPastDates = false)
             TimePickerField("Pick a time", time, onTimeChange, modifier = Modifier.padding(top = 8.dp))
+            if (date != null && time != null && !isBookableDeparture(combineDateAndTime(date, time))) {
+                Text(departureTooSoonMessage(), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+            }
         }
     }
 }
 
 @Composable
 private fun RepeatStep(
+    repeatWeekly: Boolean,
     repeatDays: Set<DayOfWeek>,
     repeatWeeks: Int,
+    onRepeatWeeklyChange: (Boolean) -> Unit,
     onDaysChange: (Set<DayOfWeek>) -> Unit,
     onWeeksChange: (Int) -> Unit
 ) {
     Column {
-        Text("Also want this on:", fontWeight = FontWeight.SemiBold)
+        Text("How often?", fontWeight = FontWeight.SemiBold)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+            FilterChip(selected = !repeatWeekly, onClick = { onRepeatWeeklyChange(false) }, label = { Text("One-time only") })
+            FilterChip(selected = repeatWeekly, onClick = { onRepeatWeeklyChange(true) }, label = { Text("Repeat weekly") })
+        }
+        if (!repeatWeekly) return@Column
+        Text("Also want this on:", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp))
         Text(
-            "Optional - shown to drivers as a note, not a separate request for each day.",
+            "Pick at least one day. Each day becomes its own request a driver can accept.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -231,6 +262,8 @@ private fun ConfirmStep(
             Text("$seats seat(s)")
             if (repeatDays.isNotEmpty()) {
                 Text("Also wants: ${repeatDays.sortedBy { it.value }.joinToString(", ") { it.name.take(3) }} for $repeatWeeks week(s)")
+            } else if (!isAsap) {
+                Text("One-time trip")
             }
             note.takeIf { it.isNotBlank() }?.let { Text("Note: $it") }
             Text(

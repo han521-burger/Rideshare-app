@@ -17,6 +17,7 @@ import com.example.ds04_monash_rideshare_application.backend.Rides
 import com.example.ds04_monash_rideshare_application.backend.UpdateRideRequest
 import com.example.ds04_monash_rideshare_application.backend.Users
 import com.example.ds04_monash_rideshare_application.backend.ValidationException
+import com.example.ds04_monash_rideshare_application.backend.requireBookableDeparture
 import com.example.ds04_monash_rideshare_application.backend.Vehicles
 import com.example.ds04_monash_rideshare_application.backend.requireDriverVehicle
 import com.example.ds04_monash_rideshare_application.backend.matching.MatchingEngine
@@ -140,9 +141,7 @@ fun Route.rideRoutes() {
         val driverId = call.requireUserId()
         val body = call.receive<CreateRideRequest>()
         if (body.seatsTotal <= 0) throw ValidationException("seatsTotal must be positive")
-        if (body.departureTime <= System.currentTimeMillis()) {
-            throw ValidationException("departureTime must be in the future")
-        }
+        requireBookableDeparture(body.departureTime)
         requireMonashEndpoint(body.originLat, body.originLng, body.destinationLat, body.destinationLng)
 
         val rideId = "ride-${UUID.randomUUID()}"

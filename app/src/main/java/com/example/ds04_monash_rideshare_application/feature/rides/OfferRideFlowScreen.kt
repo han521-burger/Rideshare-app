@@ -38,6 +38,8 @@ import com.example.ds04_monash_rideshare_application.core.ui.RoutePickerResult
 import com.example.ds04_monash_rideshare_application.core.ui.StepWizardScaffold
 import com.example.ds04_monash_rideshare_application.core.ui.TimePickerField
 import com.example.ds04_monash_rideshare_application.core.ui.combineDateAndTime
+import com.example.ds04_monash_rideshare_application.core.ui.departureTooSoonMessage
+import com.example.ds04_monash_rideshare_application.core.ui.isBookableDeparture
 import com.example.ds04_monash_rideshare_application.ui.FIXED_POINTS
 import com.example.ds04_monash_rideshare_application.ui.NamedLocation
 import java.text.SimpleDateFormat
@@ -71,6 +73,7 @@ fun OfferRideFlowScreen(
     var selectedStops by remember { mutableStateOf<List<NamedLocation>>(emptyList()) }
     var date by remember { mutableStateOf<LocalDate?>(null) }
     var time by remember { mutableStateOf<LocalTime?>(null) }
+    var repeatWeekly by remember { mutableStateOf(false) }
     var repeatDays by remember { mutableStateOf<Set<DayOfWeek>>(emptySet()) }
     var repeatWeeks by remember { mutableStateOf(4) }
     var seatsTotal by remember { mutableStateOf(minOf(3, maxSeats)) }
@@ -79,7 +82,8 @@ fun OfferRideFlowScreen(
 
     val canGoNext = when (step) {
         0 -> routePickerResult != null
-        1 -> date != null && time != null
+        1 -> isBookableDeparture(combineDateAndTime(date, time))
+        2 -> !repeatWeekly || repeatDays.isNotEmpty()
         3 -> seatsTotal in 1..maxSeats
         else -> true
     }
@@ -98,6 +102,11 @@ fun OfferRideFlowScreen(
             }
             val route = routePickerResult ?: return@StepWizardScaffold
             val departureTime = combineDateAndTime(date, time) ?: return@StepWizardScaffold
+            // The clock keeps moving while the driver fills in later steps - re-check at submit.
+            if (!isBookableDeparture(departureTime)) {
+                errorMessage = departureTooSoonMessage() + " Go back to When to change it."
+                return@StepWizardScaffold
+            }
             val draft = CreateRideDraft(
                 originLat = route.origin.point.latitude, originLng = route.origin.point.longitude,
                 destinationLat = route.destination.point.latitude, destinationLng = route.destination.point.longitude,
@@ -136,7 +145,15 @@ fun OfferRideFlowScreen(
                     }
                 )
                 1 -> WhenStep(date, time, onDateChange = { date = it }, onTimeChange = { time = it })
-                2 -> RepeatStep(repeatDays, repeatWeeks, onDaysChange = { repeatDays = it }, onWeeksChange = { repeatWeeks = it })
+                2 -> RepeatStep(
+                    repeatWeekly, repeatDays, repeatWeeks,
+                    onRepeatWeeklyChange = { weekly ->
+                        repeatWeekly = weekly
+                        if (!weekly) repeatDays = emptySet()
+                    },
+                    onDaysChange = { repeatDays = it },
+                    onWeeksChange = { repeatWeeks = it }
+                )
                 3 -> SeatsStep(seatsTotal, maxSeats, notes, onSeatsChange = { seatsTotal = it }, onNotesChange = { notes = it })
                 else -> ConfirmOfferStep(routePickerResult, date, time, selectedStops, repeatDays, repeatWeeks, seatsTotal, notes)
             }
@@ -180,22 +197,33 @@ private fun RouteStep(
 private fun WhenStep(date: LocalDate?, time: LocalTime?, onDateChange: (LocalDate) -> Unit, onTimeChange: (LocalTime) -> Unit) {
     Column {
         Text("When does this ride leave?", fontWeight = FontWeight.SemiBold)
-        DatePickerField("Pick a date", date, onDateChange, modifier = Modifier.padding(top = 12.dp))
+        DatePickerField("Pick a date", date, onDateChange, modifier = Modifier.padding(top = 12.dp), allowPastDates = false)
         TimePickerField("Pick a time", time, onTimeChange, modifier = Modifier.padding(top = 8.dp))
+        if (date != null && time != null && !isBookableDeparture(combineDateAndTime(date, time))) {
+            Text(departureTooSoonMessage(), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
+        }
     }
 }
 
 @Composable
 private fun RepeatStep(
+    repeatWeekly: Boolean,
     repeatDays: Set<DayOfWeek>,
     repeatWeeks: Int,
+    onRepeatWeeklyChange: (Boolean) -> Unit,
     onDaysChange: (Set<DayOfWeek>) -> Unit,
     onWeeksChange: (Int) -> Unit
 ) {
     Column {
-        Text("Repeat weekly on:", fontWeight = FontWeight.SemiBold)
+        Text("How often?", fontWeight = FontWeight.SemiBold)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
+            FilterChip(selected = !repeatWeekly, onClick = { onRepeatWeeklyChange(false) }, label = { Text("One-time only") })
+            FilterChip(selected = repeatWeekly, onClick = { onRepeatWeeklyChange(true) }, label = { Text("Repeat weekly") })
+        }
+        if (!repeatWeekly) return@Column
+        Text("Repeat on:", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp))
         Text(
-            "Leave every day unselected to offer just this one trip.",
+            "Pick at least one day.",
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
@@ -267,6 +295,8 @@ private fun ConfirmOfferStep(
             Text("$seatsTotal seat(s) offered")
             if (repeatDays.isNotEmpty()) {
                 Text("Repeats on ${repeatDays.sortedBy { it.value }.joinToString(", ") { it.name.take(3) }} for $repeatWeeks week(s)")
+            } else {
+                Text("One-time trip")
             }
             notes.takeIf { it.isNotBlank() }?.let { Text("Note: $it") }
         }

@@ -14,6 +14,7 @@ import com.example.ds04_monash_rideshare_application.backend.UpdateRideRequestSt
 import com.example.ds04_monash_rideshare_application.backend.Users
 import com.example.ds04_monash_rideshare_application.backend.Vehicles
 import com.example.ds04_monash_rideshare_application.backend.requireDriverVehicle
+import com.example.ds04_monash_rideshare_application.backend.requireBookableDeparture
 import com.example.ds04_monash_rideshare_application.backend.ValidationException
 import com.example.ds04_monash_rideshare_application.backend.matching.MatchingEngine
 import com.example.ds04_monash_rideshare_application.backend.matching.RideCandidate
@@ -123,6 +124,7 @@ fun Route.rideRequestRoutes() {
         if (!body.isAsap && body.desiredDepartureTime == null) {
             throw ValidationException("desiredDepartureTime is required unless isAsap is true")
         }
+        if (!body.isAsap) body.desiredDepartureTime?.let(::requireBookableDeparture)
         requireMonashEndpoint(body.originLat, body.originLng, body.destinationLat, body.destinationLng)
 
         val requestId = "req-${UUID.randomUUID()}"

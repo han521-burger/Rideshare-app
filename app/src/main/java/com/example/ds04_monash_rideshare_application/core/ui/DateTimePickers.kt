@@ -6,6 +6,7 @@ import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -28,13 +29,15 @@ import java.util.Locale
 // A tappable field that opens Material3's DatePickerDialog. Note: DatePickerState always returns
 // UTC-midnight millis for the picked calendar day regardless of device timezone - read/write it
 // via ZoneOffset.UTC only, never treat the millis as a real wall-clock instant.
+// allowPastDates = false greys out every day before today, so a ride can't be booked in the past.
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DatePickerField(
     label: String,
     selectedDate: LocalDate?,
     onDateSelected: (LocalDate) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    allowPastDates: Boolean = true
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
@@ -47,7 +50,18 @@ fun DatePickerField(
             initialSelectedDateMillis = selectedDate
                 ?.atStartOfDay(ZoneOffset.UTC)
                 ?.toInstant()
-                ?.toEpochMilli()
+                ?.toEpochMilli(),
+            selectableDates = if (allowPastDates) {
+                object : SelectableDates {}
+            } else {
+                val today = LocalDate.now()
+                object : SelectableDates {
+                    override fun isSelectableDate(utcTimeMillis: Long): Boolean =
+                        !Instant.ofEpochMilli(utcTimeMillis).atZone(ZoneOffset.UTC).toLocalDate().isBefore(today)
+
+                    override fun isSelectableYear(year: Int): Boolean = year >= today.year
+                }
+            }
         )
         DatePickerDialog(
             onDismissRequest = { showDialog = false },
@@ -109,6 +123,21 @@ fun TimePickerField(
 fun combineDateAndTime(date: LocalDate?, time: LocalTime?): Long? {
     if (date == null || time == null) return null
     return date.atTime(time).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+}
+
+// Scheduled rides and requests must leave at least this long from now, so the other side has time
+// to see and respond. The backend enforces the same rule (BookingPolicy.kt). ASAP is exempt.
+const val MIN_BOOKING_LEAD_MINUTES = 30L
+
+fun earliestBookableDeparture(nowMillis: Long = System.currentTimeMillis()): Long =
+    nowMillis + MIN_BOOKING_LEAD_MINUTES * 60_000L
+
+fun isBookableDeparture(departureMillis: Long?, nowMillis: Long = System.currentTimeMillis()): Boolean =
+    departureMillis != null && departureMillis >= earliestBookableDeparture(nowMillis)
+
+fun departureTooSoonMessage(nowMillis: Long = System.currentTimeMillis()): String {
+    val earliest = Instant.ofEpochMilli(earliestBookableDeparture(nowMillis)).atZone(ZoneId.systemDefault()).toLocalTime()
+    return "Pick a time at least $MIN_BOOKING_LEAD_MINUTES minutes from now (${formatTime(earliest)} or later)."
 }
 
 private fun formatDate(date: LocalDate): String =

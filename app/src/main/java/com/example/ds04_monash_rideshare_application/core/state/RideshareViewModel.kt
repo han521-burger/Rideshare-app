@@ -135,7 +135,10 @@ class RideshareViewModel : ViewModel() {
         get() = myRequests.data.orEmpty().filter { it.status == RequestStatus.PENDING }
 
     val incomingPendingRequests: List<RideRequestSummary>
-        get() = incomingRequests.data.orEmpty().filter { it.status == RequestStatus.PENDING }
+        // Never offer a driver their own request - one account can be both passenger and driver.
+        get() = incomingRequests.data.orEmpty().filter {
+            it.status == RequestStatus.PENDING && it.passengerId != uiState.userId
+        }
 
     fun updateActiveMode(mode: AppMode, onRegistrationRequired: () -> Unit = {}, onDriverActivated: () -> Unit = {}) {
         if (mode == AppMode.PASSENGER) { cancelDriverRegistration(); return }
@@ -195,6 +198,9 @@ class RideshareViewModel : ViewModel() {
 
     private fun applySignedInUser(user: AuthenticatedUser, emailOverride: String?) {
         cancelDriverRegistration()
+        // Switching straight to another test account must not carry over the previous account's
+        // requests - otherwise its incoming-request banner shows up for the new user.
+        if (uiState.userId != user.userId) clearUserData()
         vehicleVersion++
         vehicles = Resource()
         AuthSession.currentUserId = user.userId
@@ -208,23 +214,27 @@ class RideshareViewModel : ViewModel() {
         loadProfile()
     }
 
+    private fun clearUserData() {
+        vehicleVersion++
+        vehicleSaving = false
+        profileDetails = Resource(); myDriverRides = Resource(); myRequests = Resource()
+        incomingRequests = Resource(); openRides = Resource(); searchResults = Resource()
+        lastSearchCriteria = null
+        rideDetails = Resource(); messages = Resource(); tripHistory = Resource()
+        dashboard = Resource(); analytics = Resource(); leaderboard = Resource(); ratings = Resource(); favorites = Resource()
+        vehicles = Resource()
+        selectedRideId = null; selectedRequestId = null; requestActionError = null
+        actionInFlight = false; incomingRequestRefresh = RequestRefreshGate(); lastCreatedRide = null
+        rideDetailsVersion++; myRequestsVersion++; driverRidesVersion++
+    }
+
     fun signOut(onComplete: () -> Unit = {}) {
         authenticationProvider.logout(object : AuthenticationProvider.AuthCallback {
             override fun onSuccess(user: AuthenticatedUser?) {
                 AuthSession.currentUserId = null
                 uiState = RideshareUiState()
                 cancelDriverRegistration()
-                vehicleVersion++
-                vehicleSaving = false
-                profileDetails = Resource(); myDriverRides = Resource(); myRequests = Resource()
-                incomingRequests = Resource(); openRides = Resource(); searchResults = Resource()
-                lastSearchCriteria = null
-                rideDetails = Resource(); messages = Resource(); tripHistory = Resource()
-                dashboard = Resource(); analytics = Resource(); leaderboard = Resource(); ratings = Resource(); favorites = Resource()
-                vehicles = Resource()
-                selectedRideId = null; selectedRequestId = null; requestActionError = null
-                actionInFlight = false; incomingRequestRefresh = RequestRefreshGate(); lastCreatedRide = null
-                rideDetailsVersion++; myRequestsVersion++; driverRidesVersion++
+                clearUserData()
                 onComplete()
             }
 
