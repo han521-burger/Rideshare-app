@@ -326,7 +326,7 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
     private fun toLeaderboardEntry(dto: LeaderboardEntryDto) = LeaderboardEntry(dto.userId, dto.displayName, dto.totalCo2AvoidedKg, dto.rank)
 
     private fun toFunnelCounts(dto: RequestFunnelCountsDto) =
-        RequestFunnelCounts(dto.pending, dto.accepted, dto.rejected, dto.cancelled, dto.completed)
+        RequestFunnelCounts(dto.pending, dto.accepted, dto.rejected, dto.cancelled, dto.completed, dto.expired)
 
     private fun toAnalyticsSummary(dto: AnalyticsResponseDto) = AnalyticsSummary(
         passengerFunnel = toFunnelCounts(dto.passengerFunnel),

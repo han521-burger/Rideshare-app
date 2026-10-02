@@ -149,6 +149,8 @@ object RideRequests : Table("ride_requests") {
     val repeatWeeks = integer("repeat_weeks").nullable()
     val createdAt = long("created_at")
     val respondedAt = long("responded_at").nullable()
+    // First explicit ACCEPT/REJECT only; lifecycle timestamps and undo remain independent.
+    val driverDecisionAt = long("driver_decision_at").nullable()
 
     override val primaryKey = PrimaryKey(requestId)
 }

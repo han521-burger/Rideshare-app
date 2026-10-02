@@ -128,8 +128,8 @@ fun Route.dashboardRoutes() {
             }
             val driverFunnel = funnelCounts(driverRequestRows)
             val responseTimes = driverRequestRows.mapNotNull { row ->
-                val respondedAt = row[RideRequests.respondedAt] ?: return@mapNotNull null
-                (respondedAt - row[RideRequests.createdAt]).toDouble()
+                val decisionAt = row[RideRequests.driverDecisionAt] ?: return@mapNotNull null
+                (decisionAt - row[RideRequests.createdAt]).toDouble()
             }
             val averageDriverResponseMinutes = if (responseTimes.isEmpty()) null else {
                 (responseTimes.average() / 60_000.0)
@@ -215,7 +215,8 @@ private fun funnelCounts(rows: List<ResultRow>): RequestFunnelCounts {
         accepted = byStatus[RideRequestStatus.ACCEPTED] ?: 0,
         rejected = byStatus[RideRequestStatus.REJECTED] ?: 0,
         cancelled = byStatus[RideRequestStatus.CANCELLED] ?: 0,
-        completed = byStatus[RideRequestStatus.COMPLETED] ?: 0
+        completed = byStatus[RideRequestStatus.COMPLETED] ?: 0,
+        expired = byStatus[RideRequestStatus.EXPIRED] ?: 0
     )
 }
 

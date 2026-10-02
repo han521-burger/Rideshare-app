@@ -108,7 +108,7 @@ class FakeRideApiService : RideApiService {
     }
 
     override fun fetchAnalytics(callback: RideApiService.Callback<AnalyticsSummary>) {
-        val emptyFunnel = RequestFunnelCounts(0, 0, 0, 0, 0)
+        val emptyFunnel = RequestFunnelCounts(0, 0, 0, 0, 0, expired = 0)
         callback.onSuccess(AnalyticsSummary(emptyFunnel, emptyFunnel, null, emptyList(), List(7) { 0 }, null, null))
     }
 

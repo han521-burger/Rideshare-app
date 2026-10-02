@@ -189,9 +189,10 @@ data class RequestFunnelCounts(
     val accepted: Int,
     val rejected: Int,
     val cancelled: Int,
-    val completed: Int
+    val completed: Int,
+    val expired: Int = 0
 ) {
-    val total: Int get() = pending + accepted + rejected + cancelled + completed
+    val total: Int get() = pending + accepted + rejected + cancelled + completed + expired
 }
 
 data class HotzoneEntry(val locationName: String, val count: Int)

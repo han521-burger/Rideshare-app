@@ -415,13 +415,16 @@ fun Route.rideRequestRoutes() {
                         it[rideId] = targetRideId
                         it[status] = newStatus
                         it[respondedAt] = acceptedAt
+                        if (request[RideRequests.driverDecisionAt] == null) it[driverDecisionAt] = acceptedAt
                     }
                 }
                 RideRequestStatus.REJECTED -> {
                     if (!isOwningDriver) throw ForbiddenException("Only the ride's driver can reject a request")
+                    val rejectedAt = System.currentTimeMillis()
                     RideRequests.update({ RideRequests.requestId eq requestId }) {
                         it[status] = newStatus
-                        it[respondedAt] = System.currentTimeMillis()
+                        it[respondedAt] = rejectedAt
+                        if (request[RideRequests.driverDecisionAt] == null) it[driverDecisionAt] = rejectedAt
                     }
                 }
                 RideRequestStatus.CANCELLED -> {

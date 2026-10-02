@@ -325,7 +325,8 @@ data class RequestFunnelCounts(
     val accepted: Int = 0,
     val rejected: Int = 0,
     val cancelled: Int = 0,
-    val completed: Int = 0
+    val completed: Int = 0,
+    val expired: Int = 0
 )
 
 @Serializable
@@ -340,10 +341,10 @@ data class AnalyticsDto(
     val passengerFunnel: RequestFunnelCounts,
     // Requests sent to rides you drive, by outcome.
     val driverFunnel: RequestFunnelCounts,
-    // How long you personally take to respond to a request once it arrives - null if you've
-    // never responded to one yet.
+    // First explicit driver ACCEPT/REJECT latency. Unknown historical decisions are excluded;
+    // null when no recorded first-decision samples exist. Lifecycle/undo timestamps are separate.
     val averageDriverResponseMinutes: Double? = null,
-    // Busiest pickup/drop-off points campus-wide this week - helps decide where to offer a ride.
+    // Origins and destinations from all rides created in the last 7 days, across users.
     val hotzones: List<HotzoneEntryDto> = emptyList(),
     // Completed trips (driving + riding) by day of week, index 0 = Monday .. 6 = Sunday.
     val tripsByDayOfWeek: List<Int> = List(7) { 0 },

@@ -258,7 +258,8 @@ data class RequestFunnelCountsDto(
     val accepted: Int = 0,
     val rejected: Int = 0,
     val cancelled: Int = 0,
-    val completed: Int = 0
+    val completed: Int = 0,
+    val expired: Int = 0
 )
 
 data class HotzoneEntryDto(val locationName: String, val count: Int)

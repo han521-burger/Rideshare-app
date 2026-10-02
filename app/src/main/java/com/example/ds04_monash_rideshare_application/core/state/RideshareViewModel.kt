@@ -55,9 +55,10 @@ data class Resource<T>(
     val errorMessage: String? = null
 )
 
-class RideshareViewModel : ViewModel() {
+class RideshareViewModel(
+    private val apiService: RideApiService = RideApiServiceImpl(),
     private val authenticationProvider: AuthenticationProvider = FakeAuthenticationProvider()
-    private val apiService: RideApiService = RideApiServiceImpl()
+) : ViewModel() {
 
     var uiState by mutableStateOf(RideshareUiState())
         private set
@@ -126,6 +127,8 @@ class RideshareViewModel : ViewModel() {
     private var rideDetailsVersion = 0
     private var myRequestsVersion = 0
     private var driverRidesVersion = 0
+    private var analyticsVersion = 0L
+    private var dashboardVersion = 0L
 
     // Rides upcoming, already locked in - driving (CONFIRMED) or riding (your request ACCEPTED).
     // Computed client-side from data already loaded for Home/Requests rather than a dedicated
@@ -235,6 +238,8 @@ class RideshareViewModel : ViewModel() {
     }
 
     private fun clearUserData() {
+        analyticsVersion++
+        dashboardVersion++
         vehicleVersion++
         vehicleSaving = false
         profileDetails = Resource(); myDriverRides = Resource(); myRequests = Resource()
@@ -616,18 +621,30 @@ class RideshareViewModel : ViewModel() {
     }
 
     fun loadDashboard() {
+        val version = ++dashboardVersion
+        val userId = uiState.userId ?: return
         dashboard = Resource(isLoading = true)
         apiService.fetchDashboard(object : RideApiService.Callback<DashboardSummary> {
-            override fun onSuccess(result: DashboardSummary) { dashboard = Resource(data = result) }
-            override fun onFailure(error: Exception) { dashboard = Resource(errorMessage = error.message) }
+            override fun onSuccess(result: DashboardSummary) {
+                if (version == dashboardVersion && userId == uiState.userId) dashboard = Resource(data = result)
+            }
+            override fun onFailure(error: Exception) {
+                if (version == dashboardVersion && userId == uiState.userId) dashboard = Resource(errorMessage = error.message)
+            }
         })
     }
 
     fun loadAnalytics() {
+        val version = ++analyticsVersion
+        val userId = uiState.userId ?: return
         analytics = Resource(isLoading = true)
         apiService.fetchAnalytics(object : RideApiService.Callback<AnalyticsSummary> {
-            override fun onSuccess(result: AnalyticsSummary) { analytics = Resource(data = result) }
-            override fun onFailure(error: Exception) { analytics = Resource(errorMessage = error.message) }
+            override fun onSuccess(result: AnalyticsSummary) {
+                if (version == analyticsVersion && userId == uiState.userId) analytics = Resource(data = result)
+            }
+            override fun onFailure(error: Exception) {
+                if (version == analyticsVersion && userId == uiState.userId) analytics = Resource(errorMessage = error.message)
+            }
         })
     }
 
