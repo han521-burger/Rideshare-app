@@ -38,6 +38,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import com.example.ds04_monash_rideshare_application.feature.activity.ActivityHeader
+import com.example.ds04_monash_rideshare_application.feature.activity.activityColorScheme
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -75,8 +79,13 @@ fun BottomNavScaffold(
     modifier: Modifier = Modifier,
     content: @Composable (androidx.compose.foundation.layout.PaddingValues) -> Unit
 ) {
-    val accent = modeAccent(activeMode)
-    val colorScheme = MaterialTheme.colorScheme.copy(primary = accent, secondary = accent)
+    val isActivity = currentTab == AppDestination.Activity
+    val colorScheme = if (isActivity) activityColorScheme() else MaterialTheme.colorScheme.copy(
+        primary = modeAccent(activeMode), secondary = modeAccent(activeMode)
+    )
+    val accent = colorScheme.primary
+    val density = LocalDensity.current
+    var activityHeaderHeight by remember { mutableStateOf(0.dp) }
     var displayedRequest by remember { mutableStateOf(driverRequest) }
     // Swiping a banner away hides it for good (like a real notification) - it stays dismissed
     // across mode switches and app restarts, tracked by id rather than just "the last one swiped"
@@ -92,7 +101,11 @@ fun BottomNavScaffold(
         Box(modifier = modifier) {
             Scaffold(
                 topBar = {
-                    Surface(shadowElevation = 2.dp) {
+                    if (isActivity) {
+                        Surface(color = colorScheme.background, modifier = Modifier.onSizeChanged {
+                            activityHeaderHeight = with(density) { it.height.toDp() }
+                        }) { ActivityHeader(greetingName, activeMode, onModeChange) }
+                    } else Surface(shadowElevation = 2.dp) {
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -157,8 +170,9 @@ fun BottomNavScaffold(
                 exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { -it / 3 },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .statusBarsPadding()
-                    .padding(top = 72.dp, start = 12.dp, end = 12.dp)
+                    .then(if (isActivity) Modifier.padding(top = activityHeaderHeight)
+                        else Modifier.statusBarsPadding().padding(top = 72.dp))
+                    .padding(horizontal = 12.dp)
                     .widthIn(max = 600.dp)
                     .zIndex(2f)
             ) {

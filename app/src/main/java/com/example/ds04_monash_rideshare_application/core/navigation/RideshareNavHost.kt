@@ -297,6 +297,8 @@ fun RideshareNavHost(
                         currentUserId = uiState.userId,
                         dashboard = viewModel.dashboard,
                         analytics = viewModel.analytics,
+                        onRetryDashboard = { viewModel.loadDashboard() },
+                        onRetryAnalytics = { viewModel.loadAnalytics() },
                         tripHistory = viewModel.tripHistory,
                         onOpenLeaderboard = { navigate(AppDestination.Leaderboard) },
                         onOpenRide = { rideId ->
