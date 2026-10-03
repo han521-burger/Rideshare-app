@@ -79,13 +79,13 @@ fun BottomNavScaffold(
     modifier: Modifier = Modifier,
     content: @Composable (androidx.compose.foundation.layout.PaddingValues) -> Unit
 ) {
-    val isActivity = currentTab == AppDestination.Activity
-    val colorScheme = if (isActivity) activityColorScheme() else MaterialTheme.colorScheme.copy(
+    val usesBrandShell = currentTab == AppDestination.Activity || currentTab == AppDestination.Home
+    val colorScheme = if (usesBrandShell) activityColorScheme() else MaterialTheme.colorScheme.copy(
         primary = modeAccent(activeMode), secondary = modeAccent(activeMode)
     )
     val accent = colorScheme.primary
     val density = LocalDensity.current
-    var activityHeaderHeight by remember { mutableStateOf(0.dp) }
+    var brandHeaderHeight by remember { mutableStateOf(0.dp) }
     var displayedRequest by remember { mutableStateOf(driverRequest) }
     // Swiping a banner away hides it for good (like a real notification) - it stays dismissed
     // across mode switches and app restarts, tracked by id rather than just "the last one swiped"
@@ -101,9 +101,9 @@ fun BottomNavScaffold(
         Box(modifier = modifier) {
             Scaffold(
                 topBar = {
-                    if (isActivity) {
+                    if (usesBrandShell) {
                         Surface(color = colorScheme.background, modifier = Modifier.onSizeChanged {
-                            activityHeaderHeight = with(density) { it.height.toDp() }
+                            brandHeaderHeight = with(density) { it.height.toDp() }
                         }) { ActivityHeader(greetingName, activeMode, onModeChange) }
                     } else Surface(shadowElevation = 2.dp) {
                         Row(
@@ -170,7 +170,7 @@ fun BottomNavScaffold(
                 exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { -it / 3 },
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .then(if (isActivity) Modifier.padding(top = activityHeaderHeight)
+                    .then(if (usesBrandShell) Modifier.padding(top = brandHeaderHeight)
                         else Modifier.statusBarsPadding().padding(top = 72.dp))
                     .padding(horizontal = 12.dp)
                     .widthIn(max = 600.dp)

@@ -430,7 +430,7 @@ class RideshareViewModel(
                 if (version == driverRidesVersion) myDriverRides = Resource(data = result)
             }
             override fun onFailure(error: Exception) {
-                if (version == driverRidesVersion) myDriverRides = Resource(data = myDriverRides.data, errorMessage = error.message)
+                if (version == driverRidesVersion) myDriverRides = Resource(data = myDriverRides.data, errorMessage = error.message ?: "Could not load your rides")
             }
         })
     }
@@ -483,7 +483,7 @@ class RideshareViewModel(
                 if (version == myRequestsVersion) myRequests = Resource(data = result)
             }
             override fun onFailure(error: Exception) {
-                if (version == myRequestsVersion) myRequests = Resource(data = myRequests.data, errorMessage = error.message)
+                if (version == myRequestsVersion) myRequests = Resource(data = myRequests.data, errorMessage = error.message ?: "Could not load your requests")
             }
         })
     }

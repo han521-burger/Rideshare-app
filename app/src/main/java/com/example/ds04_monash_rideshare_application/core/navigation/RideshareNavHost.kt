@@ -258,6 +258,11 @@ fun RideshareNavHost(
                         currentUserId = uiState.userId,
                         confirmedRides = viewModel.confirmedRides,
                         myDriverRides = viewModel.myDriverRides,
+                        myRequests = viewModel.myRequests,
+                        onRetry = {
+                            if (viewModel.activeMode == AppMode.PASSENGER) viewModel.loadMyRequests()
+                            else viewModel.loadMyDriverRides()
+                        },
                         onOpenRide = { rideId ->
                             viewModel.selectedRideId = rideId
                             navigate(AppDestination.RideDetail)
