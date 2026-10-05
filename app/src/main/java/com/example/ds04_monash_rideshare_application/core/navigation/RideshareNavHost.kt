@@ -335,18 +335,24 @@ fun RideshareNavHost(
     }
 
     when (currentDestination) {
+        // A session saved by "Keep me signed in" skips straight to Home if it's still valid.
         AppDestination.Splash -> SplashScreen(
-            onFinished = { replaceStack(AppDestination.Login) }
+            onFinished = {
+                viewModel.restoreSession { signedIn ->
+                    replaceStack(if (signedIn) AppDestination.Home else AppDestination.Login)
+                }
+            }
         )
 
         AppDestination.Login -> LoginScreen(
             uiState = uiState,
-            onSignIn = { email ->
-                viewModel.signIn(email) { replaceStack(AppDestination.Home) }
+            onSignIn = { email, password, keepSignedIn ->
+                viewModel.signIn(email, password, keepSignedIn) { replaceStack(AppDestination.Home) }
             },
-            onSignInAsTestUser = { identity ->
-                viewModel.signInAsTestUser(identity) { replaceStack(AppDestination.Home) }
+            onSignUp = { name, email, password, keepSignedIn ->
+                viewModel.signUp(name, email, password, keepSignedIn) { replaceStack(AppDestination.Home) }
             },
+            onClearServerError = viewModel::clearAuthError,
             modifier = modifier
         )
 

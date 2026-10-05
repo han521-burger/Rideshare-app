@@ -60,11 +60,10 @@ specifically so it runs locally with zero external setup (see `docs/BACKEND.md` 
 - Starts on `http://localhost:8080`.
 - Uses a SQLite file at `backend/rideshare-backend.db` — gitignored, created automatically on
   first run.
-- On first run it seeds two accounts so there's something to actually test against:
-  - `fake-user-001` — matches the Android app's `FakeAuthenticationProvider`, so signing in on
-    the app and hitting the backend works immediately with no manual account setup.
-  - `demo-driver-001` with one seeded vehicle (`demo-vehicle-001`), so there's a ride to
-    search/match against right away.
+- On first run it seeds four demo accounts with rides, requests and messages, all signing in
+  with the password `rideshare123`: `test.student@student.monash.edu`,
+  `amara.singh@student.monash.edu`, `ben.nguyen@student.monash.edu` and
+  `priya.kapoor@student.monash.edu`. Or create your own account from the app.
 - Confirm it's actually up before moving on: `curl http://localhost:8080/health` should return
   `"API online"`.
 
@@ -79,15 +78,15 @@ your emulator/device.
 - On a physical device, make sure step 2's `BACKEND_BASE_URL` override is set and that your
   computer's firewall allows inbound connections on port 8080 from your local network.
 
-You should land on a login screen backed by `FakeAuthenticationProvider` — there's no real Monash
-SSO in this trial (that's intentional, see `docs/RTM.md` FR-01). A test-account switcher exists on
-the Login screen if you need to test as more than one seeded user.
+You should land on a sign-in screen. Sign in with a demo account (see step 3) or tap "New here?
+Create an account" - Monash emails only. Real Monash SSO isn't wired up yet (`docs/RTM.md` FR-01).
+To test both sides of a request, sign in as a different account on a second device.
 
 ## 5. Sanity-check it actually works
 
 A quick end-to-end smoke test once both are running:
 
-1. Log in on the app (uses the seeded `fake-user-001`).
+1. Sign in on the app as `test.student@student.monash.edu` / `rideshare123`.
 2. Switch the top-bar mode toggle to Driver, go to the Requests tab → My Offers, and offer a ride
    (the map/location step uses the fixed named locations — Melbourne CBD, Oakleigh, Chadstone,
    Glen Waverley, Monash Clayton — not freeform search).
@@ -112,8 +111,8 @@ bug — most first-run failures are the app not being able to reach the backend 
 - **Everything is polling, nothing is push** — message refresh, request badges, and ride status
   updates only refresh when you navigate to a screen or manually refresh. This is intentional for
   the trial (see `docs/RTM.md`'s "Deferred" section), not a missing feature.
-- Real Monash SSO isn't wired up (`FakeAuthenticationProvider` stands in) and isn't currently a
-  priority for this branch.
+- Real Monash SSO isn't wired up (email + password accounts stand in) and isn't currently a
+  priority for this branch. There's no email verification or password reset yet.
 
 ## Where to go next
 

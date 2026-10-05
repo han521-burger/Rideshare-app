@@ -7,22 +7,32 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
 
-// Trial-only auth: the bearer token IS the userId, trusted as-is. This stands in for real Monash
-// SSO the same way FakeAuthenticationProvider does on the Android side - the RTM (FR-01) notes
-// real SSO is blocked on Gate G1 (SAML metadata from Monash IT), so build against a fake here too
-// and swap this file for real OIDC/JWT verification once that's unblocked. Every protected route
+// The app signs in with a Monash email + password (routes/AuthRoutes.kt) and gets back a random
+// session token, sent on every call as "Authorization: Bearer <token>". Every protected route
 // calls requireUserId() to resolve "who is calling", and route handlers are responsible for
 // checking that userId owns whatever resource it's trying to modify (NFR: "users can't modify
-// other users' profiles or rides they don't own").
+// other users' profiles or rides they don't own"). Swap this for real Monash SSO (OIDC/JWT)
+// once that's unblocked (RTM FR-01, Gate G1).
 fun ApplicationCall.requireUserId(): String {
-    val header = request.header(HttpHeaders.Authorization)
-        ?: throw UnauthorizedException()
-    val userId = header.removePrefix("Bearer ").trim()
-    if (userId.isBlank()) throw UnauthorizedException()
-
-    val exists = transaction {
-        Users.selectAll().where { Users.userId eq userId }.count() > 0
+    val token = bearerToken() ?: throw UnauthorizedException()
+    val now = System.currentTimeMillis()
+    val sessionUser = transaction {
+        Sessions.selectAll().where { Sessions.token eq token }.firstOrNull()
+            ?.takeIf { it[Sessions.expiresAt] > now }
+            ?.get(Sessions.userId)
     }
-    if (!exists) throw UnauthorizedException("Unknown user")
-    return userId
+    if (sessionUser != null) return sessionUser
+
+    // Backend tests only (set in backend/build.gradle's test task): let a test call as a seeded
+    // user by sending its userId as the token, without signing in first. Never set in a real run.
+    if (System.getProperty(TRUST_USER_ID_TOKENS_PROPERTY) == "true") {
+        val exists = transaction { Users.selectAll().where { Users.userId eq token }.count() > 0 }
+        if (exists) return token
+    }
+    throw UnauthorizedException("Please sign in again")
 }
+
+fun ApplicationCall.bearerToken(): String? =
+    request.header(HttpHeaders.Authorization)?.removePrefix("Bearer ")?.trim()?.takeIf { it.isNotBlank() }
+
+const val TRUST_USER_ID_TOKENS_PROPERTY = "rideshare.test.trustUserIdTokens"

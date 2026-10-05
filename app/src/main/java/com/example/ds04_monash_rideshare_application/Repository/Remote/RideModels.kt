@@ -209,6 +209,9 @@ data class AnalyticsSummary(
     val averageSeatFillRatePercent: Double?
 )
 
+// A successful sign-up/sign-in: the session token to send on every call, and who signed in.
+data class AuthResult(val token: String, val user: UserAccountSummary)
+
 data class UserAccountSummary(
     val userId: String,
     val displayName: String,

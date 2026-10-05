@@ -1,7 +1,6 @@
 package com.example.ds04_monash_rideshare_application.core.state
 
 import com.example.ds04_monash_rideshare_application.Auth.AuthSession
-import com.example.ds04_monash_rideshare_application.Auth.TEST_IDENTITIES
 import com.example.ds04_monash_rideshare_application.Repository.Remote.*
 import org.junit.After
 import org.junit.Assert.*
@@ -13,15 +12,22 @@ class ActivityRefreshTest {
         val dashboards = mutableListOf<RideApiService.Callback<DashboardSummary>>()
         override fun fetchAnalytics(callback: RideApiService.Callback<AnalyticsSummary>) { analytics += callback }
         override fun fetchDashboard(callback: RideApiService.Callback<DashboardSummary>) { dashboards += callback }
+        // Signs straight in as whichever account the email names.
+        override fun signIn(email: String, password: String, callback: RideApiService.Callback<AuthResult>) {
+            val user = UserAccountSummary(email, email, email, email, null, null, true, null, null)
+            callback.onSuccess(AuthResult("token-$email", user))
+        }
     }
+    private val accounts = listOf("first@student.monash.edu", "second@student.monash.edu")
+    private fun signInAs(index: Int) = vm.signIn(accounts[index], "password", keepSignedIn = false)
     private val api = DeferredApi()
     private val vm = RideshareViewModel(api)
     private val funnel = RequestFunnelCounts(0, 0, 0, 0, 0, expired = 2)
     private fun analytics(n: Int) = AnalyticsSummary(funnel, funnel, n.toDouble(), emptyList(), List(7) { 0 }, null, null)
     private fun dashboard(n: Int) = DashboardSummary(n, n.toDouble(), 0.0, emptyList())
-    @After fun clearSession() { AuthSession.currentUserId = null }
+    @After fun clearSession() { AuthSession.clear() }
     private fun start() {
-        vm.signInAsTestUser(TEST_IDENTITIES[0])
+        signInAs(0)
         vm.loadAnalytics(); vm.loadDashboard()
     }
     private fun reply(index: Int, failure: Boolean) {
@@ -35,7 +41,7 @@ class ActivityRefreshTest {
     }
     private fun switchAccount(failure: Boolean) {
         start()
-        vm.signInAsTestUser(TEST_IDENTITIES[1])
+        signInAs(1)
         vm.loadAnalytics(); vm.loadDashboard(); reply(1, false)
         reply(0, failure)
         assertEquals(analytics(1), vm.analytics.data)
@@ -59,7 +65,7 @@ class ActivityRefreshTest {
     @Test fun olderRefreshSuccessCannotReplaceNewerResult() = outOfOrder(false)
     @Test fun olderRefreshFailureCannotReplaceNewerResult() = outOfOrder(true)
     @Test fun switchingAwayAndBackStillInvalidatesOriginalRequests() {
-        start(); vm.signInAsTestUser(TEST_IDENTITIES[1]); vm.signInAsTestUser(TEST_IDENTITIES[0])
+        start(); signInAs(1); signInAs(0)
         reply(0, false)
         assertEquals(Resource<AnalyticsSummary>(), vm.analytics)
         assertEquals(Resource<DashboardSummary>(), vm.dashboard)

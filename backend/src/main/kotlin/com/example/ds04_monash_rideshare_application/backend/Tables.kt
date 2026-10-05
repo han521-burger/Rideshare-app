@@ -19,8 +19,22 @@ object Users : Table("users") {
     val emergencyContactName = varchar("emergency_contact_name", 128).nullable()
     val emergencyContactPhone = varchar("emergency_contact_phone", 32).nullable()
     val createdAt = long("created_at")
+    // PBKDF2 hash (Passwords.kt) - never the password itself. Null only for an account that
+    // can't sign in with a password (none today; kept nullable so older DBs migrate in place).
+    val passwordHash = varchar("password_hash", 256).nullable()
 
     override val primaryKey = PrimaryKey(userId)
+}
+
+// One row per signed-in device. The app sends the token as "Authorization: Bearer <token>"
+// and requireUserId() (Auth.kt) resolves it back to the user. Deleted on sign-out.
+object Sessions : Table("sessions") {
+    val token = varchar("token", 128)
+    val userId = varchar("user_id", 64).references(Users.userId)
+    val createdAt = long("created_at")
+    val expiresAt = long("expires_at")
+
+    override val primaryKey = PrimaryKey(token)
 }
 
 // One registered vehicle per account, also enforced by a database unique index.

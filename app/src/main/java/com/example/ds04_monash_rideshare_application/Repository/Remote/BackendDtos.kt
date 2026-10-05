@@ -275,3 +275,9 @@ data class AnalyticsResponseDto(
     val mostUsedRoute: RouteFrequencyDto? = null,
     val averageSeatFillRatePercent: Double? = null
 )
+
+data class RegisterRequestBody(val displayName: String, val email: String, val password: String)
+
+data class LoginRequestBody(val email: String, val password: String)
+
+data class AuthResponseDto(val token: String, val user: UserDto)

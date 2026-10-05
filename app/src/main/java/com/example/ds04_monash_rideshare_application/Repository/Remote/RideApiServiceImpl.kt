@@ -246,6 +246,20 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         api.deleteVehicle(vehicleId).dispatch(callback) { it["deleted"] ?: false }
     }
 
+    override fun signUp(displayName: String, email: String, password: String, callback: RideApiService.Callback<AuthResult>) {
+        api.register(RegisterRequestBody(displayName, email, password)).dispatch(callback, ::toAuthResult)
+    }
+
+    override fun signIn(email: String, password: String, callback: RideApiService.Callback<AuthResult>) {
+        api.login(LoginRequestBody(email, password)).dispatch(callback, ::toAuthResult)
+    }
+
+    override fun signOut(token: String, callback: RideApiService.Callback<Boolean>) {
+        api.logout("Bearer $token").dispatch(callback) { true }
+    }
+
+    private fun toAuthResult(dto: AuthResponseDto) = AuthResult(dto.token, toUserAccountSummary(dto.user))
+
     private fun toUserAccountSummary(dto: UserDto) = UserAccountSummary(
         userId = dto.userId,
         displayName = dto.displayName,

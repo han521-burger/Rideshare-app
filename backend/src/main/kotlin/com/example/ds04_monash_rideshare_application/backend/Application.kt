@@ -1,5 +1,6 @@
 package com.example.ds04_monash_rideshare_application.backend
 
+import com.example.ds04_monash_rideshare_application.backend.routes.authRoutes
 import com.example.ds04_monash_rideshare_application.backend.routes.dashboardRoutes
 import com.example.ds04_monash_rideshare_application.backend.routes.favoriteRoutes
 import com.example.ds04_monash_rideshare_application.backend.routes.healthRoutes
@@ -49,6 +50,7 @@ fun Application.module(databaseUrl: String = "jdbc:sqlite:./rideshare-backend.db
 
     routing {
         healthRoutes()
+        authRoutes()
         userRoutes()
         vehicleRoutes()
         rideRoutes()

@@ -5,15 +5,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import com.example.ds04_monash_rideshare_application.Auth.AuthSession
-import com.example.ds04_monash_rideshare_application.Auth.AuthenticatedUser
-import com.example.ds04_monash_rideshare_application.Auth.AuthenticationProvider
-import com.example.ds04_monash_rideshare_application.Auth.FakeAuthenticationProvider
-import com.example.ds04_monash_rideshare_application.Auth.TestIdentity
 import com.example.ds04_monash_rideshare_application.Repository.Remote.BackendException
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CONFLICT_OWN_PENDING_REQUEST
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateRideDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateVehicleDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.AnalyticsSummary
+import com.example.ds04_monash_rideshare_application.Repository.Remote.AuthResult
 import com.example.ds04_monash_rideshare_application.Repository.Remote.DashboardSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.FavoriteDriverSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.LeaderboardResult
@@ -56,8 +53,7 @@ data class Resource<T>(
 )
 
 class RideshareViewModel(
-    private val apiService: RideApiService = RideApiServiceImpl(),
-    private val authenticationProvider: AuthenticationProvider = FakeAuthenticationProvider()
+    private val apiService: RideApiService = RideApiServiceImpl()
 ) : ViewModel() {
 
     var uiState by mutableStateOf(RideshareUiState())
@@ -194,46 +190,75 @@ class RideshareViewModel(
 
     fun clearDriverModeError() { driverModeError = null }
 
-    fun signIn(email: String? = null, onSuccess: () -> Unit = {}) {
+    fun signIn(email: String, password: String, keepSignedIn: Boolean, onSuccess: () -> Unit = {}) {
         if (uiState.isSigningIn) return
         uiState = uiState.copy(isSigningIn = true, errorMessage = null)
-        authenticationProvider.login(object : AuthenticationProvider.AuthCallback {
-            override fun onSuccess(user: AuthenticatedUser) {
-                applySignedInUser(user, email)
+        apiService.signIn(email.trim(), password, authCallback(keepSignedIn, onSuccess, "Sign in was unsuccessful. Please try again."))
+    }
+
+    fun signUp(displayName: String, email: String, password: String, keepSignedIn: Boolean, onSuccess: () -> Unit = {}) {
+        if (uiState.isSigningIn) return
+        uiState = uiState.copy(isSigningIn = true, errorMessage = null)
+        apiService.signUp(
+            displayName.trim(), email.trim(), password,
+            authCallback(keepSignedIn, onSuccess, "Couldn't create your account. Please try again.")
+        )
+    }
+
+    private fun authCallback(keepSignedIn: Boolean, onSuccess: () -> Unit, fallbackError: String) =
+        object : RideApiService.Callback<AuthResult> {
+            override fun onSuccess(result: AuthResult) {
+                AuthSession.start(result.token, result.user.userId, remember = keepSignedIn)
+                applySignedInUser(result.user)
                 onSuccess()
             }
 
             override fun onFailure(error: Exception) {
-                uiState = uiState.copy(isSigningIn = false, errorMessage = error.message ?: "Sign in was unsuccessful. Please try again.")
+                uiState = uiState.copy(isSigningIn = false, errorMessage = error.message ?: fallbackError)
+            }
+        }
+
+    fun clearAuthError() {
+        uiState = uiState.copy(errorMessage = null)
+    }
+
+    // On launch: if "Keep me signed in" saved a session, check it's still valid and skip the
+    // sign-in screen. done(false) means show sign-in (nothing saved, expired, or unreachable).
+    fun restoreSession(done: (Boolean) -> Unit) {
+        if (!AuthSession.restoreSaved()) {
+            done(false)
+            return
+        }
+        apiService.fetchMyProfile(object : RideApiService.Callback<UserAccountSummary> {
+            override fun onSuccess(result: UserAccountSummary) {
+                applySignedInUser(result)
+                done(true)
+            }
+
+            override fun onFailure(error: Exception) {
+                AuthSession.clear()
+                done(false)
             }
         })
     }
 
-    // Trial-only: signs in directly as one of the other seeded test accounts (backend/Database.kt),
-    // bypassing FakeAuthenticationProvider (which only ever returns fake-user-001). Without this
-    // there's no way to test both sides of a request/accept/message flow.
-    fun signInAsTestUser(identity: TestIdentity, onSuccess: () -> Unit = {}) {
-        if (uiState.isSigningIn) return
-        val user = AuthenticatedUser(identity.userId, identity.externalSubjectId, identity.email, identity.displayName)
-        applySignedInUser(user, identity.email)
-        onSuccess()
-    }
-
-    private fun applySignedInUser(user: AuthenticatedUser, emailOverride: String?) {
+    private fun applySignedInUser(user: UserAccountSummary) {
         cancelDriverRegistration()
-        // Switching straight to another test account must not carry over the previous account's
+        // Signing in as a different account must not carry over the previous account's
         // requests - otherwise its incoming-request banner shows up for the new user.
         if (uiState.userId != user.userId) clearUserData()
         vehicleVersion++
         vehicles = Resource()
-        AuthSession.currentUserId = user.userId
         uiState = uiState.copy(
             isSigningIn = false,
+            errorMessage = null,
             userId = user.userId,
-            email = emailOverride?.trim()?.takeIf { it.isNotBlank() } ?: user.emailAccount,
+            email = user.emailAccount,
             displayName = user.displayName,
-            preferredName = user.displayName
+            preferredName = user.preferredName.ifBlank { user.displayName },
+            passengerEnabled = user.passengerEnabled
         )
+        profileDetails = Resource(data = user)
         loadProfile()
     }
 
@@ -254,20 +279,20 @@ class RideshareViewModel(
         rideDetailsVersion++; myRequestsVersion++; driverRidesVersion++
     }
 
+    // Signs out on this device straight away; the server-side session is ended in the
+    // background (best effort - it also expires on its own).
     fun signOut(onComplete: () -> Unit = {}) {
-        authenticationProvider.logout(object : AuthenticationProvider.AuthCallback {
-            override fun onSuccess(user: AuthenticatedUser?) {
-                AuthSession.currentUserId = null
-                uiState = RideshareUiState()
-                cancelDriverRegistration()
-                clearUserData()
-                onComplete()
-            }
-
-            override fun onFailure(error: Exception) {
-                uiState = uiState.copy(errorMessage = error.message ?: "Sign out was unsuccessful. Please try again.")
-            }
-        })
+        AuthSession.token?.let { token ->
+            apiService.signOut(token, object : RideApiService.Callback<Boolean> {
+                override fun onSuccess(result: Boolean) = Unit
+                override fun onFailure(error: Exception) = Unit
+            })
+        }
+        AuthSession.clear()
+        uiState = RideshareUiState()
+        cancelDriverRegistration()
+        clearUserData()
+        onComplete()
     }
 
     fun loadProfile() {

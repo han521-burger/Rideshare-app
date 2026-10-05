@@ -20,4 +20,19 @@ class LoginValidationTest {
         assertNull(validateMonashEmail("student@student.monash.edu"))
         assertNull(validateMonashEmail("staff@monash.edu"))
     }
+
+    @Test
+    fun `sign in only needs a Monash email and a password`() {
+        assertEquals(BLANK_PASSWORD_ERROR, validateLoginForm(false, "", "a@student.monash.edu", "", ""))
+        assertNull(validateLoginForm(false, "", "a@student.monash.edu", "short", ""))
+    }
+
+    @Test
+    fun `create account checks name, password length and confirmation`() {
+        assertEquals(BLANK_NAME_ERROR, validateLoginForm(true, " ", "a@student.monash.edu", "longenough", "longenough"))
+        assertEquals(INVALID_EMAIL_ERROR, validateLoginForm(true, "Jess", "jess@gmail.com", "longenough", "longenough"))
+        assertEquals(SHORT_PASSWORD_ERROR, validateLoginForm(true, "Jess", "a@student.monash.edu", "short", "short"))
+        assertEquals(PASSWORD_MISMATCH_ERROR, validateLoginForm(true, "Jess", "a@student.monash.edu", "longenough", "different"))
+        assertNull(validateLoginForm(true, "Jess", "a@student.monash.edu", "longenough", "longenough"))
+    }
 }

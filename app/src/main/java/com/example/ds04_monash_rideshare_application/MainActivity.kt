@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.lifecycle.ViewModelProvider
+import com.example.ds04_monash_rideshare_application.Auth.AuthSession
 import com.example.ds04_monash_rideshare_application.core.state.RideshareViewModel
 import com.example.ds04_monash_rideshare_application.ui.theme.Ds04_monash_rideshare_applicationTheme
 
@@ -14,6 +15,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         if (BuildConfig.YANDEX_MAPKIT_API_KEY.isNotBlank()) MapKitFactory.initialize(this)
         enableEdgeToEdge()
+        AuthSession.init(this)
         val rideshareViewModel = ViewModelProvider(this)[RideshareViewModel::class.java]
         setContent {
             Ds04_monash_rideshare_applicationTheme {

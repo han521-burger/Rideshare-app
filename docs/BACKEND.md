@@ -13,8 +13,9 @@ change to point at a real hosted Postgres later.
 
 Starts on `http://localhost:8080`, using a SQLite file at `backend/rideshare-backend.db`
 (gitignored, recreated automatically). On first run it seeds:
-- `fake-user-001` - matches `FakeAuthenticationProvider`'s fixed demo user, so signing in on
-  Android and hitting the backend "just works" out of the box.
+- Four demo accounts (Test Student, Amara Singh, Ben Nguyen, Priya Kapoor) that sign in with
+  their `@student.monash.edu` email and the password `rideshare123` (`DEMO_ACCOUNT_PASSWORD` in
+  Database.kt), with rides, requests and messages already set up.
 - `demo-driver-001` with one vehicle (`demo-vehicle-001`), so there's something to search/match
   against immediately.
 
@@ -23,11 +24,17 @@ From an Android emulator, the backend is reachable at `http://10.0.2.2:8080`.
 ## Auth (trial-only, read this before assuming it's secure)
 
 There's no real Monash SSO yet (RTM FR-01 - blocked on Gate G1, SAML metadata from Monash IT).
-Every request must send `Authorization: Bearer <userId>`, and the backend trusts that userId as
-given if it exists in the `users` table. This is a stand-in for real auth, the same way
-`FakeAuthenticationProvider` stands in on the Android side. **Do not deploy this anywhere public
-as-is** - swap `Auth.kt`'s `requireUserId()` for real OIDC/JWT verification once Monash SSO access
-is granted.
+Instead, accounts use a Monash email + password:
+- `POST /auth/register` `{displayName, email, password}` - Monash emails only, password 8+ chars.
+- `POST /auth/login` `{email, password}` - both return `{token, user}`.
+- `POST /auth/logout` - ends the session for the token sent.
+
+Passwords are stored as PBKDF2 hashes (`Passwords.kt`). Every other request must send
+`Authorization: Bearer <token>`; `Auth.kt`'s `requireUserId()` resolves it via the `sessions`
+table (30-day expiry). Backend tests may send a userId as the token instead - only because the
+test task sets `rideshare.test.trustUserIdTokens`. Still missing before any real deployment:
+HTTPS, email verification, password reset and login rate limiting. Swap this for real OIDC/JWT
+verification once Monash SSO access is granted.
 
 ## Endpoints
 

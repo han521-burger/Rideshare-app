@@ -48,4 +48,6 @@ application {
 
 test {
     useJUnitPlatform()
+    // Lets tests call as a seeded user by sending its userId as the bearer token (see Auth.kt).
+    systemProperty 'rideshare.test.trustUserIdTokens', 'true'
 }

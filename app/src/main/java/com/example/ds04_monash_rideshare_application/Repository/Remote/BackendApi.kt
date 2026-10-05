@@ -4,6 +4,7 @@ import retrofit2.Call
 import retrofit2.http.Body
 import retrofit2.http.DELETE
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.PUT
 import retrofit2.http.Path
@@ -13,6 +14,17 @@ import retrofit2.http.Query
 // docs/BACKEND.md). RideApiServiceImpl is the only caller - it maps these DTOs to/from the
 // domain models in RideModels.kt the rest of the app works with.
 interface BackendApi {
+    @POST("auth/register")
+    fun register(@Body body: RegisterRequestBody): Call<AuthResponseDto>
+
+    @POST("auth/login")
+    fun login(@Body body: LoginRequestBody): Call<AuthResponseDto>
+
+    // Token passed explicitly: the app clears its in-memory session right away on sign-out,
+    // so the interceptor may no longer have it by the time this request goes out.
+    @POST("auth/logout")
+    fun logout(@Header("Authorization") authorization: String): Call<Map<String, Boolean>>
+
     @GET("users/me")
     fun getMyProfile(): Call<UserDto>
 

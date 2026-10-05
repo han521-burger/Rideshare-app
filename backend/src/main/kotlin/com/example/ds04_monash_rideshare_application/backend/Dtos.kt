@@ -356,3 +356,14 @@ data class AnalyticsDto(
 
 @Serializable
 data class ErrorResponse(val error: String, val code: String? = null)
+
+@Serializable
+data class RegisterRequest(val displayName: String, val email: String, val password: String)
+
+@Serializable
+data class LoginRequest(val email: String, val password: String)
+
+// Returned by sign-up and sign-in: the session token the app sends as its bearer token, plus
+// the signed-in user's own profile.
+@Serializable
+data class AuthResponse(val token: String, val user: UserDto)

@@ -2,9 +2,11 @@ package com.example.ds04_monash_rideshare_application.backend
 
 import org.jetbrains.exposed.sql.Database
 import org.jetbrains.exposed.sql.SchemaUtils
+import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 
 // SQLite file DB for local trial/dev use - see build.gradle header for why, and swap this for a
 // hosted Postgres connection once the team picks real hosting (RTM FR-08).
@@ -20,20 +22,34 @@ fun initDatabase(jdbcUrl: String = "jdbc:sqlite:./rideshare-backend.db") {
         // createMissingTablesAndColumns (not create) so a local dev DB from before a schema
         // change - a new nullable/defaulted column, a new table - gets migrated in place via
         // ALTER TABLE instead of silently keeping the old shape and erroring at query time.
-        SchemaUtils.createMissingTablesAndColumns(Users, Vehicles, Rides, RideStops, RideRequests, Messages, Ratings, FavoriteDrivers)
+        SchemaUtils.createMissingTablesAndColumns(Users, Sessions, Vehicles, Rides, RideStops, RideRequests, Messages, Ratings, FavoriteDrivers)
         seedDemoDataIfEmpty()
+        setDemoPasswords()
+    }
+}
+
+// The seeded demo accounts (Test Student, Amara, Ben, Priya) sign in with their email and this
+// shared password, so both sides of a request can still be tested. Only fills in accounts that
+// have no password yet - a demo password someone has since changed is left alone.
+const val DEMO_ACCOUNT_PASSWORD = "rideshare123"
+private val DEMO_USER_IDS = listOf("fake-user-001", "demo-driver-001", "demo-driver-002", "demo-passenger-002")
+
+private fun setDemoPasswords() {
+    DEMO_USER_IDS.forEach { id ->
+        Users.update({ (Users.userId eq id) and Users.passwordHash.isNull() }) {
+            it[passwordHash] = hashPassword(DEMO_ACCOUNT_PASSWORD)
+        }
     }
 }
 
 private const val DAY_MS = 24 * 60 * 60 * 1000L
 private const val HOUR_MS = 60 * 60 * 1000L
 
-// Seeds a full test dataset built around "fake-user-001" (FakeAuthenticationProvider's fixed
-// account, so it's whoever the Android app signs in as). Since there's no way to switch accounts
-// in the trial app, fake-user-001 appears on both sides of the flow here - as a driver with an
-// incoming request to accept/reject, and as a passenger with an already-confirmed ride, a
-// message thread, and completed trip history - so every screen has real data on first launch
-// with zero manual setup. See docs/BACKEND.md.
+// Seeds a full test dataset built around "fake-user-001" (Test Student). It appears on both
+// sides of the flow - as a driver with an incoming request to accept/reject, and as a passenger
+// with an already-confirmed ride, a message thread, and completed trip history - so every screen
+// has real data on first launch with zero manual setup. The demo accounts sign in with
+// DEMO_ACCOUNT_PASSWORD (setDemoPasswords above). See docs/BACKEND.md.
 private fun seedDemoDataIfEmpty() {
     if (Users.selectAll().count() > 0) return
 

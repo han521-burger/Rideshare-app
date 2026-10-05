@@ -7,6 +7,18 @@ package com.example.ds04_monash_rideshare_application.Repository.Remote
 class FakeRideApiService : RideApiService {
     private val unavailable = UnsupportedOperationException("No backend configured - run ./gradlew :backend:run and rebuild")
 
+    override fun signUp(displayName: String, email: String, password: String, callback: RideApiService.Callback<AuthResult>) {
+        callback.onFailure(unavailable)
+    }
+
+    override fun signIn(email: String, password: String, callback: RideApiService.Callback<AuthResult>) {
+        callback.onFailure(unavailable)
+    }
+
+    override fun signOut(token: String, callback: RideApiService.Callback<Boolean>) {
+        callback.onSuccess(true)
+    }
+
     override fun fetchMyProfile(callback: RideApiService.Callback<UserAccountSummary>) {
         callback.onFailure(unavailable)
     }

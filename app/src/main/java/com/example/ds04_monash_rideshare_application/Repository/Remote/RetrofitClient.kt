@@ -9,14 +9,14 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
-// Attaches the current signed-in userId as a bearer token (see backend/Auth.kt for why the
-// token is just the userId, trial-only, until real Monash SSO is wired up).
+// Attaches the signed-in session token (from POST /auth/login or /auth/register) as a bearer
+// token - the backend resolves it to the user (backend/Auth.kt).
 private object AuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
-        val userId = AuthSession.currentUserId
-        val request = if (userId != null) {
+        val token = AuthSession.token
+        val request = if (token != null) {
             chain.request().newBuilder()
-                .addHeader("Authorization", "Bearer $userId")
+                .addHeader("Authorization", "Bearer $token")
                 .build()
         } else {
             chain.request()
