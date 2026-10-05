@@ -11,7 +11,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.NotificationsActive
-import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.Button
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedCard
@@ -69,36 +68,8 @@ fun DriverRequestNotification(
     SwipeToDismissBox(
         state = dismissState,
         modifier = modifier.fillMaxWidth(),
-        backgroundContent = {
-            Surface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(22.dp),
-                color = MaterialTheme.colorScheme.surfaceVariant
-            ) {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
-                    horizontalArrangement = when (dismissState.dismissDirection) {
-                        SwipeToDismissBoxValue.EndToStart -> Arrangement.End
-                        else -> Arrangement.Start
-                    },
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.VisibilityOff,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "Hide",
-                        modifier = Modifier.padding(horizontal = 8.dp),
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                }
-            }
-        }
+        // Nothing behind the card - it just slides away, like a phone notification.
+        backgroundContent = {}
     ) {
         DriverRequestNotificationCard(request, totalWaiting, isActionInFlight, errorMessage, onReview, onAccept, onDecline)
     }
