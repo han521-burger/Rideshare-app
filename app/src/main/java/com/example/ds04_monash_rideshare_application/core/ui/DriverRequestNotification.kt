@@ -3,7 +3,9 @@ package com.example.ds04_monash_rideshare_application.core.ui
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -27,6 +29,7 @@ import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -68,13 +71,13 @@ fun DriverRequestNotification(
     SwipeToDismissBox(
         state = dismissState,
         modifier = modifier.fillMaxWidth(),
-        // Nothing behind the card - it just slides away, like a phone notification.
         backgroundContent = {}
     ) {
         DriverRequestNotificationCard(request, totalWaiting, isActionInFlight, errorMessage, onReview, onAccept, onDecline)
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DriverRequestNotificationCard(
     request: RideRequestSummary,
@@ -85,6 +88,7 @@ private fun DriverRequestNotificationCard(
     onAccept: () -> Unit,
     onDecline: () -> Unit
 ) {
+    val largeText = LocalDensity.current.fontScale > 1.3f
     val ride = request.ride
     val routeLabel = when {
         ride != null -> "${describeLocation(ride.originLat, ride.originLng)} → ${describeLocation(ride.destinationLat, ride.destinationLng)}"
@@ -119,7 +123,7 @@ private fun DriverRequestNotificationCard(
                         modifier = Modifier.padding(9.dp)
                     )
                 }
-                Column(modifier = Modifier.padding(start = 12.dp)) {
+                Column(modifier = Modifier.weight(1f).padding(start = 12.dp)) {
                     Text(
                         text = "New passenger request",
                         style = MaterialTheme.typography.titleMedium,
@@ -131,20 +135,10 @@ private fun DriverRequestNotificationCard(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                Spacer(modifier = Modifier.weight(1f))
-                Surface(
-                    shape = RoundedCornerShape(50),
-                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
-                ) {
-                    Text(
-                        text = if (totalWaiting > 1) "$totalWaiting WAITING" else "NEW",
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                if (!largeText) WaitingRequestChip(totalWaiting)
             }
+            // The badge must not be squeezed to zero width by enlarged heading text.
+            if (largeText) WaitingRequestChip(totalWaiting)
 
             Text(
                 text = routeLabel,
@@ -180,21 +174,21 @@ private fun DriverRequestNotificationCard(
             }
 
             if (canQuickRespond) {
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     OutlinedButton(
                         onClick = onDecline,
                         enabled = !isActionInFlight,
-                        modifier = Modifier.weight(1f)
+                        modifier = (if (largeText) Modifier else Modifier.weight(1f)).heightIn(min = 48.dp)
                     ) { Text("Decline") }
                     TextButton(onClick = onReview, enabled = !isActionInFlight) { Text("Review") }
                     Button(
                         onClick = onAccept,
                         enabled = !isActionInFlight,
-                        modifier = Modifier.weight(1f)
+                        modifier = (if (largeText) Modifier else Modifier.weight(1f)).heightIn(min = 48.dp)
                     ) { Text("Accept") }
                 }
             } else {
@@ -205,5 +199,21 @@ private fun DriverRequestNotificationCard(
                 ) { Text("Review matching request") }
             }
         }
+    }
+}
+
+@Composable
+private fun WaitingRequestChip(totalWaiting: Int) {
+    Surface(
+        shape = RoundedCornerShape(50),
+        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.14f)
+    ) {
+        Text(
+            text = if (totalWaiting > 1) "$totalWaiting WAITING" else "NEW",
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.Bold
+        )
     }
 }

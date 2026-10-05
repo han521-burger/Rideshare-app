@@ -276,6 +276,10 @@ fun RideshareNavHost(
                         myRequests = viewModel.myPendingAndRecentlyExpiredRequests,
                         incomingRequests = viewModel.incomingPendingRequests,
                         openRides = viewModel.openRides,
+                        myRequestsResource = viewModel.myRequests,
+                        incomingRequestsResource = viewModel.incomingRequests,
+                        myOffersResource = viewModel.myDriverRides,
+                        onRetryOpenRides = viewModel::loadOpenRides,
                         // OPEN offers wait for their first approved passenger; confirmed rides
                         // already appear on Home and remain reachable from there.
                         myOffers = viewModel.myDriverRides.data.orEmpty().filter { it.status == RideStatus.OPEN },
