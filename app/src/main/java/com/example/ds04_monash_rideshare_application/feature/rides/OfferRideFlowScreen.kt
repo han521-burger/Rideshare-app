@@ -41,7 +41,7 @@ import com.example.ds04_monash_rideshare_application.core.ui.TimePickerField
 import com.example.ds04_monash_rideshare_application.core.ui.combineDateAndTime
 import com.example.ds04_monash_rideshare_application.core.ui.departureTooSoonMessage
 import com.example.ds04_monash_rideshare_application.core.ui.isBookableDeparture
-import com.example.ds04_monash_rideshare_application.ui.FIXED_POINTS
+import com.example.ds04_monash_rideshare_application.ui.APPROVED_POINTS
 import com.example.ds04_monash_rideshare_application.ui.NamedLocation
 import java.text.SimpleDateFormat
 import java.time.DayOfWeek
@@ -177,7 +177,7 @@ private fun RouteStep(
             val endpoints = setOf(routePickerResult.origin, routePickerResult.destination)
             PlaceSearchField(
                 label = "Add a stop",
-                places = FIXED_POINTS.filter { it !in endpoints },
+                places = APPROVED_POINTS.filter { it !in endpoints },
                 onPick = onToggleStop,
                 isPicked = { it in selectedStops },
                 modifier = Modifier.padding(top = 4.dp)

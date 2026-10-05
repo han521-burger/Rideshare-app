@@ -31,12 +31,18 @@ class ApprovedPointSearchTest {
         assertEquals(1, nearestApprovedPoints(-37.925,145.12,limit=1).size)
         assertTrue(nearestApprovedPoints(-37.925,145.12,limit=0).isEmpty())
     }
-    @Test fun campusAndDuplicateEndpointAreExcluded() {
+    @Test fun chosenCampusAndDuplicateEndpointAreExcludedButOtherCampusesStay() {
         val campus = MONASH_CAMPUSES.first()
         val alias = NamedLocation("Duplicate", Point(campus.point.latitude,campus.point.longitude))
         val result = nearestApprovedPoints(campus.point.latitude,campus.point.longitude,
             points = MONASH_CAMPUSES + FIXED_POINTS + alias, excluded = campus, limit = 100)
-        assertEquals(FIXED_POINTS.toSet(), result.map { it.location }.toSet())
+        assertEquals((FIXED_POINTS + MONASH_CAMPUSES - campus).toSet(), result.map { it.location }.toSet())
+    }
+    @Test fun anotherCampusCanBeTheOtherEnd() {
+        val clayton = MONASH_CAMPUSES.single { it.name == "Monash Clayton" }
+        val caulfield = MONASH_CAMPUSES.single { it.name == "Monash Caulfield" }
+        val result = nearestApprovedPoints(caulfield.point.latitude, caulfield.point.longitude, excluded = clayton)
+        assertSame(caulfield, result.first().location)
     }
     @Test fun emptyListAndInvalidCoordinatesAreSafe() {
         assertTrue(nearestApprovedPoints(-37.9,145.1,points=emptyList()).isEmpty())

@@ -50,6 +50,11 @@ val FIXED_POINTS = listOf(
     NamedLocation("Karingal Hub", Point(-38.1517, 145.1608))
 )
 
+// What can be picked as the other end of a trip (and as a stop): the approved points plus the
+// campuses, so a trip can also run from one Monash campus to another. The campus already chosen
+// as the trip's Monash end is excluded where it's used.
+val APPROVED_POINTS = FIXED_POINTS + MONASH_CAMPUSES
+
 // Points from before the current list (FIXED_POINTS above). No longer offered anywhere - kept
 // only so trips created at them still get a readable "Near X" label instead of raw coordinates.
 private val RETIRED_POINTS = listOf(
