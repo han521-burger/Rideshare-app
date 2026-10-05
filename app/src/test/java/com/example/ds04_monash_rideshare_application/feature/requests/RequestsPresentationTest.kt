@@ -1,8 +1,9 @@
 package com.example.ds04_monash_rideshare_application.feature.requests
 
-import com.example.ds04_monash_rideshare_application.Auth.TestIdentity
+import com.example.ds04_monash_rideshare_application.Auth.AuthSession
 import com.example.ds04_monash_rideshare_application.Repository.Remote.*
 import com.example.ds04_monash_rideshare_application.core.state.*
+import org.junit.After
 import org.junit.Assert.*
 import org.junit.Test
 
@@ -25,7 +26,14 @@ class RequestsPresentationTest {
         override fun fetchMyDriverRides(callback: RideApiService.Callback<List<RideSummary>>) { offers += callback }
         override fun fetchOpenRides(callback: RideApiService.Callback<List<RideSummary>>) { browse += callback }
         override fun fetchMyProfile(callback: RideApiService.Callback<UserAccountSummary>) { /* No unrelated lookup. */ }
+        // Signs in as user "me" so the incoming-request selector has an identity to exclude.
+        override fun signIn(email: String, password: String, callback: RideApiService.Callback<AuthResult>) {
+            val user = UserAccountSummary("me", "Me", "Me", email, null, null, true, null, null)
+            callback.onSuccess(AuthResult("token-me", user))
+        }
     }
+
+    @After fun clearSession() { AuthSession.clear() }
 
     @Test fun actualPendingSelectorKeepsRecentExpiryButBadgeDoesNot() {
         val api = Api(); val vm = RideshareViewModel(api)
@@ -41,7 +49,7 @@ class RequestsPresentationTest {
 
     @Test fun actualIncomingSelectorExcludesOwnAndNonPending() {
         val api = Api(); val vm = RideshareViewModel(api)
-        vm.signInAsTestUser(TestIdentity("me", "subject", "me@student.monash.edu", "Me", "driver"))
+        vm.signIn("me@student.monash.edu", "password", keepSignedIn = false)
         vm.loadIncomingRequests()
         api.incoming.single().onSuccess(listOf(request("own", passenger = "me"), request("standalone"),
             request("attached").copy(rideId = "ride", ride = ride("ride")), request("expired", status = RequestStatus.EXPIRED)))

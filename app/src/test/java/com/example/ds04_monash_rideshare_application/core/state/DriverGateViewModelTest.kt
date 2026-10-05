@@ -1,7 +1,6 @@
 package com.example.ds04_monash_rideshare_application.core.state
 
 import com.example.ds04_monash_rideshare_application.Auth.AuthSession
-import com.example.ds04_monash_rideshare_application.Auth.TEST_IDENTITIES
 import com.example.ds04_monash_rideshare_application.Repository.Remote.*
 import org.junit.After
 import org.junit.Assert.*
@@ -13,6 +12,11 @@ class DriverGateViewModelTest {
     private class DeferredApi : RideApiService by FakeRideApiService() {
         val vehicleLookups = mutableListOf<RideApiService.Callback<List<VehicleSummary>>>()
         override fun fetchMyVehicles(callback: RideApiService.Callback<List<VehicleSummary>>) { vehicleLookups += callback }
+        // Signs straight in as whichever account the email names (same approach as ActivityRefreshTest).
+        override fun signIn(email: String, password: String, callback: RideApiService.Callback<AuthResult>) {
+            val user = UserAccountSummary(email, email, email, email, null, null, true, null, null)
+            callback.onSuccess(AuthResult("token-$email", user))
+        }
     }
 
     private val api = DeferredApi()
@@ -20,10 +24,12 @@ class DriverGateViewModelTest {
     private val vehicle = VehicleSummary("v1", 0, "Mazda", "CX-5", null, "3AA·BB4", "PETROL", 4, "SEDAN", "White")
     private var registrationRequired = 0
     private var driverActivated = 0
+    private val accounts = listOf("first@student.monash.edu", "second@student.monash.edu")
 
-    @After fun clearSession() { AuthSession.currentUserId = null }
+    @After fun clearSession() { AuthSession.clear() }
 
-    private fun signedIn() = vm.signInAsTestUser(TEST_IDENTITIES[0])
+    private fun signInAs(index: Int) = vm.signIn(accounts[index], "password", keepSignedIn = false)
+    private fun signedIn() = signInAs(0)
     private fun chooseDriver() = vm.updateActiveMode(AppMode.DRIVER, { registrationRequired++ }, { driverActivated++ })
 
     @Test fun choosingDriverStartsOneCheckAndKeepsPassengerActive() {
@@ -114,7 +120,7 @@ class DriverGateViewModelTest {
 
     @Test fun signingOutDuringTheCheckCannotActivateDriverForTheNextUser() {
         signedIn(); chooseDriver()
-        vm.signInAsTestUser(TEST_IDENTITIES[1])
+        signInAs(1)
         api.vehicleLookups[0].onSuccess(listOf(vehicle))
         assertEquals(AppMode.PASSENGER, vm.activeMode)
         assertEquals(0, driverActivated)

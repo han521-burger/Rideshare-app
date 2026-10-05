@@ -34,6 +34,11 @@ class VehicleEntryPathsTest {
 
     private class Api : RideApiService by FakeRideApiService() {
         var vehicles: List<VehicleSummary> = emptyList()
+        // The saved ("Keep me signed in") session is validated through the profile lookup on launch.
+        override fun fetchMyProfile(callback: RideApiService.Callback<UserAccountSummary>) {
+            callback.onSuccess(UserAccountSummary("fake-user-001", "Test Student", "Test", "test.student@student.monash.edu",
+                null, null, true, null, null))
+        }
         override fun fetchMyVehicles(callback: RideApiService.Callback<List<VehicleSummary>>) { callback.onSuccess(vehicles) }
         override fun createVehicle(draft: CreateVehicleDraft, callback: RideApiService.Callback<VehicleSummary>) {
             val v = VehicleSummary("v-new", draft.year, draft.make, draft.model, draft.variant, draft.registrationMasked,
@@ -47,13 +52,15 @@ class VehicleEntryPathsTest {
     private val vm = RideshareViewModel(api)
     private val mazda = VehicleSummary("v1", 0, "Mazda", "CX-5", null, "3AA·BB4", "PETROL", 4, "SEDAN", "White")
 
-    @After fun clearSession() { AuthSession.currentUserId = null }
+    @After fun clearSession() { AuthSession.clear() }
 
+    // Signs in through the supported saved-session route: a remembered session makes Splash validate it
+    // (profile lookup) and go straight to Home, the same path a "Keep me signed in" user takes.
     private fun launch(initial: List<VehicleSummary>) {
         api.vehicles = initial
+        AuthSession.init(androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext)
+        AuthSession.start("test-token", "fake-user-001", remember = true)
         compose.setContent { Ds04_monash_rideshare_applicationTheme { RideshareNavHost(vm) } }
-        waitForText("Test Student")
-        compose.onNodeWithText("Test Student").performScrollTo().performClick()
         waitForText("Activity")
     }
 
