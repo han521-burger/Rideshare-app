@@ -17,6 +17,7 @@ class NotFoundException(message: String = "Not found") : ApiException(message)
 class ForbiddenException(message: String = "You don't have permission to do that") : ApiException(message)
 class UnauthorizedException(message: String = "Sign-in required") : ApiException(message)
 class ValidationException(message: String) : ApiException(message)
+class TooManyRequestsException(message: String) : ApiException(message)
 // code lets the app react to a specific conflict (e.g. offer "cancel my own request and accept")
 // instead of only showing the message.
 class ConflictException(message: String, val code: String? = null) : ApiException(message)
@@ -36,6 +37,9 @@ fun Application.installErrorHandling() {
         }
         exception<ValidationException> { call, cause ->
             call.respond(HttpStatusCode.BadRequest, ErrorResponse(cause.message ?: "Invalid request"))
+        }
+        exception<TooManyRequestsException> { call, cause ->
+            call.respond(HttpStatusCode.TooManyRequests, ErrorResponse(cause.message ?: "Too many attempts"))
         }
         exception<ConflictException> { call, cause ->
             call.respond(HttpStatusCode.Conflict, ErrorResponse(cause.message ?: "Conflict", cause.code))

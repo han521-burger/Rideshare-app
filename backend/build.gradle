@@ -46,6 +46,17 @@ application {
     mainClass = 'com.example.ds04_monash_rideshare_application.backend.ApplicationKt'
 }
 
+// Forgotten-password reset for whoever runs the backend (no email sending yet):
+//   ./gradlew :backend:resetPassword --args="someone@student.monash.edu"
+tasks.register('resetPassword', JavaExec) {
+    group = 'application'
+    description = 'Sets a temporary password for an account and prints it.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.example.ds04_monash_rideshare_application.backend.ResetPasswordToolKt'
+    // Same working directory as :backend:run, so it opens the same rideshare-backend.db.
+    workingDir = projectDir
+}
+
 test {
     useJUnitPlatform()
     // Lets tests call as a seeded user by sending its userId as the bearer token (see Auth.kt).

@@ -132,6 +132,32 @@ fun findTripConflicts(
     return TripConflicts(null, pending)
 }
 
+// Cancels one PENDING or ACCEPTED request (must be called inside a transaction). An accepted seat
+// goes back to its ride, and a CONFIRMED ride with nobody left accepted reopens. Cancelling a
+// pending request never changes capacity.
+fun cancelRequest(request: ResultRow, at: Long) {
+    val wasAccepted = request[RideRequests.status] == RideRequestStatus.ACCEPTED
+    val rideId = request[RideRequests.rideId]
+    val ride = rideId?.let { rid -> Rides.selectAll().where { Rides.rideId eq rid }.firstOrNull() }
+    if (wasAccepted && rideId != null && ride != null) {
+        Rides.update({ Rides.rideId eq rideId }) {
+            it[seatsAvailable] = ride[Rides.seatsAvailable] + request[RideRequests.seatsRequested]
+        }
+    }
+    markRequest(request[RideRequests.requestId], RideRequestStatus.CANCELLED, at)
+    // Counted after cancelling this request. Pending/history rows do not keep an empty ride confirmed.
+    if (wasAccepted && rideId != null && ride?.get(Rides.status) == RideStatus.CONFIRMED) {
+        val acceptedRemaining = RideRequests.selectAll().where {
+            (RideRequests.rideId eq rideId) and (RideRequests.status eq RideRequestStatus.ACCEPTED)
+        }.count()
+        if (acceptedRemaining == 0L) {
+            Rides.update({ (Rides.rideId eq rideId) and (Rides.status eq RideStatus.CONFIRMED) }) {
+                it[status] = RideStatus.OPEN
+            }
+        }
+    }
+}
+
 fun cancelRequests(requestIds: List<String>, at: Long) {
     requestIds.forEach { markRequest(it, RideRequestStatus.CANCELLED, at) }
 }

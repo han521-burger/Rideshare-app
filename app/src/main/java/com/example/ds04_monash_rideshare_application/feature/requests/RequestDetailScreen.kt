@@ -60,7 +60,6 @@ fun RequestDetailScreen(
 
         val isPassenger = request.passengerId == currentUserId
         val isStandalone = request.rideId == null
-        val isOwningDriver = !isStandalone && request.ride?.driverId == currentUserId
 
         Column(modifier = Modifier.padding(contentPadding).padding(16.dp).fillMaxSize()) {
             Card(modifier = Modifier.fillMaxWidth()) {
@@ -128,7 +127,9 @@ fun RequestDetailScreen(
                             modifier = Modifier.weight(1f)
                         ) { Text("Accept") }
                     }
-                    if (isOwningDriver) {
+                    // On an open ask (no ride yet) Decline only hides it from this driver; it stays
+                    // open for others (backend PUT /requests/{id} REJECTED).
+                    if (!isPassenger) {
                         OutlinedButton(onClick = onDecline, enabled = !isActionInFlight, modifier = Modifier.weight(1f)) { Text("Decline") }
                     }
                     if (isPassenger) {

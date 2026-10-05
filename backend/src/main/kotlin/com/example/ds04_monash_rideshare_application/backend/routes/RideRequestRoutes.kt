@@ -3,6 +3,7 @@ package com.example.ds04_monash_rideshare_application.backend.routes
 import com.example.ds04_monash_rideshare_application.backend.CONFLICT_OWN_PENDING_REQUEST
 import com.example.ds04_monash_rideshare_application.backend.ConflictException
 import com.example.ds04_monash_rideshare_application.backend.RideStops
+import com.example.ds04_monash_rideshare_application.backend.cancelRequest
 import com.example.ds04_monash_rideshare_application.backend.cancelRequests
 import com.example.ds04_monash_rideshare_application.backend.estimatedTripWindow
 import com.example.ds04_monash_rideshare_application.backend.findTripConflicts
@@ -11,6 +12,7 @@ import com.example.ds04_monash_rideshare_application.backend.requestWindow
 import com.example.ds04_monash_rideshare_application.backend.rideWindow
 import com.example.ds04_monash_rideshare_application.backend.CreateRideRequestBody
 import com.example.ds04_monash_rideshare_application.backend.CreateStandaloneRequestBody
+import com.example.ds04_monash_rideshare_application.backend.DeclinedRequests
 import com.example.ds04_monash_rideshare_application.backend.ForbiddenException
 import com.example.ds04_monash_rideshare_application.backend.NotFoundException
 import com.example.ds04_monash_rideshare_application.backend.RideRequestStatus
@@ -215,12 +217,16 @@ fun Route.rideRequestRoutes() {
                 rid != null && ownRideDtos.containsKey(rid) && (rideIdFilter == null || rid == rideIdFilter)
             }
             val standaloneRows = if (rideIdFilter != null) emptyList() else {
+                val declinedByMe = DeclinedRequests.selectAll().where { DeclinedRequests.driverId eq driverId }
+                    .map { it[DeclinedRequests.requestId] }.toSet()
                 RideRequests.selectAll()
                     .where { RideRequests.status eq RideRequestStatus.PENDING }
                     // Your own standalone ask isn't something for you to accept as a driver - it
                     // already shows under "My requests" on your own passenger side. Without this,
                     // a request you post to yourself (any account can be both) shows up twice.
                     .filter { it[RideRequests.rideId] == null && it[RideRequests.passengerId] != driverId }
+                    // Asks this driver said "not for me" to (PUT ... REJECTED on an open ask).
+                    .filter { it[RideRequests.requestId] !in declinedByMe }
             }
 
             val allRows = attachedRows + standaloneRows
@@ -419,6 +425,22 @@ fun Route.rideRequestRoutes() {
                     }
                 }
                 RideRequestStatus.REJECTED -> {
+                    // An open ask has no driver yet, so one driver declining can't reject it for
+                    // everyone - it's just hidden from that driver's inbox and stays PENDING.
+                    if (existingRideId == null) {
+                        if (isPassenger) throw ForbiddenException("Cancel your own request instead")
+                        val alreadyDeclined = DeclinedRequests.selectAll().where {
+                            (DeclinedRequests.driverId eq userId) and (DeclinedRequests.requestId eq requestId)
+                        }.count() > 0
+                        if (!alreadyDeclined) {
+                            DeclinedRequests.insert {
+                                it[driverId] = userId
+                                it[DeclinedRequests.requestId] = requestId
+                                it[createdAt] = System.currentTimeMillis()
+                            }
+                        }
+                        return@transaction
+                    }
                     if (!isOwningDriver) throw ForbiddenException("Only the ride's driver can reject a request")
                     val rejectedAt = System.currentTimeMillis()
                     RideRequests.update({ RideRequests.requestId eq requestId }) {
@@ -429,33 +451,8 @@ fun Route.rideRequestRoutes() {
                 }
                 RideRequestStatus.CANCELLED -> {
                     if (!isPassenger && !isOwningDriver) throw ForbiddenException("Not your request")
-                    // An accepted seat is returned on cancellation so another request can be
-                    // approved. Cancelling a still-pending request never changes capacity.
-                    if (currentStatus == RideRequestStatus.ACCEPTED && existingRideId != null) {
-                        val freshRide = Rides.selectAll().where { Rides.rideId eq existingRideId }.first()
-                        Rides.update({ Rides.rideId eq existingRideId }) {
-                            it[seatsAvailable] = freshRide[Rides.seatsAvailable] + request[RideRequests.seatsRequested]
-                        }
-                    }
-                    RideRequests.update({ RideRequests.requestId eq requestId }) {
-                        it[status] = newStatus
-                        it[respondedAt] = System.currentTimeMillis()
-                    }
-                    // Count after cancelling this request, in the same transaction as seat
-                    // restoration. Pending/history rows do not keep an empty ride confirmed.
-                    if (currentStatus == RideRequestStatus.ACCEPTED && existingRideId != null &&
-                        existingRide?.get(Rides.status) == RideStatus.CONFIRMED
-                    ) {
-                        val acceptedRemaining = RideRequests.selectAll().where {
-                            (RideRequests.rideId eq existingRideId) and
-                                (RideRequests.status eq RideRequestStatus.ACCEPTED)
-                        }.count()
-                        if (acceptedRemaining == 0L) {
-                            Rides.update({ (Rides.rideId eq existingRideId) and (Rides.status eq RideStatus.CONFIRMED) }) {
-                                it[status] = RideStatus.OPEN
-                            }
-                        }
-                    }
+                    // Returns an accepted seat and reopens an emptied ride (Lifecycle.kt).
+                    cancelRequest(request, System.currentTimeMillis())
                 }
                 RideRequestStatus.COMPLETED -> {
                     if (!isPassenger && !isOwningDriver) throw ForbiddenException("Not your request")

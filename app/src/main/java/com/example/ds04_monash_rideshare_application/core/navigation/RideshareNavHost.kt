@@ -332,6 +332,13 @@ fun RideshareNavHost(
                         vehicle = viewModel.vehicles.data.orEmpty().firstOrNull(),
                         onOpenVehicles = { navigate(AppDestination.Vehicles) },
                         onSignOut = ::returnToLogin,
+                        onChangePassword = viewModel::changePassword,
+                        onDeleteAccount = { password, onDone ->
+                            viewModel.deleteAccount(password) { error ->
+                                onDone(error)
+                                if (error == null) replaceStack(AppDestination.Login)
+                            }
+                        },
                         activeMode = viewModel.activeMode,
                         // The scaffold already reserves the bottom bar; without this, imePadding inside the screen
                         // would add the bar height again and leave a blank band above the keyboard.

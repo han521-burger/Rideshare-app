@@ -258,6 +258,14 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         api.logout("Bearer $token").dispatch(callback) { true }
     }
 
+    override fun changePassword(currentPassword: String, newPassword: String, callback: RideApiService.Callback<Boolean>) {
+        api.changePassword(ChangePasswordRequestBody(currentPassword, newPassword)).dispatch(callback) { true }
+    }
+
+    override fun deleteAccount(password: String, callback: RideApiService.Callback<Boolean>) {
+        api.deleteAccount(DeleteAccountRequestBody(password)).dispatch(callback) { true }
+    }
+
     private fun toAuthResult(dto: AuthResponseDto) = AuthResult(dto.token, toUserAccountSummary(dto.user))
 
     private fun toUserAccountSummary(dto: UserDto) = UserAccountSummary(

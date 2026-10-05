@@ -19,6 +19,14 @@ class FakeRideApiService : RideApiService {
         callback.onSuccess(true)
     }
 
+    override fun changePassword(currentPassword: String, newPassword: String, callback: RideApiService.Callback<Boolean>) {
+        callback.onFailure(unavailable)
+    }
+
+    override fun deleteAccount(password: String, callback: RideApiService.Callback<Boolean>) {
+        callback.onFailure(unavailable)
+    }
+
     override fun fetchMyProfile(callback: RideApiService.Callback<UserAccountSummary>) {
         callback.onFailure(unavailable)
     }

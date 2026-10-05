@@ -367,3 +367,10 @@ data class LoginRequest(val email: String, val password: String)
 // the signed-in user's own profile.
 @Serializable
 data class AuthResponse(val token: String, val user: UserDto)
+
+@Serializable
+data class ChangePasswordRequest(val currentPassword: String, val newPassword: String)
+
+// Deleting an account asks for the password again, so a phone left signed in can't be used to do it.
+@Serializable
+data class DeleteAccountRequest(val password: String)

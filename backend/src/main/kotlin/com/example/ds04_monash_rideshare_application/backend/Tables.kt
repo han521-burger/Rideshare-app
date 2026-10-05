@@ -169,6 +169,16 @@ object RideRequests : Table("ride_requests") {
     override val primaryKey = PrimaryKey(requestId)
 }
 
+// A driver saying "not for me" to an open standalone ask (no ride attached yet). The ask stays
+// PENDING for every other driver; it just stops showing in this driver's inbox.
+object DeclinedRequests : Table("declined_requests") {
+    val driverId = varchar("driver_id", 64).references(Users.userId)
+    val requestId = varchar("request_id", 64).references(RideRequests.requestId)
+    val createdAt = long("created_at")
+
+    override val primaryKey = PrimaryKey(driverId, requestId)
+}
+
 object Messages : Table("messages") {
     val messageId = varchar("message_id", 64)
     // Conversations are keyed directly by ride - one thread per ride, matching item 7's

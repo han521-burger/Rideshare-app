@@ -33,12 +33,29 @@ Instead, accounts use a Monash email + password:
 - `POST /auth/register` `{displayName, email, password}` - Monash emails only, password 8+ chars.
 - `POST /auth/login` `{email, password}` - both return `{token, user}`.
 - `POST /auth/logout` - ends the session for the token sent.
+- `POST /auth/change-password` `{currentPassword, newPassword}` - signs out every other device.
+- `POST /auth/delete-account` `{password}` - cancels the person's upcoming rides/requests (seats
+  go back to others), wipes their name/email/phone/plate so past trips show "Deleted user", ends
+  all sessions and frees the email (`AccountAdmin.kt`).
+
+**Wrong passwords:** 5 wrong attempts for one email within 15 minutes lock that email for 15
+minutes (429, "try again in N minutes") - `LoginThrottle.kt`, in memory, cleared on restart.
+
+**Forgotten password** (no email sending yet): whoever runs the backend resets it from a terminal,
+which works while the server is running:
+
+```
+./gradlew :backend:resetPassword --args="someone@student.monash.edu"
+```
+
+It prints a 12-character temporary password and signs that account out everywhere; pass it on and
+ask them to change it.
 
 Passwords are stored as PBKDF2 hashes (`Passwords.kt`). Every other request must send
 `Authorization: Bearer <token>`; `Auth.kt`'s `requireUserId()` resolves it via the `sessions`
 table (30-day expiry). Backend tests may send a userId as the token instead - only because the
 test task sets `rideshare.test.trustUserIdTokens`. Still missing before any real deployment:
-HTTPS, email verification, password reset and login rate limiting. Swap this for real OIDC/JWT
+HTTPS and email verification (self-service password reset needs email too). Swap this for real OIDC/JWT
 verification once Monash SSO access is granted.
 
 ## Endpoints
@@ -46,7 +63,8 @@ verification once Monash SSO access is granted.
 Everything except `/health` and `/auth/*` needs `Authorization: Bearer <token>`.
 
 - `GET /health` -> `"API online"`
-- `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`
+- `POST /auth/register`, `POST /auth/login`, `POST /auth/logout`, `POST /auth/change-password`,
+  `POST /auth/delete-account`
 - `GET/PUT /users/me`, `GET /users/{id}/rides` (self only)
 - `GET /vehicles/mine`, `POST /vehicles`, `PUT/DELETE /vehicles/{id}` (one vehicle per account)
 - `GET /rides` (filter: `date`, `originLat/Lng`, `destinationLat/Lng`, `radiusMeters`, `availableOnly`)
@@ -91,6 +109,9 @@ Everything except `/health` and `/auth/*` needs `Authorization: Bearer <token>`.
    `PENDING`, the seat is returned, a ride created just for that accept is removed, and anything
    the accept auto-cancelled is restored.
 5. A passenger can cancel a pending request. Cancelling an accepted request returns its seats.
+6. Declining (`REJECTED`) a request on your own ride rejects it. Declining an open ask (no ride
+   yet) only hides it from your inbox (`declined_requests` table) - it stays `PENDING` for other
+   drivers.
 
 ## Expiry and auto-completion (FR-05)
 
@@ -128,6 +149,7 @@ auto-books.
   decision the team hasn't made yet. Android debug builds allow plain HTTP to any address
   (`app/src/debug/res/xml/network_security_config.xml`) so testing over LAN/Tailscale works;
   release builds only allow the emulator/localhost addresses.
-- No login rate limiting, email verification or password reset yet.
+- No email verification or self-service password reset (admin reset command only). The login
+  lockout is in memory, so restarting the backend clears it.
 - Expiry runs on every request rather than on a schedule - fine at trial scale, but a hosted
   version should move it to a scheduled job.

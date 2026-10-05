@@ -31,7 +31,8 @@ Boxes above are left for the sprint review to tick; this is what the code curren
 | Server-side validation on writes | **Mostly** - seats, Monash-only emails, password length, campus endpoint, 30-min booking lead, overlapping trips, vehicle fields are validated server-side. Not every free-text field has a length limit. |
 | Errors don't reveal internals | **Met** - `Errors.kt` maps unknown failures to a generic 500 message. |
 | Logs never contain tokens/passwords | **Likely met, not yet verified by grepping logs** - backend logs the path on unhandled errors only; the app's debug HTTP log is `BASIC` (method + URL, no headers or bodies). |
-| Passwords | Stored as PBKDF2-HMAC-SHA256 hashes (210k iterations, random salt). Wrong email and wrong password give the same error. **Missing:** login rate limiting / lockout, password reset, email verification. |
+| Passwords | Stored as PBKDF2-HMAC-SHA256 hashes (210k iterations, random salt). Wrong email and wrong password give the same error. 5 wrong attempts lock an email for 15 minutes (unknown emails too, so lockouts don't reveal accounts). Changing a password signs out other devices; admin reset signs out everywhere. **Missing:** email verification, self-service reset. Lockout state is in memory (cleared on restart). |
+| Account deletion / data minimisation | `POST /auth/delete-account` (password required) cancels upcoming trips and wipes name, email, phone, emergency contact and vehicle plate; past trips show "Deleted user". Message text the person sent is kept for the other participants. |
 
 ## Additional items from the SAML/auth architecture guide
 

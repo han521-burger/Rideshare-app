@@ -12,6 +12,8 @@ interface RideApiService {
     fun signUp(displayName: String, email: String, password: String, callback: Callback<AuthResult>)
     fun signIn(email: String, password: String, callback: Callback<AuthResult>)
     fun signOut(token: String, callback: Callback<Boolean>)
+    fun changePassword(currentPassword: String, newPassword: String, callback: Callback<Boolean>)
+    fun deleteAccount(password: String, callback: Callback<Boolean>)
 
     fun fetchMyProfile(callback: Callback<UserAccountSummary>)
     fun updateProfile(

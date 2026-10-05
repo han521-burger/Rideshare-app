@@ -288,11 +288,38 @@ class RideshareViewModel(
                 override fun onFailure(error: Exception) = Unit
             })
         }
+        clearLocalSession()
+        onComplete()
+    }
+
+    private fun clearLocalSession() {
         AuthSession.clear()
         uiState = RideshareUiState()
         cancelDriverRegistration()
         clearUserData()
-        onComplete()
+    }
+
+    // onDone(null) on success, otherwise the message to show. The server signs out every other
+    // device; this one stays signed in.
+    fun changePassword(currentPassword: String, newPassword: String, onDone: (String?) -> Unit) {
+        apiService.changePassword(currentPassword, newPassword, object : RideApiService.Callback<Boolean> {
+            override fun onSuccess(result: Boolean) = onDone(null)
+            override fun onFailure(error: Exception) =
+                onDone(error.message ?: "Couldn't change your password. Please try again.")
+        })
+    }
+
+    // On success the account no longer exists, so this device is signed out too.
+    fun deleteAccount(password: String, onDone: (String?) -> Unit) {
+        apiService.deleteAccount(password, object : RideApiService.Callback<Boolean> {
+            override fun onSuccess(result: Boolean) {
+                clearLocalSession()
+                onDone(null)
+            }
+
+            override fun onFailure(error: Exception) =
+                onDone(error.message ?: "Couldn't delete your account. Please try again.")
+        })
     }
 
     fun loadProfile() {

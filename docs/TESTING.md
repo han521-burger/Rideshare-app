@@ -33,7 +33,7 @@ tests covering both the valid and invalid paths.
 
 Run everything with `./gradlew :backend:test :app:testDebugUnitTest` (JVM, no emulator) and
 `./gradlew :app:connectedDebugAndroidTest` (needs a running emulator/device). At last run:
-103 backend tests and 111 app unit tests, all passing.
+111 backend tests and 114 app unit tests, all passing.
 
 **Backend (`backend/src/test/...`)** — each test boots the real Ktor app on a temporary SQLite
 file. The Gradle test task sets `rideshare.test.trustUserIdTokens`, letting tests call as a
@@ -42,6 +42,8 @@ seeded user by sending its userId as the token; `AuthTest` switches that off to 
 | Suite | Covers |
 |---|---|
 | `AuthTest` | Sign up → token works → sign out → token rejected → sign in again; Monash-only emails, 8+ char passwords, duplicate emails; same error for wrong password and unknown email; bare userIds rejected; demo password works; passwords stored hashed |
+| `AccountSecurityTest` | 5-wrong-password lockout and its 15-minute expiry, success clearing attempts, unknown emails locking too; change password keeping this device and signing out others; admin reset; deleting a driver (rides + bookings cancelled, details wiped, email reusable) and a passenger (seat returned) |
+| `DeclineRequestTest` | Declining an open ask hides it for that driver only (still PENDING, others can accept, passenger can't decline their own); declining on your own ride still rejects |
 | `RideRequestApprovalTest` | Request stays PENDING, capacity unchanged until the owning driver accepts; other drivers get 403; rejection keeps capacity |
 | `RequestCancellationTest`, `RideCancellationPropagationTest` | Cancelling requests/rides, seat restoration, who may cancel, what cascades |
 | `RideCompletionLifecycleTest` | Completing rides and requests, allowed transitions, ownership |
@@ -52,7 +54,8 @@ seeded user by sending its userId as the token; `AuthTest` switches that off to 
 | `AnalyticsRoutesTest`, `AnalyticsCorrectnessTest` | Dashboard/analytics numbers |
 
 **App unit tests (`app/src/test/...`)** — presentation logic and ViewModel state:
-`LoginValidationTest` (sign-in/create-account form rules), `FindRideSearchTest` (search form
+`LoginValidationTest` (sign-in/create-account form rules), `AccountSecurityTest` (change-password
+form rules; deleting the account signs the device out, a failed delete doesn't), `FindRideSearchTest` (search form
 rules), `ApprovedPointSearchTest` + `PlaceSearchFieldTest` (approved points, campus-to-campus,
 type-to-search), `ActivityRefreshTest` (switching accounts never shows the previous account's
 data), `DriverAccessStateTest` / `DriverGateViewModelTest` (Driver mode needs a vehicle),

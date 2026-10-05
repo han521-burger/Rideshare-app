@@ -78,7 +78,9 @@ Home/Activity/Profile design.
 - Real Monash SSO remains blocked on institutional access; email + password accounts stand in.
 - HTTPS/hosted deployment is not done - the backend runs on a developer's machine. Session tokens
   are real now, but without HTTPS they travel in plain text outside Tailscale.
-- No login rate limiting, email verification or password reset yet.
+- Login lockout (5 wrong passwords → 15 min) is in; change password and delete account are on
+  Profile's Security card; forgotten passwords use an admin reset command.
+  No email verification or self-service reset (needs email sending).
 - The current app has no Room/offline cache; the RTM documents this deliberate trial limitation.
 - Allocate+ integration and push notifications remain deferred.
 

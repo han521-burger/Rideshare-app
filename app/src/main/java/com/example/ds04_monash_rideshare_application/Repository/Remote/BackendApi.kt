@@ -22,6 +22,12 @@ interface BackendApi {
 
     // Token passed explicitly: the app clears its in-memory session right away on sign-out,
     // so the interceptor may no longer have it by the time this request goes out.
+    @POST("auth/change-password")
+    fun changePassword(@Body body: ChangePasswordRequestBody): Call<Map<String, Boolean>>
+
+    @POST("auth/delete-account")
+    fun deleteAccount(@Body body: DeleteAccountRequestBody): Call<Map<String, Boolean>>
+
     @POST("auth/logout")
     fun logout(@Header("Authorization") authorization: String): Call<Map<String, Boolean>>
 

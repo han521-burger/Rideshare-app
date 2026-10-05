@@ -93,7 +93,10 @@ fun ProfileScreen(
     onOpenVehicles: () -> Unit,
     onSignOut: () -> Unit,
     modifier: Modifier = Modifier,
-    activeMode: AppMode = AppMode.PASSENGER
+    activeMode: AppMode = AppMode.PASSENGER,
+    // Each reports null on success or an error message (AccountSecurity.kt).
+    onChangePassword: (current: String, new: String, onDone: (String?) -> Unit) -> Unit = { _, _, _ -> },
+    onDeleteAccount: (password: String, onDone: (String?) -> Unit) -> Unit = { _, _ -> }
 ) {
     var displayName by remember { mutableStateOf(uiState.displayName) }
     var preferredName by remember { mutableStateOf(uiState.preferredName) }
@@ -250,6 +253,10 @@ fun ProfileScreen(
             items(favoriteList, key = { it.driverId }) { favorite ->
                 FavoriteDriverRow(favorite) { onRemoveFavorite(favorite.driverId) }
             }
+        }
+
+        item {
+            AccountSecurityCard(onChangePassword, onDeleteAccount, Modifier.padding(top = 8.dp))
         }
 
         item {

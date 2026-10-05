@@ -22,7 +22,7 @@ fun initDatabase(jdbcUrl: String = "jdbc:sqlite:./rideshare-backend.db") {
         // createMissingTablesAndColumns (not create) so a local dev DB from before a schema
         // change - a new nullable/defaulted column, a new table - gets migrated in place via
         // ALTER TABLE instead of silently keeping the old shape and erroring at query time.
-        SchemaUtils.createMissingTablesAndColumns(Users, Sessions, Vehicles, Rides, RideStops, RideRequests, Messages, Ratings, FavoriteDrivers)
+        SchemaUtils.createMissingTablesAndColumns(Users, Sessions, Vehicles, Rides, RideStops, RideRequests, DeclinedRequests, Messages, Ratings, FavoriteDrivers)
         seedDemoDataIfEmpty()
         setDemoPasswords()
     }

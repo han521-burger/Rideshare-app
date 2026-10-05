@@ -14,6 +14,7 @@ import com.example.ds04_monash_rideshare_application.backend.RideStatus
 import com.example.ds04_monash_rideshare_application.backend.Rides
 import com.example.ds04_monash_rideshare_application.backend.RouteFrequencyDto
 import com.example.ds04_monash_rideshare_application.backend.Users
+import com.example.ds04_monash_rideshare_application.backend.ACCOUNT_STATUS_DELETED
 import com.example.ds04_monash_rideshare_application.backend.Vehicles
 import com.example.ds04_monash_rideshare_application.backend.nearestNamedPointLabel
 import com.example.ds04_monash_rideshare_application.backend.requireUserId
@@ -98,7 +99,10 @@ fun Route.dashboardRoutes() {
         val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 100) ?: 10
 
         val response = transaction {
-            val allUserIds = Users.selectAll().map { it[Users.userId] }
+            // Deleted accounts (AccountAdmin.kt) drop off the leaderboard.
+            val allUserIds = Users.selectAll()
+                .filter { it[Users.accountStatus] != ACCOUNT_STATUS_DELETED }
+                .map { it[Users.userId] }
             val ranked = allUserIds
                 .map { id -> id to completedTripsDrivenBy(id).sumOf { Emissions.co2AvoidedKgForTrip(it.distanceMeters, it.fuelType, it.seatsFilled) } }
                 .filter { (_, co2) -> co2 > 0.0 }

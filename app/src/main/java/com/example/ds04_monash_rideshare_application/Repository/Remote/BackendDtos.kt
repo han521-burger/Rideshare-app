@@ -281,3 +281,7 @@ data class RegisterRequestBody(val displayName: String, val email: String, val p
 data class LoginRequestBody(val email: String, val password: String)
 
 data class AuthResponseDto(val token: String, val user: UserDto)
+
+data class ChangePasswordRequestBody(val currentPassword: String, val newPassword: String)
+
+data class DeleteAccountRequestBody(val password: String)
