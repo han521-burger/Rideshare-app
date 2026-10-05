@@ -225,7 +225,7 @@ fun RideshareNavHost(
 
     if (currentDestination in AppDestination.tabDestinations) {
         val pendingDriverRequests = viewModel.incomingPendingRequests
-        val newestDriverRequest = pendingDriverRequests.maxByOrNull { it.createdAt }
+        val newestDriverRequest = viewModel.driverBannerRequest
         BottomNavScaffold(
             activeMode = viewModel.activeMode,
             onModeChange = { mode ->
@@ -251,6 +251,7 @@ fun RideshareNavHost(
             onAcceptDriverRequest = { requestId ->
                 viewModel.respondToRequest(requestId, RequestStatus.ACCEPTED)
             },
+            onDismissDriverRequest = viewModel::dismissDriverBanner,
             onDeclineDriverRequest = { requestId ->
                 viewModel.respondToRequest(requestId, RequestStatus.REJECTED)
             },

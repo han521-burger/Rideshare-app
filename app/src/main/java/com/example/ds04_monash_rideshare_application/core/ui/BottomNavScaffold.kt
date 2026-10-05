@@ -44,7 +44,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -88,6 +87,8 @@ fun BottomNavScaffold(
     greetingName: String,
     driverChecking: Boolean = false,
     modifier: Modifier = Modifier,
+    // Swiping the banner away (kept last so existing positional callers still line up).
+    onDismissDriverRequest: (String) -> Unit = {},
     content: @Composable (androidx.compose.foundation.layout.PaddingValues) -> Unit
 ) {
     val usesBrandShell = currentTab == AppDestination.Activity || currentTab == AppDestination.Home ||
@@ -102,11 +103,9 @@ fun BottomNavScaffold(
     var bannerHeight by remember { mutableStateOf(0.dp) }
     var bottomBarHeight by remember { mutableStateOf(0.dp) }
     var displayedRequest by remember { mutableStateOf(driverRequest) }
-    // Swiping a banner away hides it for good (like a real notification) - it stays dismissed
-    // across mode switches and app restarts, tracked by id rather than just "the last one swiped"
-    // so dismissing a second request doesn't un-hide the first. The request itself stays PENDING;
-    // only a genuinely different (or later re-opened) request id shows a banner again.
-    var dismissedRequestIds by rememberSaveable { mutableStateOf(setOf<String>()) }
+    // Swiping a banner away hides it for good, like a real notification: the caller remembers the
+    // dismissed id (RideshareViewModel.dismissDriverBanner) and stops passing that request in.
+    // The request itself stays PENDING in the Requests tab.
 
     LaunchedEffect(driverRequest) {
         if (driverRequest != null) displayedRequest = driverRequest
@@ -191,8 +190,7 @@ fun BottomNavScaffold(
             )
 
             AnimatedVisibility(
-                visible = activeMode == AppMode.DRIVER && driverRequest != null &&
-                    driverRequest.requestId !in dismissedRequestIds,
+                visible = activeMode == AppMode.DRIVER && driverRequest != null,
                 enter = fadeIn(tween(350)) + slideInVertically(tween(350)) { -it / 2 },
                 exit = fadeOut(tween(220)) + slideOutVertically(tween(220)) { -it / 3 },
                 modifier = Modifier
@@ -218,7 +216,7 @@ fun BottomNavScaffold(
                         onReview = { onReviewDriverRequest(request.requestId) },
                         onAccept = { onAcceptDriverRequest(request.requestId) },
                         onDecline = { onDeclineDriverRequest(request.requestId) },
-                        onSwipeDismiss = { dismissedRequestIds = dismissedRequestIds + request.requestId }
+                        onSwipeDismiss = { onDismissDriverRequest(request.requestId) }
                     )
                 }
             }

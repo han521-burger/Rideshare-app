@@ -159,6 +159,22 @@ class RideshareViewModel(
             it.status == RequestStatus.PENDING && it.passengerId != uiState.userId
         }
 
+    // Request ids whose driver banner this account swiped away. Kept here (not in the tab shell,
+    // which is rebuilt whenever you open a ride or request) and saved per account, so a dismissed
+    // banner stays gone after navigating or restarting. The requests stay in the Requests tab.
+    var dismissedBannerRequestIds by mutableStateOf<Set<String>>(emptySet())
+        private set
+
+    // The request the driver banner should show: the newest pending one not swiped away.
+    val driverBannerRequest: RideRequestSummary?
+        get() = incomingPendingRequests.filter { it.requestId !in dismissedBannerRequestIds }.maxByOrNull { it.createdAt }
+
+    fun dismissDriverBanner(requestId: String) {
+        val userId = uiState.userId ?: return
+        dismissedBannerRequestIds = dismissedBannerRequestIds + requestId
+        BannerDismissals.save(userId, dismissedBannerRequestIds)
+    }
+
     fun updateActiveMode(mode: AppMode, onRegistrationRequired: () -> Unit = {}, onDriverActivated: () -> Unit = {}) {
         if (mode == AppMode.PASSENGER) { cancelDriverRegistration(); return }
         if (driverAccess.checking) return
@@ -247,6 +263,7 @@ class RideshareViewModel(
         // Signing in as a different account must not carry over the previous account's
         // requests - otherwise its incoming-request banner shows up for the new user.
         if (uiState.userId != user.userId) clearUserData()
+        dismissedBannerRequestIds = BannerDismissals.load(user.userId)
         vehicleVersion++
         vehicles = Resource()
         uiState = uiState.copy(
@@ -274,7 +291,7 @@ class RideshareViewModel(
         dashboard = Resource(); analytics = Resource(); leaderboard = Resource(); ratings = Resource(); favorites = Resource()
         vehicles = Resource()
         selectedRideId = null; selectedRequestId = null; requestActionError = null
-        acceptConflict = null; undoableAcceptRequestId = null
+        acceptConflict = null; undoableAcceptRequestId = null; dismissedBannerRequestIds = emptySet()
         actionInFlight = false; incomingRequestRefresh = RequestRefreshGate(); lastCreatedRide = null
         rideDetailsVersion++; myRequestsVersion++; driverRidesVersion++
     }
@@ -540,6 +557,18 @@ class RideshareViewModel(
         })
     }
 
+    // Keeps the saved dismissal list from growing forever: once a request is no longer pending
+    // (accepted, expired, cancelled...) its banner can't come back anyway.
+    private fun forgetDismissalsNoLongerPending() {
+        val userId = uiState.userId ?: return
+        val pendingIds = incomingPendingRequests.map { it.requestId }.toSet()
+        val kept = dismissedBannerRequestIds.filter { it in pendingIds }.toSet()
+        if (kept != dismissedBannerRequestIds) {
+            dismissedBannerRequestIds = kept
+            BannerDismissals.save(userId, kept)
+        }
+    }
+
     fun loadIncomingRequests(showLoading: Boolean = true, requireFresh: Boolean = true) {
         val refresh = incomingRequestRefresh
         if (!refresh.start(requireFresh)) return
@@ -548,7 +577,10 @@ class RideshareViewModel(
             override fun onSuccess(result: List<RideRequestSummary>) {
                 if (refresh !== incomingRequestRefresh) return
                 if (refresh.finish()) loadIncomingRequests(showLoading = false)
-                else incomingRequests = Resource(data = result)
+                else {
+                    incomingRequests = Resource(data = result)
+                    forgetDismissalsNoLongerPending()
+                }
             }
 
             override fun onFailure(error: Exception) {
