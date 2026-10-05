@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+Debug builds only (overrides src/main's file of the same name): allow plain HTTP to any host, so
+testing on a real phone or another laptop just needs BACKEND_BASE_URL in local.properties set to
+this PC's current Wi-Fi IP - no IP list to update whenever the network changes. Release builds
+still use src/main's strict list. Remove once the backend is hosted with HTTPS.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
