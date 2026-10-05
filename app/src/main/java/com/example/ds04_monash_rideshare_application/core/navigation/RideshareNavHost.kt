@@ -2,11 +2,13 @@ package com.example.ds04_monash_rideshare_application.core.navigation
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Snackbar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -30,6 +32,7 @@ import com.example.ds04_monash_rideshare_application.core.state.AppMode
 import com.example.ds04_monash_rideshare_application.core.state.RideshareViewModel
 import com.example.ds04_monash_rideshare_application.core.ui.BottomNavScaffold
 import com.example.ds04_monash_rideshare_application.feature.activity.ActivityScreen
+import com.example.ds04_monash_rideshare_application.feature.activity.ActivityTheme
 import com.example.ds04_monash_rideshare_application.feature.activity.LeaderboardScreen
 import com.example.ds04_monash_rideshare_application.feature.profile.VehiclesScreen
 import com.example.ds04_monash_rideshare_application.feature.auth.LoginScreen
@@ -185,11 +188,9 @@ fun RideshareNavHost(
         }
     }
 
-    if (viewModel.driverAccess.checking) {
-        AlertDialog(onDismissRequest = viewModel::cancelDriverRegistration,
-            title = { Text("Checking your vehicle") }, text = { CircularProgressIndicator() },
-            confirmButton = { TextButton(onClick = viewModel::cancelDriverRegistration) { Text("Cancel") } })
-    }
+    // While the Driver vehicle lookup runs, the shell's Driver segment shows "Checking vehicle…" (and
+    // the Vehicles screen shows its hand-off banner) instead of a blocking dialog. Tapping Passenger
+    // still cancels via updateActiveMode(PASSENGER) -> cancelDriverRegistration().
     // Accepting clashed with the driver's own ride request around the same time (backend
     // Lifecycle.kt) - let them choose to drive this passenger instead.
     viewModel.acceptConflict?.let { conflict ->
@@ -212,9 +213,14 @@ fun RideshareNavHost(
         }
     }
     viewModel.driverModeError?.let { error ->
-        AlertDialog(onDismissRequest = viewModel::clearDriverModeError,
-            title = { Text("Unable to switch to Driver") }, text = { Text(error) },
-            confirmButton = { TextButton(onClick = viewModel::clearDriverModeError) { Text("OK") } })
+        // Same title, message and dismissal as before; only the surface styling follows the branded scheme.
+        ActivityTheme {
+            AlertDialog(onDismissRequest = viewModel::clearDriverModeError,
+                shape = RoundedCornerShape(28.dp), containerColor = MaterialTheme.colorScheme.surface,
+                titleContentColor = MaterialTheme.colorScheme.onSurface, textContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                title = { Text("Unable to switch to Driver") }, text = { Text(error) },
+                confirmButton = { TextButton(onClick = viewModel::clearDriverModeError) { Text("OK") } })
+        }
     }
 
     if (currentDestination in AppDestination.tabDestinations) {
@@ -249,6 +255,7 @@ fun RideshareNavHost(
                 viewModel.respondToRequest(requestId, RequestStatus.REJECTED)
             },
             greetingName = uiState.greetingName,
+            driverChecking = viewModel.driverAccess.checking,
             modifier = modifier
         ) { contentPadding ->
             Box(modifier = Modifier.padding(contentPadding)) {
@@ -324,7 +331,11 @@ fun RideshareNavHost(
                         onRemoveFavorite = { driverId -> viewModel.toggleFavorite(driverId, currentlyFavorite = true) },
                         vehicle = viewModel.vehicles.data.orEmpty().firstOrNull(),
                         onOpenVehicles = { navigate(AppDestination.Vehicles) },
-                        onSignOut = ::returnToLogin
+                        onSignOut = ::returnToLogin,
+                        activeMode = viewModel.activeMode,
+                        // The scaffold already reserves the bottom bar; without this, imePadding inside the screen
+                        // would add the bar height again and leave a blank band above the keyboard.
+                        modifier = Modifier.consumeWindowInsets(contentPadding)
                     )
 
                     else -> Unit
@@ -519,22 +530,26 @@ fun RideshareNavHost(
             modifier = modifier
         )
 
-        AppDestination.Vehicles -> VehiclesScreen(
-            vehicles = viewModel.vehicles,
-            isSaving = viewModel.vehicleSaving,
-            onAddVehicle = { draft, onDone ->
-                viewModel.createVehicle(draft) { error ->
-                    onDone(error)
-                    if (error == null && registeringForDriver) {
-                        viewModel.updateActiveMode(AppMode.DRIVER,
-                            onDriverActivated = { registeringForDriver = false; replaceStack(AppDestination.Home) })
+        AppDestination.Vehicles -> ActivityTheme {
+            VehiclesScreen(
+                vehicles = viewModel.vehicles,
+                isSaving = viewModel.vehicleSaving,
+                onAddVehicle = { draft, onDone ->
+                    viewModel.createVehicle(draft) { error ->
+                        onDone(error)
+                        if (error == null && registeringForDriver) {
+                            viewModel.updateActiveMode(AppMode.DRIVER,
+                                onDriverActivated = { registeringForDriver = false; replaceStack(AppDestination.Home) })
+                        }
                     }
-                }
-            },
-            onUpdateVehicle = { vehicleId, draft, onDone -> viewModel.updateVehicle(vehicleId, draft, onDone) },
-            onNavigateBack = ::navigateUp,
-            modifier = modifier
-        )
+                },
+                onUpdateVehicle = { vehicleId, draft, onDone -> viewModel.updateVehicle(vehicleId, draft, onDone) },
+                onNavigateBack = ::navigateUp,
+                modifier = modifier,
+                driverSetup = registeringForDriver,
+                driverChecking = viewModel.driverAccess.checking
+            )
+        }
 
         else -> Unit
     }

@@ -86,10 +86,12 @@ fun BottomNavScaffold(
     onAcceptDriverRequest: (String) -> Unit,
     onDeclineDriverRequest: (String) -> Unit,
     greetingName: String,
+    driverChecking: Boolean = false,
     modifier: Modifier = Modifier,
     content: @Composable (androidx.compose.foundation.layout.PaddingValues) -> Unit
 ) {
-    val usesBrandShell = currentTab == AppDestination.Activity || currentTab == AppDestination.Home || currentTab == AppDestination.Requests
+    val usesBrandShell = currentTab == AppDestination.Activity || currentTab == AppDestination.Home ||
+        currentTab == AppDestination.Requests || currentTab == AppDestination.Profile
     val colorScheme = if (usesBrandShell) activityColorScheme() else MaterialTheme.colorScheme.copy(
         primary = modeAccent(activeMode), secondary = modeAccent(activeMode)
     )
@@ -119,7 +121,7 @@ fun BottomNavScaffold(
                     if (usesBrandShell) {
                         Surface(color = colorScheme.background, modifier = Modifier.onSizeChanged {
                             brandHeaderHeight = with(density) { it.height.toDp() }
-                        }) { ActivityHeader(greetingName, activeMode, onModeChange) }
+                        }) { ActivityHeader(greetingName, activeMode, onModeChange, driverChecking) }
                     } else Surface(shadowElevation = 2.dp) {
                         Row(
                             modifier = Modifier

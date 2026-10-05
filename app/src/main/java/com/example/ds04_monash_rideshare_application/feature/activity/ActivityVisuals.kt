@@ -12,14 +12,24 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.ds04_monash_rideshare_application.core.state.AppMode
 
-// Applied only to Activity and its shell. Other tabs retain their existing role-based palette.
+// The branded scheme shared by the shell and the Home, Requests, Activity and Profile tabs (and the
+// Vehicles sub-screen). Passenger and Driver share this palette; role changes content, not colour.
 @Composable
 fun activityColorScheme(dark: Boolean = isSystemInDarkTheme()): ColorScheme = if (dark) darkColorScheme(
     primary = Color(0xFFFFB77F), onPrimary = Color(0xFF512400),
@@ -54,7 +64,7 @@ internal fun outcomeColors(): List<Color> = if (isSystemInDarkTheme()) listOf(
 ) else listOf(Color(0xFFB57924), Color(0xFF4D6D89), Color(0xFF40825E), Color(0xFFBA453A), Color(0xFFAD9987), Color(0xFF806C99))
 
 @Composable
-fun ActivityHeader(name: String, mode: AppMode, onModeChange: (AppMode) -> Unit) {
+fun ActivityHeader(name: String, mode: AppMode, onModeChange: (AppMode) -> Unit, driverChecking: Boolean = false) {
     Column(Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -68,24 +78,44 @@ fun ActivityHeader(name: String, mode: AppMode, onModeChange: (AppMode) -> Unit)
             }
         }
         ActivitySegments(listOf("Passenger", "Driver"), if (mode == AppMode.PASSENGER) 0 else 1,
-            onSelect = { onModeChange(if (it == 0) AppMode.PASSENGER else AppMode.DRIVER) }, filled = true)
+            onSelect = { onModeChange(if (it == 0) AppMode.PASSENGER else AppMode.DRIVER) }, filled = true,
+            busyIndex = if (driverChecking) 1 else null, busyLabel = "Checking vehicle…")
     }
 }
 
+// [busyIndex] marks one segment as working (e.g. Driver while its vehicle lookup runs). The selection
+// does not move until the work succeeds; the busy segment shows a spinner and a text label.
 @Composable
-internal fun ActivitySegments(labels: List<String>, selected: Int, onSelect: (Int) -> Unit, filled: Boolean = false) {
+internal fun ActivitySegments(
+    labels: List<String>, selected: Int, onSelect: (Int) -> Unit, filled: Boolean = false,
+    busyIndex: Int? = null, busyLabel: String = ""
+) {
     val colors = MaterialTheme.colorScheme
     Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(28.dp)).background(colors.surfaceVariant)
         .padding(3.dp).selectableGroup()) {
         labels.forEachIndexed { index, label ->
             val active = selected == index
+            val busy = busyIndex == index
             Box(Modifier.weight(1f).clip(RoundedCornerShape(24.dp))
-                .background(if (active) { if (filled) colors.primary else colors.surface } else Color.Transparent)
+                .background(if (active) { if (filled) colors.primary else colors.surface } else if (busy) colors.surface else Color.Transparent)
+                .then(if (busy) Modifier.drawBehind {
+                    drawRoundRect(colors.primary, cornerRadius = CornerRadius(24.dp.toPx()),
+                        style = Stroke(1.5.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(10f, 8f))))
+                } else Modifier)
                 .selectable(selected = active, role = Role.RadioButton, onClick = { onSelect(index) })
+                // The segment keeps its own name ("Driver") for TalkBack; the visible busy text is decorative.
+                .semantics { if (busy) { contentDescription = label; stateDescription = "Checking vehicle"; liveRegion = LiveRegionMode.Polite } }
                 .heightIn(min = 48.dp).padding(horizontal = 8.dp, vertical = 10.dp), contentAlignment = Alignment.Center) {
-                Text(label, style = MaterialTheme.typography.labelLarge,
-                    color = if (active && filled) colors.onPrimary else colors.onSurface,
-                    fontWeight = if (active) FontWeight.Bold else FontWeight.Medium)
+                if (busy) {
+                    Row(Modifier.clearAndSetSemantics {}, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = colors.primary)
+                        Text(busyLabel, style = MaterialTheme.typography.labelLarge, color = colors.onSurface, fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    Text(label, style = MaterialTheme.typography.labelLarge,
+                        color = if (active && filled) colors.onPrimary else colors.onSurface,
+                        fontWeight = if (active) FontWeight.Bold else FontWeight.Medium)
+                }
             }
         }
     }
