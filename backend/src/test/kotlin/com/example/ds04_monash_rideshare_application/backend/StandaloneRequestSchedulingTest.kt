@@ -62,7 +62,7 @@ class StandaloneRequestSchedulingTest {
             header(HttpHeaders.Authorization, "Bearer $passenger")
             contentType(ContentType.Application.Json)
             setBody(
-                """{"originLat":-37.9,"originLng":145.1,"destinationLat":-37.91,"destinationLng":145.13,
+                """{"originLat":-37.9,"originLng":145.1,"destinationLat":-37.9105,"destinationLng":145.1362,
                     |"isAsap":false,"desiredDepartureTime":$start,"seatsRequested":1,
                     |"repeatDaysOfWeek":[1,2,3,4,5,6,7],"repeatWeeks":1}""".trimMargin()
             )
@@ -103,7 +103,7 @@ class StandaloneRequestSchedulingTest {
             header(HttpHeaders.Authorization, "Bearer $passenger")
             contentType(ContentType.Application.Json)
             setBody(
-                """{"originLat":-37.9,"originLng":145.1,"destinationLat":-37.91,"destinationLng":145.13,
+                """{"originLat":-37.9,"originLng":145.1,"destinationLat":-37.9105,"destinationLng":145.1362,
                     |"isAsap":true,"seatsRequested":1,
                     |"repeatDaysOfWeek":[1,2,3,4,5,6,7],"repeatWeeks":1}""".trimMargin()
             )

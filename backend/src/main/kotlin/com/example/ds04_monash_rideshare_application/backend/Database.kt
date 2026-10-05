@@ -138,9 +138,9 @@ private fun seedDemoDataIfEmpty() {
 
     // Approximate commute corridor between Melbourne CBD and Monash Clayton, so both the map's
     // default camera position and realistic tap locations land near this data.
-    val oakleigh = 145.0906 to -37.8988
-    val chadstone = 145.0733 to -37.8862
-    val glenWaverley = 145.1628 to -37.8811
+    val oakleigh = 145.0886 to -37.9002 // Oakleigh Station
+    val chadstone = 145.0829 to -37.8866 // Chadstone Shopping Centre
+    val glenWaverley = 145.1621 to -37.8795 // Glen Waverley Station
     val monashClayton = 145.1362 to -37.9105
 
     fun ride(

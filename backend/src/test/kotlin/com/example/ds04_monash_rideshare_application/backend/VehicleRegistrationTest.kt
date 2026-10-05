@@ -54,7 +54,7 @@ class VehicleRegistrationTest {
         return json.decodeFromString(response.bodyAsText())
     }
     private fun rideBody(seats: Int, recurring: Boolean = false) = """{"originLat":-37.8136,"originLng":144.9631,
-        "destinationLat":-37.8988,"destinationLng":145.0906,"distanceMeters":10000.0,"estimatedDurationSeconds":1200,
+        "destinationLat":-37.9105,"destinationLng":145.1362,"distanceMeters":10000.0,"estimatedDurationSeconds":1200,
         "departureTime":${System.currentTimeMillis()+86400000},"seatsTotal":$seats,
         "repeatDaysOfWeek":${if(recurring) "[1,2,3,4,5,6,7]" else "[]"},"repeatWeeks":1}"""
     private suspend fun HttpClient.offer(seats: Int, caller: String = owner, recurring: Boolean = false, expected: HttpStatusCode = HttpStatusCode.OK): RideDto? {

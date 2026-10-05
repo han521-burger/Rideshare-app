@@ -34,6 +34,7 @@ import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSumma
 import com.example.ds04_monash_rideshare_application.Repository.Remote.StopInput
 import com.example.ds04_monash_rideshare_application.core.ui.CampusRoutePicker
 import com.example.ds04_monash_rideshare_application.core.ui.DatePickerField
+import com.example.ds04_monash_rideshare_application.core.ui.PlaceSearchField
 import com.example.ds04_monash_rideshare_application.core.ui.RoutePickerResult
 import com.example.ds04_monash_rideshare_application.core.ui.StepWizardScaffold
 import com.example.ds04_monash_rideshare_application.core.ui.TimePickerField
@@ -173,21 +174,30 @@ private fun RouteStep(
         CampusRoutePicker(onResult = onRouteChange)
         if (routePickerResult != null) {
             Text("Optional stops along the way", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp))
-            LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                items(FIXED_POINTS, key = { it.name }) { location ->
-                    FilterChip(
-                        selected = selectedStops.contains(location),
-                        onClick = { onToggleStop(location) },
-                        label = { Text(location.name) }
-                    )
-                }
-            }
+            val endpoints = setOf(routePickerResult.origin, routePickerResult.destination)
+            PlaceSearchField(
+                label = "Add a stop",
+                places = FIXED_POINTS.filter { it !in endpoints },
+                onPick = onToggleStop,
+                isPicked = { it in selectedStops },
+                modifier = Modifier.padding(top = 4.dp)
+            )
             if (selectedStops.isNotEmpty()) {
                 Text(
                     "Order: " + selectedStops.joinToString(" → ") { it.name },
                     style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 4.dp)
+                    modifier = Modifier.padding(top = 8.dp)
                 )
+                // Tap a stop to remove it.
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
+                    items(selectedStops, key = { it.name }) { location ->
+                        FilterChip(
+                            selected = true,
+                            onClick = { onToggleStop(location) },
+                            label = { Text("${location.name}  ✕") }
+                        )
+                    }
+                }
             }
         }
     }

@@ -15,7 +15,7 @@ class ApprovedPointSearchTest {
     }
     @Test fun blankInputIsRejectedBeforeLookup() { assertEquals(LocationInputKind.EMPTY, locationInputKind("  ")) }
     @Test fun closestCanonicalPointIsFirst() {
-        val oakleigh = FIXED_POINTS.single { it.name == "Oakleigh" }
+        val oakleigh = FIXED_POINTS.single { it.name == "Oakleigh Station" }
         val result = nearestApprovedPoints(oakleigh.point.latitude, oakleigh.point.longitude)
         assertSame(oakleigh, result.first().location)
         assertEquals(0.0, result.first().distanceMeters, 0.001)

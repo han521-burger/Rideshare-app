@@ -51,7 +51,7 @@ class LifecycleTest {
             header(HttpHeaders.Authorization, "Bearer $caller")
             contentType(ContentType.Application.Json)
             setBody(
-                """{"originLat":-37.9,"originLng":145.1,"destinationLat":-37.91,"destinationLng":145.13,
+                """{"originLat":-37.9,"originLng":145.1,"destinationLat":-37.9105,"destinationLng":145.1362,
                     |"isAsap":false,"desiredDepartureTime":$departure,"seatsRequested":1}""".trimMargin()
             )
         }
@@ -150,7 +150,7 @@ class LifecycleTest {
             header(HttpHeaders.Authorization, "Bearer $passenger")
             contentType(ContentType.Application.Json)
             setBody(
-                """{"originLat":-37.9,"originLng":145.1,"destinationLat":-37.91,"destinationLng":145.13,
+                """{"originLat":-37.9,"originLng":145.1,"destinationLat":-37.9105,"destinationLng":145.1362,
                     |"distanceMeters":4000.0,"estimatedDurationSeconds":600,"departureTime":${tripTime + 10 * minuteMs},
                     |"seatsTotal":1,"repeatDaysOfWeek":[],"repeatWeeks":1}""".trimMargin()
             )
@@ -162,7 +162,7 @@ class LifecycleTest {
             header(HttpHeaders.Authorization, "Bearer $passenger")
             contentType(ContentType.Application.Json)
             setBody(
-                """{"originLat":-37.9,"originLng":145.1,"destinationLat":-37.91,"destinationLng":145.13,
+                """{"originLat":-37.9,"originLng":145.1,"destinationLat":-37.9105,"destinationLng":145.1362,
                     |"isAsap":false,"desiredDepartureTime":${tripTime + 15 * minuteMs},"seatsRequested":1}""".trimMargin()
             )
         }

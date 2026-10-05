@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -31,13 +30,15 @@ import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSearc
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
 import com.example.ds04_monash_rideshare_application.core.state.Resource
 import com.example.ds04_monash_rideshare_application.core.ui.DatePickerField
+import com.example.ds04_monash_rideshare_application.core.ui.PlaceSearchField
 import com.example.ds04_monash_rideshare_application.core.ui.RideshareScaffold
 import com.example.ds04_monash_rideshare_application.core.ui.TimePickerField
 import com.example.ds04_monash_rideshare_application.core.ui.combineDateAndTime
+import com.example.ds04_monash_rideshare_application.ui.FIXED_POINTS
+import com.example.ds04_monash_rideshare_application.ui.MONASH_CAMPUSES
 import com.example.ds04_monash_rideshare_application.ui.NamedLocation
 import com.example.ds04_monash_rideshare_application.ui.describeLocation
 import com.example.ds04_monash_rideshare_application.ui.haversineMeters
-import com.yandex.mapkit.geometry.Point
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
@@ -46,17 +47,10 @@ import java.time.ZoneId
 import java.util.Date
 import java.util.Locale
 
-private val RIDE_SEARCH_LOCATIONS = listOf(
-    NamedLocation("Melbourne CBD", Point(-37.8136, 144.9631)),
-    NamedLocation("Oakleigh Station", Point(-37.9002, 145.0886)),
-    NamedLocation("Huntingdale Station", Point(-37.9112, 145.1029)),
-    NamedLocation("Clayton Station", Point(-37.9246, 145.1203)),
-    NamedLocation("Glen Waverley Station", Point(-37.8795, 145.1621)),
-    NamedLocation("Chadstone", Point(-37.8862, 145.0733)),
-    NamedLocation("Monash Clayton", Point(-37.9105, 145.1362))
-)
+// Every place a ride can start or end: the 5 campuses plus the approved points.
+private val RIDE_SEARCH_LOCATIONS = MONASH_CAMPUSES + FIXED_POINTS
 
-private val MONASH_CLAYTON = RIDE_SEARCH_LOCATIONS.last()
+private val MONASH_CLAYTON = MONASH_CAMPUSES.first()
 
 internal data class RideSearchFormResult(
     val criteria: RideSearchCriteria? = null,
@@ -309,15 +303,12 @@ private fun LocationPicker(
                 style = MaterialTheme.typography.bodySmall
             )
         }
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            items(RIDE_SEARCH_LOCATIONS, key = { it.name }) { location ->
-                FilterChip(
-                    selected = selected == location,
-                    onClick = { onSelected(location) },
-                    label = { Text(location.name) }
-                )
-            }
-        }
+        PlaceSearchField(
+            label = if (selected == null) "Search places" else "Change",
+            places = RIDE_SEARCH_LOCATIONS,
+            onPick = onSelected,
+            isPicked = { it == selected }
+        )
     }
 }
 
