@@ -1,9 +1,28 @@
-# Feature Proposals — draft, not yet implemented
+# Feature Proposals
 
-Status: draft for review. Written against the `complete-app-trial` branch as it stands today.
-Nothing below has been coded yet — this is the "what and why" so the team can weigh in before
-any of it turns into a PR. Real Monash SSO (FR-01) is intentionally left out of this pass —
-`FakeAuthenticationProvider` is good enough for the trial for now.
+## Where these stand (2026-10-06)
+
+Most of this list has since been built on `complete-app-trial`. The original proposals below are
+kept as written, for the reasoning behind each.
+
+| # | Proposal | Status |
+|---|---|---|
+| 1 | Wire ride matching into the UI | **Built.** Find a ride calls `GET /rides/match` and shows ranked results; the unfiltered "Rides I can join" list stays as a secondary path. |
+| 2 | Vehicle management | **Built.** One vehicle per driver, required before offering a ride or switching to Driver mode; seats offered are capped by it and its fuel type feeds CO2/fuel estimates. |
+| 3 | Map fixed tap points | **Replaced** by an approved-places list: 5 Monash campuses + 25 stations/shopping centres, chosen via postcode/suburb search or a type-to-search field. One end of every trip must be a campus (campus-to-campus allowed). |
+| 4 | Messaging improvements | **Open.** Still manual Refresh; no auto-poll while open or unread badge. On hold while the Messages screen is being restyled. |
+| 5 | Analytics | **Built** (rule-based): outcome funnel, response time, hotzone, weekday pattern, common route, occupancy, CO2 leaderboard. ETA estimation and prediction not done (need new data). |
+
+Open questions from the end of this doc, as decided: matching keeps browsing as a fallback;
+offering a ride requires a saved vehicle; the place list is the 30 approved places above;
+messaging poll interval still undecided.
+
+Real Monash SSO (FR-01) was out of scope for this pass. Email + password accounts (Monash emails
+only) now stand in for it - see `docs/BACKEND.md`.
+
+---
+
+*Original draft (written before any of the above was built):*
 
 ## 1. Wire ride matching into the UI (FR-04)
 

@@ -9,7 +9,7 @@ beside each new validation or state transition.
 | Layer | Framework | Notes                                                                                              |
 |---|---|----------------------------------------------------------------------------------------------------|
 | Backend (Ktor, Kotlin) | JUnit 5 + Ktor `testApplication` | Route integration tests use a temporary SQLite database; pure matching/validation logic can use unit tests. |
-| Android — domain/ViewModel/repository (JVM, no Android framework dependency) | JUnit 5 + MockK + `kotlinx-coroutines-test` | Runs on the JVM, fast, no emulator needed.                                                         |
+| Android — domain/ViewModel/repository (JVM, no Android framework dependency) | JUnit 4 (`libs.junit`); fakes are hand-written (e.g. a subclass of `FakeRideApiService`) - no MockK | Runs on the JVM, fast, no emulator needed. `./gradlew :app:testDebugUnitTest` |
 | Android — Compose UI / instrumented | JUnit 4 + AndroidX Test + Compose Test rule | AndroidX's instrumented test runner requires JUnit 4, not JUnit 5                                  |
 
 ## Naming and structure
@@ -29,14 +29,43 @@ beside each new validation or state transition.
 Per the weekly build plan, any PR/MR touching validation or state-transition logic needs
 tests covering both the valid and invalid paths.
 
-`backend/src/test/.../RideRequestApprovalTest.kt` currently verifies the key approval path:
-request creation stays `PENDING`, capacity is unchanged before approval, the owning driver sees
-the request, acceptance changes both request status and available seats, another driver cannot
-respond, and rejection leaves ride capacity unchanged.
+## What's covered today (2026-10-06)
 
-`app/src/test/.../FindRideSearchTest.kt` verifies Member A's Week 4 search-form rules: both
-route endpoints are required, pickup and drop-off must differ, a valid form maps to the ranked
-search criteria sent to the backend, and a past preferred time is rejected.
+Run everything with `./gradlew :backend:test :app:testDebugUnitTest` (JVM, no emulator) and
+`./gradlew :app:connectedDebugAndroidTest` (needs a running emulator/device). At last run:
+103 backend tests and 111 app unit tests, all passing.
+
+**Backend (`backend/src/test/...`)** — each test boots the real Ktor app on a temporary SQLite
+file. The Gradle test task sets `rideshare.test.trustUserIdTokens`, letting tests call as a
+seeded user by sending its userId as the token; `AuthTest` switches that off to test real sessions.
+
+| Suite | Covers |
+|---|---|
+| `AuthTest` | Sign up → token works → sign out → token rejected → sign in again; Monash-only emails, 8+ char passwords, duplicate emails; same error for wrong password and unknown email; bare userIds rejected; demo password works; passwords stored hashed |
+| `RideRequestApprovalTest` | Request stays PENDING, capacity unchanged until the owning driver accepts; other drivers get 403; rejection keeps capacity |
+| `RequestCancellationTest`, `RideCancellationPropagationTest` | Cancelling requests/rides, seat restoration, who may cancel, what cascades |
+| `RideCompletionLifecycleTest` | Completing rides and requests, allowed transitions, ownership |
+| `LifecycleTest` | Auto-expiry (past scheduled, 30-min-old ASAP, empty past rides), expired requests can't be accepted; "drive them instead" conflict + undo restoring everything; a booked passenger can't drive or book again at the same time |
+| `StandaloneRequestSchedulingTest` | Repeat-weekly asks become one request per day; ASAP never repeats; two drivers racing for the last seat - exactly one wins |
+| `VehicleRegistrationTest` | One vehicle per account, field validation, seat caps on offered rides, ownership |
+| `MatchingEngineTest`, `MatchingRouteTest` | Matching gates, scoring and the `GET /rides/match` route |
+| `AnalyticsRoutesTest`, `AnalyticsCorrectnessTest` | Dashboard/analytics numbers |
+
+**App unit tests (`app/src/test/...`)** — presentation logic and ViewModel state:
+`LoginValidationTest` (sign-in/create-account form rules), `FindRideSearchTest` (search form
+rules), `ApprovedPointSearchTest` + `PlaceSearchFieldTest` (approved points, campus-to-campus,
+type-to-search), `ActivityRefreshTest` (switching accounts never shows the previous account's
+data), `DriverAccessStateTest` / `DriverGateViewModelTest` (Driver mode needs a vehicle),
+`RequestRefreshGateTest`, and the `*PresentationTest` files for Home, Activity, Profile,
+Vehicles and Requests.
+
+**Instrumented UI tests (`app/src/androidTest/...`)** — Compose tests for Home, Activity,
+Profile, Vehicles, Requests, completing a ride, and accessibility semantics.
+
+**Not covered by automated tests yet:** the Offer/Request ride step flows (one-time/repeat
+choice, 30-minute rule in the pickers), the conflict pop-up and Undo bar in the UI, sign-in
+screen UI, expired-request "Request again", and Messages. These are checked by hand on two
+devices (see `docs/SETUP.md` step 5).
 
 ## Validation test matrix (Week 2 scope)
 
@@ -57,7 +86,7 @@ the spec both the test author and the reviewer check the PR against.
 |---|---|---|
 | Valid future ride | departure time tomorrow | Accepted |
 | Past departure time | departure time before now | Rejected |
-| Departure equals now (boundary) | departure time == current time | Define and document the chosen boundary rule, then test it |
+| Too soon (boundary) | departure less than 30 minutes from now | Rejected - rule: scheduled departures must be ≥ 30 min ahead (`BookingPolicy.kt`, 2 min grace for clock drift; app pickers enforce the same). ASAP requests are exempt |
 | Missing date/time | null departure time | Rejected |
 
 ### Seat validation
@@ -70,9 +99,11 @@ the spec both the test author and the reviewer check the PR against.
 | Concurrent accept race | two requests each for the last seat | Exactly one succeeds |
 
 ### Status transition validation
-Allowed transitions per the weekly plan's status model:
-`PENDING → ACCEPTED`, `PENDING → REJECTED`, `PENDING → CANCELLED`.
-Disallowed examples: `REJECTED → ACCEPTED`, `COMPLETED → PENDING`.
+Allowed transitions (`RideRequestStatus.transitions` in `Tables.kt`):
+`PENDING → ACCEPTED / REJECTED / CANCELLED`, `ACCEPTED → COMPLETED / CANCELLED`.
+The server also moves `PENDING → EXPIRED` and `ACCEPTED → COMPLETED` on its own (`Lifecycle.kt`),
+and `undo-accept` moves `ACCEPTED → PENDING` within 60 seconds for the accepting driver only.
+`REJECTED`, `CANCELLED`, `COMPLETED` and `EXPIRED` are final.
 
 | Case | Transition | Expected result               |
 |---|---|-------------------------------|
@@ -81,4 +112,6 @@ Disallowed examples: `REJECTED → ACCEPTED`, `COMPLETED → PENDING`.
 | Cancel a pending request | PENDING → CANCELLED | Allowed                       |
 | Re-accept a rejected request | REJECTED → ACCEPTED | Rejected                      |
 | Revert a completed ride | COMPLETED → PENDING | Rejected  |
+| Accept an expired request | EXPIRED → ACCEPTED | Rejected ("This request has expired") |
+| Undo an accept after 60 s | ACCEPTED → PENDING via undo | Rejected ("Too late to undo") |
 

@@ -3,7 +3,7 @@
 Owner: Tony Doan. Tracks what's outstanding from earlier weeks. Update this whenever an item lands.
 Editor: Keng Hong. Updates what have been done for myself.
 
-Last reviewed: 2026-08-21 on `complete-app-trial`.
+Last reviewed: 2026-10-06 on `complete-app-trial`.
 
 ## Build baseline
 
@@ -45,10 +45,40 @@ passenger count, ranked match results, ride details, seat-request confirmation a
 Drivers can review and accept/reject pending requests; acceptance is the point at which capacity is
 decremented.
 
+## Since Week 4 — landed on `complete-app-trial` (2026-09 to 2026-10-06)
+
+Some notes above predate these (e.g. Week 2's "vehicle selection not implemented").
+
+- **Vehicles:** drivers register one vehicle before offering a ride; seats offered are capped by
+  it, and its fuel type feeds the CO2/fuel estimates.
+- **Activity insights:** rule-based analytics (outcome funnel, response time, hotzone, weekday
+  pattern, common route, occupancy) and the redesigned Activity tab.
+- **Accounts:** email + password sign-up/sign-in, Monash emails only, hashed passwords and
+  session tokens; the fixed test user and "sign in as" buttons are gone. Demo accounts use
+  password `rideshare123`.
+- **Booking rules:** scheduled times must be 30+ minutes ahead; clear "One-time only / Repeat
+  weekly" choice when offering or requesting.
+- **Lifecycle:** stale requests/rides expire automatically, rides with passengers auto-complete;
+  expired asks show "Request again".
+- **Conflicts:** nobody can be in two overlapping trips; accepting while you have your own waiting
+  request asks "Drive them instead?"; Undo for a few seconds after accepting.
+- **Places:** 5 campuses + 25 approved stations/shopping centres with a type-to-search picker;
+  campus-to-campus trips allowed. 12 of the new coordinates still need checking on a map.
+- **Fixes:** a driver never sees their own request in the banner; swiping the banner just
+  dismisses it.
+- **Multi-device testing:** debug builds talk to a backend at any address; teammates share one
+  backend over Tailscale (`docs/SETUP.md` step 2).
+
+In progress: Keng Hong is restyling the remaining old-style screens (Ride/Request detail,
+Messages, Leaderboard, Find a ride, the Offer/Request/Request-seat flows, Map) to match the new
+Home/Activity/Profile design.
+
 ## Team-level items that are not Member A deliverables
 
-- Real Monash SSO remains blocked on institutional access; the app uses test authentication.
-- HTTPS/hosted deployment and real token verification are not complete.
+- Real Monash SSO remains blocked on institutional access; email + password accounts stand in.
+- HTTPS/hosted deployment is not done - the backend runs on a developer's machine. Session tokens
+  are real now, but without HTTPS they travel in plain text outside Tailscale.
+- No login rate limiting, email verification or password reset yet.
 - The current app has no Room/offline cache; the RTM documents this deliberate trial limitation.
 - Allocate+ integration and push notifications remain deferred.
 
