@@ -1,5 +1,6 @@
 package com.example.ds04_monash_rideshare_application.backend.routes
 
+import com.example.ds04_monash_rideshare_application.backend.ATTACH_TIME_WINDOW_MILLIS
 import com.example.ds04_monash_rideshare_application.backend.CONFLICT_OWN_PENDING_REQUEST
 import com.example.ds04_monash_rideshare_application.backend.ConflictException
 import com.example.ds04_monash_rideshare_application.backend.RideStops
@@ -148,11 +149,20 @@ fun Route.rideRequestRoutes() {
 
         val requestId = "req-${UUID.randomUUID()}"
         val now = System.currentTimeMillis()
-        // You can't ask for a ride while you're driving (or already booked) at that time.
-        fun blockedAt(start: Long) = findTripConflicts(
-            passengerId,
-            estimatedTripWindow(start, body.originLat, body.originLng, body.destinationLat, body.destinationLng)
-        ).blocking
+        // You can't ask for a ride while you're driving (or already booked) at that time, or when you
+        // already have a waiting open ask then - a duplicate would just show up twice for drivers.
+        // (Seat requests on different posted rides are still fine: accepting one cancels the rest.)
+        fun blockedAt(start: Long): String? {
+            val conflicts = findTripConflicts(
+                passengerId,
+                estimatedTripWindow(start, body.originLat, body.originLng, body.destinationLat, body.destinationLng)
+            )
+            conflicts.blocking?.let { return it }
+            val duplicate = conflicts.pendingRequestIds.isNotEmpty() && RideRequests.selectAll()
+                .where { RideRequests.requestId inList conflicts.pendingRequestIds }
+                .any { it[RideRequests.rideId] == null }
+            return if (duplicate) "you already have a ride request around ${formatTripTime(start)} - cancel it first" else null
+        }
         transaction {
             blockedAt(if (body.isAsap) now else body.desiredDepartureTime!!)?.let {
                 throw ConflictException("You can't request a ride then - $it.")
@@ -317,6 +327,20 @@ fun Route.rideRequestRoutes() {
                     // Nobody can be in two trips at once (Lifecycle.kt): check both the accepting
                     // driver and the passenger before anything is written.
                     val plannedRideId = existingRideId ?: body.targetRideId
+                    // An open ask can only join one of the driver's rides that leaves around the
+                    // time the passenger asked for - not, say, last week's or next week's trip.
+                    if (existingRideId == null && body.targetRideId != null) {
+                        val target = Rides.selectAll().where { Rides.rideId eq body.targetRideId }.firstOrNull()
+                            ?: throw NotFoundException("Target ride not found")
+                        val wanted = if (request[RideRequests.isAsap]) acceptedAt
+                            else request[RideRequests.desiredDepartureTime] ?: acceptedAt
+                        if (kotlin.math.abs(target[Rides.departureTime] - wanted) > ATTACH_TIME_WINDOW_MILLIS) {
+                            throw ValidationException(
+                                "That ride leaves ${formatTripTime(target[Rides.departureTime])}, but they asked for " +
+                                    "${formatTripTime(wanted)}. Pick a ride near their time, or create a new ride."
+                            )
+                        }
+                    }
                     val window = plannedRideId
                         ?.let { rid -> Rides.selectAll().where { Rides.rideId eq rid }.firstOrNull()?.let(::rideWindow) }
                         ?: requestWindow(request)
@@ -333,9 +357,10 @@ fun Route.rideRequestRoutes() {
                             }
                             cancelRequests(driverConflicts.pendingRequestIds, acceptedAt)
                         }
+                        // The ride being accepted onto is NOT skipped here: if the passenger is already
+                        // booked on it (or anything else at that time), this would double-book them.
                         val passengerConflicts = findTripConflicts(
-                            request[RideRequests.passengerId], window,
-                            ignoreRideId = plannedRideId, ignoreRequestId = requestId
+                            request[RideRequests.passengerId], window, ignoreRequestId = requestId
                         )
                         passengerConflicts.blocking?.let {
                             throw ConflictException("This passenger already has another trip around then")

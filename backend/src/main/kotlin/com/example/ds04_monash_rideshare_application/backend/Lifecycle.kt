@@ -23,6 +23,10 @@ private const val ESTIMATED_SPEED_METERS_PER_SECOND = 40_000.0 / 3600.0
 
 const val CONFLICT_OWN_PENDING_REQUEST = "OWN_PENDING_REQUEST"
 
+// How far a driver's posted ride may leave from an open ask's requested time and still take it
+// (same window as ride matching).
+const val ATTACH_TIME_WINDOW_MILLIS = 45L * 60_000L
+
 // There's no scheduler in this trial backend, so stale records are tidied lazily: this runs before
 // every API call (Application.kt) and is cheap at trial scale.
 // - PENDING requests whose departure has passed (ASAP: 30 min after asking) become EXPIRED.

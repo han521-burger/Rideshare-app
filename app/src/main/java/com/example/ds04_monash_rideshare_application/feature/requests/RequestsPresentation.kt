@@ -132,3 +132,13 @@ internal fun seriesSummary(series: RequestSeries, zone: ZoneId = ZoneId.systemDe
     val time = times.firstOrNull()?.let { SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(it.toInstant().toEpochMilli())) } ?: ""
     return (if (days.size == 1) "Every $dayText" else dayText) + " · " + time
 }
+
+// A posted ride can take an open ask only if it leaves within this long of the asked-for time
+// (backend ATTACH_TIME_WINDOW_MILLIS). ASAP asks compare against now.
+internal const val ATTACH_WINDOW_MILLIS = 45L * 60_000L
+
+internal fun rideFitsRequestTime(ride: com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary,
+    request: RideRequestSummary, now: Long = System.currentTimeMillis()): Boolean {
+    val wanted = if (request.isAsap) now else request.desiredDepartureTime ?: now
+    return kotlin.math.abs(ride.departureTime - wanted) <= ATTACH_WINDOW_MILLIS
+}

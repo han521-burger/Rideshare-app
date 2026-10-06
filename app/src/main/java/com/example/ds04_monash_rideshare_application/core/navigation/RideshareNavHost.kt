@@ -42,6 +42,7 @@ import com.example.ds04_monash_rideshare_application.feature.messages.MessagesSc
 import com.example.ds04_monash_rideshare_application.feature.profile.ProfileScreen
 import com.example.ds04_monash_rideshare_application.feature.requests.RequestDetailScreen
 import com.example.ds04_monash_rideshare_application.feature.requests.RequestsScreen
+import com.example.ds04_monash_rideshare_application.feature.requests.rideFitsRequestTime
 import com.example.ds04_monash_rideshare_application.feature.rides.FindRideScreen
 import com.example.ds04_monash_rideshare_application.feature.rides.OfferRideFlowScreen
 import com.example.ds04_monash_rideshare_application.feature.rides.RequestRideFlowScreen
@@ -415,9 +416,12 @@ fun RideshareNavHost(
             RequestDetailScreen(
                 request = request,
                 currentUserId = uiState.userId,
+                // Only your rides leaving near the time they asked for (the backend allows 45 min
+                // either side) - never another day's trip.
                 myOpenRidesForAccept = viewModel.myDriverRides.data.orEmpty()
                     .filter {
-                        it.status in listOf(RideStatus.OPEN, RideStatus.CONFIRMED) && it.seatsAvailable >= minSeats
+                        it.status in listOf(RideStatus.OPEN, RideStatus.CONFIRMED) && it.seatsAvailable >= minSeats &&
+                            request != null && rideFitsRequestTime(it, request)
                     },
                 isActionInFlight = viewModel.actionInFlight,
                 actionErrorMessage = viewModel.requestActionError,
