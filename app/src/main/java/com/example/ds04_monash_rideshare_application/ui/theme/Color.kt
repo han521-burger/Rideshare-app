@@ -13,7 +13,6 @@ val DarkSurface = Color(0xFF102A43)
 
 // Role-toggle accents (core/ui/BottomNavScaffold.kt) - teal while in Passenger mode, amber while
 // in Driver mode, so the whole app visibly signals which side of a ride you're currently acting on.
-val PassengerTeal = Color(0xFF00897B)
-val PassengerTealLight = Color(0xFFB2DFDB)
-val DriverAmber = Color(0xFFEF6C00)
-val DriverAmberLight = Color(0xFFFFCC80)
+// Role colours - the primary of each role's scheme in feature/activity/ActivityVisuals.kt.
+val PassengerBlue = Color(0xFF2F5D7C)
+val DriverOrange = Color(0xFFA44708)

@@ -58,10 +58,10 @@ import androidx.compose.ui.zIndex
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideRequestSummary
 import com.example.ds04_monash_rideshare_application.core.navigation.AppDestination
 import com.example.ds04_monash_rideshare_application.core.state.AppMode
-import com.example.ds04_monash_rideshare_application.ui.theme.DriverAmber
-import com.example.ds04_monash_rideshare_application.ui.theme.PassengerTeal
+import com.example.ds04_monash_rideshare_application.ui.theme.DriverOrange
+import com.example.ds04_monash_rideshare_application.ui.theme.PassengerBlue
 
-fun modeAccent(mode: AppMode): Color = if (mode == AppMode.PASSENGER) PassengerTeal else DriverAmber
+fun modeAccent(mode: AppMode): Color = if (mode == AppMode.PASSENGER) PassengerBlue else DriverOrange
 
 // The shell for all four bottom-nav tabs: a top bar carrying the Passenger/Driver toggle (teal
 // while passenger, amber while driver - the whole tab content picks up the same accent so the
@@ -90,7 +90,7 @@ fun BottomNavScaffold(
 ) {
     val usesBrandShell = currentTab == AppDestination.Activity || currentTab == AppDestination.Home ||
         currentTab == AppDestination.Requests || currentTab == AppDestination.Profile
-    val colorScheme = if (usesBrandShell) activityColorScheme() else MaterialTheme.colorScheme.copy(
+    val colorScheme = if (usesBrandShell) activityColorScheme(mode = activeMode) else MaterialTheme.colorScheme.copy(
         primary = modeAccent(activeMode), secondary = modeAccent(activeMode)
     )
     val accent = colorScheme.primary
@@ -236,10 +236,10 @@ private fun ModeToggle(activeMode: AppMode, onModeChange: (AppMode) -> Unit) {
             .background(MaterialTheme.colorScheme.surfaceVariant, RoundedCornerShape(20.dp))
             .padding(3.dp)
     ) {
-        ModeToggleOption("Passenger", selected = activeMode == AppMode.PASSENGER, accent = PassengerTeal) {
+        ModeToggleOption("Passenger", selected = activeMode == AppMode.PASSENGER, accent = PassengerBlue) {
             onModeChange(AppMode.PASSENGER)
         }
-        ModeToggleOption("Driver", selected = activeMode == AppMode.DRIVER, accent = DriverAmber) {
+        ModeToggleOption("Driver", selected = activeMode == AppMode.DRIVER, accent = DriverOrange) {
             onModeChange(AppMode.DRIVER)
         }
     }

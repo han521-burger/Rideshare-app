@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -28,10 +29,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.ds04_monash_rideshare_application.core.state.AppMode
 
+// Which role the app is in right now, provided once at the top of RideshareNavHost so every
+// screen's theme can follow it without passing the mode through each call.
+val LocalAppMode = compositionLocalOf { AppMode.PASSENGER }
+
 // The branded scheme shared by the shell and the Home, Requests, Activity and Profile tabs (and the
-// Vehicles sub-screen). Passenger and Driver share this palette; role changes content, not colour.
+// Vehicles sub-screen and ride flows). Driver keeps the warm orange; Passenger swaps the primary
+// family for a deep blue so the two roles are easy to tell apart. Blue/orange stays distinguishable
+// for colour-blind users, and every role colour keeps >= 4.5:1 contrast for text.
 @Composable
-fun activityColorScheme(dark: Boolean = isSystemInDarkTheme()): ColorScheme = if (dark) darkColorScheme(
+fun activityColorScheme(dark: Boolean = isSystemInDarkTheme(), mode: AppMode = LocalAppMode.current): ColorScheme {
+    val base = baseColorScheme(dark)
+    if (mode == AppMode.DRIVER) return base
+    return if (dark) base.copy(
+        primary = Color(0xFFA7C4DE), onPrimary = Color(0xFF102E44),
+        primaryContainer = Color(0xFF263F54), onPrimaryContainer = Color(0xFFD9E9F6)
+    ) else base.copy(
+        primary = Color(0xFF2F5D7C), onPrimary = Color.White,
+        primaryContainer = Color(0xFFDCE8F2), onPrimaryContainer = Color(0xFF173A54)
+    )
+}
+
+private fun baseColorScheme(dark: Boolean): ColorScheme = if (dark) darkColorScheme(
     primary = Color(0xFFFFB77F), onPrimary = Color(0xFF512400),
     primaryContainer = Color(0xFF63310E), onPrimaryContainer = Color(0xFFFFDCC3),
     secondary = Color(0xFFA7C4DE), onSecondary = Color(0xFF102E44),
