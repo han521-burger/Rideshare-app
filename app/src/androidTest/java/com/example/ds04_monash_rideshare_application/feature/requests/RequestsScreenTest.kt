@@ -182,6 +182,31 @@ class RequestsScreenTest {
         compose.runOnIdle { assertEquals(1, searches) }
     }
 
+    // Swiping the banner sideways dismisses it, on the Requests tab and on the other tabs.
+    @Test fun swipingTheBannerDismissesItOnEveryTab() {
+        val tab = mutableStateOf<AppDestination>(AppDestination.Home)
+        val banner = mutableStateOf(request("on-home").copy(rideId = "ride", ride = ride()))
+        val dismissed = mutableListOf<String>()
+        compose.setContent {
+            BottomNavScaffold(AppMode.DRIVER, {}, tab.value, {}, 1, banner.value, 1,
+                false, null, {}, {}, {}, "Amara", onDismissDriverRequest = { dismissed += it }) { padding ->
+                Box(Modifier.padding(padding).fillMaxSize()) { Text("Content") }
+            }
+        }
+        compose.onNodeWithTag("global-request-banner").performTouchInput { swipeRight() }
+        compose.waitForIdle()
+        // A different request then arrives while on the Requests tab: it must show and swipe too.
+        compose.runOnIdle {
+            tab.value = AppDestination.Requests
+            banner.value = request("on-requests").copy(rideId = "ride", ride = ride())
+        }
+        compose.waitForIdle()
+        compose.onNodeWithTag("global-request-banner").performTouchInput { swipeLeft() }
+        compose.waitForIdle()
+        // The swipe may report the same dismissal more than once; the ViewModel treats it as a set.
+        assertEquals(listOf("on-home", "on-requests"), dismissed.distinct())
+    }
+
     // The banner floats over the page like a phone notification: the content never moves when it
     // appears or goes away, so dismissing it can't leave a blank gap.
     @Test fun bannerFloatsOverContentWithoutMovingIt() {

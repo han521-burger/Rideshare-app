@@ -35,22 +35,23 @@ class DriverBannerDismissalTest {
 
     @After fun clear() = AuthSession.clear()
 
-    @Test fun `a dismissed banner stays gone after refreshing and shows the next request instead`() {
+    @Test fun `swiping clears the banner for everything waiting, until a new request arrives`() {
         api.inbox = listOf(request("old", 1), request("new", 2))
         vm.loadIncomingRequests()
         assertEquals("new", vm.driverBannerRequest?.requestId)
 
+        // The older waiting request must not pop up in its place.
         vm.dismissDriverBanner("new")
-        assertEquals("old", vm.driverBannerRequest?.requestId)
+        assertNull(vm.driverBannerRequest)
 
         vm.loadIncomingRequests()
-        assertEquals("old", vm.driverBannerRequest?.requestId)
+        assertNull(vm.driverBannerRequest)
         // Still listed for the Requests tab - dismissing only hides the banner.
         assertEquals(2, vm.incomingPendingRequests.size)
 
-        vm.dismissDriverBanner("old")
+        api.inbox = listOf(request("old", 1), request("new", 2), request("newer", 3))
         vm.loadIncomingRequests()
-        assertNull(vm.driverBannerRequest)
+        assertEquals("newer", vm.driverBannerRequest?.requestId)
     }
 
     @Test fun `dismissals for requests that are no longer pending are forgotten`() {

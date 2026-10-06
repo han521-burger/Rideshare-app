@@ -169,9 +169,13 @@ class RideshareViewModel(
     val driverBannerRequest: RideRequestSummary?
         get() = incomingPendingRequests.filter { it.requestId !in dismissedBannerRequestIds }.maxByOrNull { it.createdAt }
 
+    // Swiping the banner clears it for every request waiting right now, like clearing a phone
+    // notification - otherwise the next waiting request pops up in its place and the swipe looks
+    // like it did nothing. Only requests that arrive afterwards bring the banner back.
     fun dismissDriverBanner(requestId: String) {
         val userId = uiState.userId ?: return
-        dismissedBannerRequestIds = dismissedBannerRequestIds + requestId
+        dismissedBannerRequestIds = dismissedBannerRequestIds + requestId +
+            incomingPendingRequests.map { it.requestId }
         BannerDismissals.save(userId, dismissedBannerRequestIds)
     }
 
