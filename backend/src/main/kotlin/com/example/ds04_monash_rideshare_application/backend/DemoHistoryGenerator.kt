@@ -65,15 +65,21 @@ object DemoHistoryGenerator {
         Template("Monash Peninsula", "Leawarra Station", 1)
     )
 
+    // Stable per account (String.hashCode is fixed by the JVM spec), so re-seeding the same account
+    // reproduces its history while different accounts get different trips.
+    fun seedFor(userId: String): Long = SEED xor userId.hashCode().toLong()
+
     private fun campusPoint(name: String): NamedPoint =
         MONASH_CAMPUSES.single { it.name == name }.let { NamedPoint(it.name, it.lat, it.lng) }
 
     private fun hubPoint(name: String): NamedPoint = NAMED_FIXED_POINTS.single { it.name == name }
 
-    // `maxPassengerSeats` is the target's vehicle capacity minus the driver's own seat.
-    fun generate(anchorMillis: Long, zone: ZoneId, maxPassengerSeats: Int): List<DemoTrip> {
+    // `maxPassengerSeats` is the target's vehicle capacity minus the driver's own seat. `seed` picks
+    // the story: the same seed always gives the same plan; the seeder passes one per account
+    // (seedFor) so two demo accounts don't end up with identical histories.
+    fun generate(anchorMillis: Long, zone: ZoneId, maxPassengerSeats: Int, seed: Long = SEED): List<DemoTrip> {
         require(maxPassengerSeats >= 1) { "A vehicle must offer at least one passenger seat" }
-        val random = Random(SEED)
+        val random = Random(seed)
         val today = java.time.Instant.ofEpochMilli(anchorMillis).atZone(zone).toLocalDate()
         val totalWeight = TEMPLATES.sumOf { it.weight }
         val drafts = mutableListOf<DemoTrip>()

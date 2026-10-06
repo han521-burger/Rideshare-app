@@ -75,7 +75,7 @@ fun seedDemoHistory(
     val vehicle = Vehicles.selectAll().where { Vehicles.ownerId eq userId }.singleOrNull()
         ?: throw ValidationException("This account has no registered vehicle. Register one in the app (Profile > My vehicle) first - demo driving history is attributed to it.")
     val maxPassengerSeats = vehicle[Vehicles.seatCapacity] - 1
-    val plan = DemoHistoryGenerator.generate(now, zone, maxPassengerSeats)
+    val plan = DemoHistoryGenerator.generate(now, zone, maxPassengerSeats, DemoHistoryGenerator.seedFor(userId))
 
     ensureCast(now)
     var requests = 0

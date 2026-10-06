@@ -94,4 +94,14 @@ class DemoHistoryGeneratorTest {
         val hours = plan.map { Instant.ofEpochMilli(it.departureTime).atZone(zone).hour }
         assertTrue(hours.any { it < 12 } && hours.any { it >= 15 }, "morning and afternoon commutes")
     }
+
+    @Test
+    fun `each account gets its own history, and the same one every time`() {
+        fun planFor(userId: String) =
+            DemoHistoryGenerator.generate(anchor, zone, 3, DemoHistoryGenerator.seedFor(userId))
+        val first = planFor("user-a")
+        assertEquals(first, planFor("user-a"))
+        assertFalse(first == planFor("user-b"), "two accounts must not get identical demo histories")
+        assertEquals(DemoHistoryGenerator.TRIPS_PER_WEEK.sum(), planFor("user-b").size)
+    }
 }
