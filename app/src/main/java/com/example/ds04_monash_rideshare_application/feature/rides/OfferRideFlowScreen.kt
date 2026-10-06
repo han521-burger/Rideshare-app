@@ -1,23 +1,8 @@
 package com.example.ds04_monash_rideshare_application.feature.rides
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,39 +10,40 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateRideDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.StopInput
 import com.example.ds04_monash_rideshare_application.core.ui.CampusRoutePicker
-import com.example.ds04_monash_rideshare_application.core.ui.DatePickerField
-import com.example.ds04_monash_rideshare_application.core.ui.PlaceSearchField
+import com.example.ds04_monash_rideshare_application.core.ui.CountStepper
+import com.example.ds04_monash_rideshare_application.core.ui.FormBanner
+import com.example.ds04_monash_rideshare_application.core.ui.FormBannerKind
+import com.example.ds04_monash_rideshare_application.core.ui.FormInfoRow
+import com.example.ds04_monash_rideshare_application.core.ui.FormSectionCard
+import com.example.ds04_monash_rideshare_application.core.ui.FormStatusPill
+import com.example.ds04_monash_rideshare_application.core.ui.OptionalNoteField
+import com.example.ds04_monash_rideshare_application.core.ui.ReviewDivider
+import com.example.ds04_monash_rideshare_application.core.ui.ReviewSection
+import com.example.ds04_monash_rideshare_application.core.ui.RideFlowScaffold
 import com.example.ds04_monash_rideshare_application.core.ui.RoutePickerResult
-import com.example.ds04_monash_rideshare_application.core.ui.StepWizardScaffold
-import com.example.ds04_monash_rideshare_application.core.ui.TimePickerField
+import com.example.ds04_monash_rideshare_application.core.ui.SeatBlocks
+import com.example.ds04_monash_rideshare_application.core.ui.StopPicker
 import com.example.ds04_monash_rideshare_application.core.ui.combineDateAndTime
 import com.example.ds04_monash_rideshare_application.core.ui.departureTooSoonMessage
 import com.example.ds04_monash_rideshare_application.core.ui.isBookableDeparture
 import com.example.ds04_monash_rideshare_application.ui.APPROVED_POINTS
 import com.example.ds04_monash_rideshare_application.ui.NamedLocation
-import java.text.SimpleDateFormat
 import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
-import java.util.Date
-import java.util.Locale
 
-private val STEP_LABELS = listOf("Route", "When", "Repeat", "Seats", "Confirm")
-private val WEEK_DAYS = listOf(
-    DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY,
-    DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY
-)
-
-// Offer-a-Ride flow: driver picks a route on the map (with optional multi-stop waypoints from the
-// known named locations), when it departs, whether it repeats weekly, how many seats, then confirms.
+// Offer-a-Ride flow: driver picks a route (with optional multi-stop waypoints from the known named
+// locations), when it departs, whether it repeats weekly, how many seats, then confirms.
+// Phase 8B: presentation only (RideFlowScaffold + approved cards). State, validation and the published
+// draft are exactly as before.
 @Composable
 fun OfferRideFlowScreen(
     isPublishing: Boolean,
@@ -67,7 +53,9 @@ fun OfferRideFlowScreen(
     onPublish: (CreateRideDraft, onSuccess: (RideSummary) -> Unit, onError: (String) -> Unit) -> Unit,
     onExit: () -> Unit,
     onPublished: (RideSummary) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // The route picker inside the Route step; tests substitute a fake (see RequestRideFlowScreen).
+    routeStep: @Composable (onResult: (RoutePickerResult?) -> Unit) -> Unit = { CampusRoutePicker(onResult = it) }
 ) {
     var step by rememberSaveable { mutableStateOf(0) }
     var routePickerResult by remember { mutableStateOf<RoutePickerResult?>(null) }
@@ -88,25 +76,34 @@ fun OfferRideFlowScreen(
         3 -> seatsTotal in 1..maxSeats
         else -> true
     }
+    val hint = when (step) {
+        0 -> "Choose a campus and an approved point to continue."
+        1 -> whenHint(date != null, time != null, date != null && time != null && !canGoNext)
+        2 -> "Pick at least one day to continue."
+        else -> null
+    }
 
-    StepWizardScaffold(
+    RideFlowScaffold(
         title = "Offer a ride",
-        stepLabels = STEP_LABELS,
+        stepLabels = OFFER_STEP_LABELS,
         currentStep = step,
         canGoNext = canGoNext,
+        hint = hint,
         isSubmitting = isPublishing,
+        finalLabel = "Publish ride",
+        busyLabel = "Publishing ride…",
         onBackStep = { step-- },
         onNextStep = {
-            if (step < STEP_LABELS.lastIndex) {
+            if (step < OFFER_STEP_LABELS.lastIndex) {
                 step++
-                return@StepWizardScaffold
+                return@RideFlowScaffold
             }
-            val route = routePickerResult ?: return@StepWizardScaffold
-            val departureTime = combineDateAndTime(date, time) ?: return@StepWizardScaffold
+            val route = routePickerResult ?: return@RideFlowScaffold
+            val departureTime = combineDateAndTime(date, time) ?: return@RideFlowScaffold
             // The clock keeps moving while the driver fills in later steps - re-check at submit.
             if (!isBookableDeparture(departureTime)) {
                 errorMessage = departureTooSoonMessage() + " Go back to When to change it."
-                return@StepWizardScaffold
+                return@RideFlowScaffold
             }
             val draft = CreateRideDraft(
                 originLat = route.origin.point.latitude, originLng = route.origin.point.longitude,
@@ -124,166 +121,95 @@ fun OfferRideFlowScreen(
         },
         onExit = onExit,
         modifier = modifier
-    ) { contentPadding: PaddingValues ->
-        Column(
-            modifier = Modifier
-                .padding(contentPadding)
-                .padding(16.dp)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-        ) {
-            when (step) {
-                0 -> RouteStep(
-                    routePickerResult = routePickerResult,
-                    onRouteChange = { routePickerResult = it },
-                    selectedStops = selectedStops,
-                    onToggleStop = { location ->
-                        selectedStops = if (selectedStops.contains(location)) {
-                            selectedStops - location
-                        } else {
-                            selectedStops + location
-                        }
-                    }
-                )
-                1 -> WhenStep(date, time, onDateChange = { date = it }, onTimeChange = { time = it })
-                2 -> RepeatStep(
-                    repeatWeekly, repeatDays, repeatWeeks,
-                    onRepeatWeeklyChange = { weekly ->
-                        repeatWeekly = weekly
-                        if (!weekly) repeatDays = emptySet()
-                    },
-                    onDaysChange = { repeatDays = it },
-                    onWeeksChange = { repeatWeeks = it }
-                )
-                3 -> SeatsStep(seatsTotal, maxSeats, notes, onSeatsChange = { seatsTotal = it }, onNotesChange = { notes = it })
-                else -> ConfirmOfferStep(routePickerResult, date, time, selectedStops, repeatDays, repeatWeeks, seatsTotal, notes)
+    ) {
+        // The publish error lives with the Review step it belongs to; hidden while a retry is in flight.
+        if (step == OFFER_STEP_LABELS.lastIndex && !isPublishing) {
+            errorMessage?.let {
+                FormBanner(it, FormBannerKind.Error, Modifier.testTag("ride-error"), title = "Ride not published")
             }
-            errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 12.dp)) }
+        }
+        if (step in 1 until OFFER_STEP_LABELS.lastIndex) routePickerResult?.let { RideRouteRecap(it, selectedStops.size) }
+        when (step) {
+            0 -> OfferRouteStep(
+                routePickerResult = routePickerResult,
+                onRouteChange = { routePickerResult = it },
+                routeStep = routeStep,
+                selectedStops = selectedStops,
+                onToggleStop = { location ->
+                    selectedStops = if (selectedStops.contains(location)) {
+                        selectedStops - location
+                    } else {
+                        selectedStops + location
+                    }
+                }
+            )
+            1 -> OfferWhenStep(date, time, onDateChange = { date = it }, onTimeChange = { time = it })
+            2 -> RideRepeatStep(
+                repeatWeekly, repeatDays, repeatWeeks,
+                onRepeatWeeklyChange = { weekly ->
+                    repeatWeekly = weekly
+                    if (!weekly) repeatDays = emptySet()
+                },
+                onDaysChange = { repeatDays = it },
+                onWeeksChange = { repeatWeeks = it },
+                daysTitle = "Repeat on",
+                daysHelp = "Pick at least one day."
+            )
+            3 -> OfferSeatsStep(seatsTotal, maxSeats, notes, onSeatsChange = { seatsTotal = it }, onNotesChange = { notes = it })
+            else -> OfferReviewStep(routePickerResult, date, time, selectedStops, repeatDays, repeatWeeks, seatsTotal, notes)
         }
     }
 }
 
 @Composable
-private fun RouteStep(
+internal fun OfferRouteStep(
     routePickerResult: RoutePickerResult?,
     onRouteChange: (RoutePickerResult?) -> Unit,
     selectedStops: List<NamedLocation>,
-    onToggleStop: (NamedLocation) -> Unit
+    onToggleStop: (NamedLocation) -> Unit,
+    routeStep: @Composable (onResult: (RoutePickerResult?) -> Unit) -> Unit = { CampusRoutePicker(onResult = it) }
 ) {
-    Column {
-        CampusRoutePicker(onResult = onRouteChange)
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        routeStep(onRouteChange)
         if (routePickerResult != null) {
-            Text("Optional stops along the way", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp))
             val endpoints = setOf(routePickerResult.origin, routePickerResult.destination)
-            PlaceSearchField(
-                label = "Add a stop",
-                places = APPROVED_POINTS.filter { it !in endpoints },
-                onPick = onToggleStop,
-                isPicked = { it in selectedStops },
-                modifier = Modifier.padding(top = 4.dp)
-            )
-            if (selectedStops.isNotEmpty()) {
-                Text(
-                    "Order: " + selectedStops.joinToString(" → ") { it.name },
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 8.dp)
-                )
-                // Tap a stop to remove it.
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 4.dp)) {
-                    items(selectedStops, key = { it.name }) { location ->
-                        FilterChip(
-                            selected = true,
-                            onClick = { onToggleStop(location) },
-                            label = { Text("${location.name}  ✕") }
-                        )
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun WhenStep(date: LocalDate?, time: LocalTime?, onDateChange: (LocalDate) -> Unit, onTimeChange: (LocalTime) -> Unit) {
-    Column {
-        Text("When does this ride leave?", fontWeight = FontWeight.SemiBold)
-        DatePickerField("Pick a date", date, onDateChange, modifier = Modifier.padding(top = 12.dp), allowPastDates = false)
-        TimePickerField("Pick a time", time, onTimeChange, modifier = Modifier.padding(top = 8.dp))
-        if (date != null && time != null && !isBookableDeparture(combineDateAndTime(date, time))) {
-            Text(departureTooSoonMessage(), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
-        }
-    }
-}
-
-@Composable
-private fun RepeatStep(
-    repeatWeekly: Boolean,
-    repeatDays: Set<DayOfWeek>,
-    repeatWeeks: Int,
-    onRepeatWeeklyChange: (Boolean) -> Unit,
-    onDaysChange: (Set<DayOfWeek>) -> Unit,
-    onWeeksChange: (Int) -> Unit
-) {
-    Column {
-        Text("How often?", fontWeight = FontWeight.SemiBold)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-            FilterChip(selected = !repeatWeekly, onClick = { onRepeatWeeklyChange(false) }, label = { Text("One-time only") })
-            FilterChip(selected = repeatWeekly, onClick = { onRepeatWeeklyChange(true) }, label = { Text("Repeat weekly") })
-        }
-        if (!repeatWeekly) return@Column
-        Text("Repeat on:", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp))
-        Text(
-            "Pick at least one day.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-            items(WEEK_DAYS) { day ->
-                FilterChip(
-                    selected = repeatDays.contains(day),
-                    onClick = {
-                        onDaysChange(if (repeatDays.contains(day)) repeatDays - day else repeatDays + day)
-                    },
-                    label = { Text(day.name.take(3)) }
+            FormSectionCard(
+                "Optional stops", Modifier.testTag("offer-stops"),
+                supporting = "Add approved places the ride passes on the way. Stops are visited in the order you add them. " +
+                    "The distance and time shown for your route don’t include stops."
+            ) {
+                StopPicker(
+                    places = APPROVED_POINTS.filter { it !in endpoints },
+                    selected = selectedStops,
+                    onToggle = onToggleStop
                 )
             }
         }
-        if (repeatDays.isNotEmpty()) {
-            Text("For how many weeks?", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                OutlinedButton(onClick = { if (repeatWeeks > 1) onWeeksChange(repeatWeeks - 1) }) { Text("-") }
-                Text(repeatWeeks.toString(), modifier = Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleMedium)
-                OutlinedButton(onClick = { if (repeatWeeks < 12) onWeeksChange(repeatWeeks + 1) }) { Text("+") }
-            }
-        }
     }
 }
 
 @Composable
-private fun SeatsStep(seatsTotal: Int, maxSeats: Int, notes: String, onSeatsChange: (Int) -> Unit, onNotesChange: (String) -> Unit) {
-    Column {
-        Text("How many seats are you offering?", fontWeight = FontWeight.SemiBold)
-        Text(
-            "Up to $maxSeats - your registered vehicle's seat capacity.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-            OutlinedButton(onClick = { if (seatsTotal > 1) onSeatsChange(seatsTotal - 1) }) { Text("-") }
-            Text(seatsTotal.toString(), modifier = Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleMedium)
-            OutlinedButton(onClick = { if (seatsTotal < maxSeats) onSeatsChange(seatsTotal + 1) }) { Text("+") }
-        }
-        OutlinedTextField(
-            value = notes,
-            onValueChange = onNotesChange,
-            label = { Text("Note for passengers (optional)") },
-            modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
-        )
+internal fun OfferWhenStep(date: LocalDate?, time: LocalTime?, onDateChange: (LocalDate) -> Unit, onTimeChange: (LocalTime) -> Unit) {
+    FormSectionCard("When does this ride leave?", Modifier.testTag("offer-when")) {
+        DateTimeFields(date, time, onDateChange, onTimeChange)
     }
 }
 
 @Composable
-private fun ConfirmOfferStep(
+internal fun OfferSeatsStep(seatsTotal: Int, maxSeats: Int, notes: String, onSeatsChange: (Int) -> Unit, onNotesChange: (String) -> Unit) {
+    FormSectionCard("Passenger seats available", Modifier.testTag("offer-seats")) {
+        CountStepper(seatsTotal, 1, maxSeats, onSeatsChange,
+            unit = if (seatsTotal == 1) "seat" else "seats", subject = "passenger seats available")
+        SeatBlocks(seatsTotal, capacity = maxSeats)
+        FormInfoRow(vehicleSeatsSupport(maxSeats))
+    }
+    FormSectionCard("Note for passengers", Modifier.testTag("offer-note"), trailing = { FormStatusPill("Optional") }) {
+        OptionalNoteField(notes, onNotesChange, label = "Anything passengers should know", subject = "Note for passengers")
+    }
+}
+
+@Composable
+internal fun OfferReviewStep(
     routePickerResult: RoutePickerResult?,
     date: LocalDate?,
     time: LocalTime?,
@@ -294,21 +220,21 @@ private fun ConfirmOfferStep(
     notes: String
 ) {
     val route = routePickerResult ?: return
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Review your ride", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text("${route.origin.name} → ${route.destination.name}")
-            if (stops.isNotEmpty()) Text("Via: " + stops.joinToString(", ") { it.name })
-            val departure = combineDateAndTime(date, time)
-            if (departure != null) Text(SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault()).format(Date(departure)))
-            Text("%.1f km, about %d min".format(route.distanceMeters / 1000.0, route.estimatedDurationSeconds / 60))
-            Text("$seatsTotal seat(s) offered")
-            if (repeatDays.isNotEmpty()) {
-                Text("Repeats on ${repeatDays.sortedBy { it.value }.joinToString(", ") { it.name.take(3) }} for $repeatWeeks week(s)")
-            } else {
-                Text("One-time trip")
-            }
-            notes.takeIf { it.isNotBlank() }?.let { Text("Note: $it") }
+    FormSectionCard("Review your ride", Modifier.testTag("offer-review")) {
+        ReviewSection("ROUTE") { ReviewRouteBlock(route, via = stops.map { it.name }) }
+        ReviewDivider()
+        ReviewSection("WHEN") {
+            if (date != null && time != null) Text(departureSummary(date, time), fontWeight = FontWeight.Bold)
+            Text(
+                repeatSummary(repeatDays, repeatWeeks)?.let { "Repeats on $it" } ?: "One-time trip",
+                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        ReviewDivider()
+        ReviewSection("SEATS OFFERED") { Text(seatsOfferedLabel(seatsTotal), fontWeight = FontWeight.Bold) }
+        notes.trim().takeIf { it.isNotEmpty() }?.let {
+            ReviewDivider()
+            ReviewSection("NOTE") { Text("“$it”") }
         }
     }
 }

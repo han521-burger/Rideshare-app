@@ -37,12 +37,19 @@ fun DatePickerField(
     selectedDate: LocalDate?,
     onDateSelected: (LocalDate) -> Unit,
     modifier: Modifier = Modifier,
-    allowPastDates: Boolean = true
+    allowPastDates: Boolean = true,
+    // Optional custom entry surface (Request/Offer wizards). Default is the original outlined button;
+    // the dialog, date limits and result are identical either way.
+    trigger: (@Composable (valueText: String?, onClick: () -> Unit) -> Unit)? = null
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
-    OutlinedButton(onClick = { showDialog = true }, modifier = modifier.fillMaxWidth()) {
-        Text(selectedDate?.let { formatDate(it) } ?: label)
+    if (trigger != null) {
+        trigger(selectedDate?.let { formatDate(it) }) { showDialog = true }
+    } else {
+        OutlinedButton(onClick = { showDialog = true }, modifier = modifier.fillMaxWidth()) {
+            Text(selectedDate?.let { formatDate(it) } ?: label)
+        }
     }
 
     if (showDialog) {
@@ -88,12 +95,17 @@ fun TimePickerField(
     label: String,
     selectedTime: LocalTime?,
     onTimeSelected: (LocalTime) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    trigger: (@Composable (valueText: String?, onClick: () -> Unit) -> Unit)? = null
 ) {
     var showDialog by remember { mutableStateOf(false) }
 
-    OutlinedButton(onClick = { showDialog = true }, modifier = modifier.fillMaxWidth()) {
-        Text(selectedTime?.let { formatTime(it) } ?: label)
+    if (trigger != null) {
+        trigger(selectedTime?.let { formatTime(it) }) { showDialog = true }
+    } else {
+        OutlinedButton(onClick = { showDialog = true }, modifier = modifier.fillMaxWidth()) {
+            Text(selectedTime?.let { formatTime(it) } ?: label)
+        }
     }
 
     if (showDialog) {
@@ -140,8 +152,8 @@ fun departureTooSoonMessage(nowMillis: Long = System.currentTimeMillis()): Strin
     return "Pick a time at least $MIN_BOOKING_LEAD_MINUTES minutes from now (${formatTime(earliest)} or later)."
 }
 
-private fun formatDate(date: LocalDate): String =
+internal fun formatDate(date: LocalDate): String =
     date.format(DateTimeFormatter.ofPattern("EEE d MMM yyyy", Locale.getDefault()))
 
-private fun formatTime(time: LocalTime): String =
+internal fun formatTime(time: LocalTime): String =
     time.format(DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault()))

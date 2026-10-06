@@ -1,22 +1,6 @@
 package com.example.ds04_monash_rideshare_application.feature.rides
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Card
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -24,16 +8,24 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
 import com.example.ds04_monash_rideshare_application.Repository.Remote.StandaloneRequestDraft
+import com.example.ds04_monash_rideshare_application.core.ui.AsapToggleRow
 import com.example.ds04_monash_rideshare_application.core.ui.CampusRoutePicker
-import com.example.ds04_monash_rideshare_application.core.ui.DatePickerField
+import com.example.ds04_monash_rideshare_application.core.ui.CountStepper
+import com.example.ds04_monash_rideshare_application.core.ui.FormBanner
+import com.example.ds04_monash_rideshare_application.core.ui.FormBannerKind
+import com.example.ds04_monash_rideshare_application.core.ui.FormInfoRow
+import com.example.ds04_monash_rideshare_application.core.ui.FormSectionCard
+import com.example.ds04_monash_rideshare_application.core.ui.FormStatusPill
+import com.example.ds04_monash_rideshare_application.core.ui.OptionalNoteField
+import com.example.ds04_monash_rideshare_application.core.ui.ReviewDivider
+import com.example.ds04_monash_rideshare_application.core.ui.ReviewSection
+import com.example.ds04_monash_rideshare_application.core.ui.RideFlowScaffold
 import com.example.ds04_monash_rideshare_application.core.ui.RoutePickerResult
-import com.example.ds04_monash_rideshare_application.core.ui.StepWizardScaffold
-import com.example.ds04_monash_rideshare_application.core.ui.TimePickerField
+import com.example.ds04_monash_rideshare_application.core.ui.SeatBlocks
 import com.example.ds04_monash_rideshare_application.core.ui.combineDateAndTime
 import com.example.ds04_monash_rideshare_application.core.ui.departureTooSoonMessage
 import com.example.ds04_monash_rideshare_application.core.ui.isBookableDeparture
@@ -41,22 +33,20 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalTime
 
-private val ASAP_STEP_LABELS = listOf("Route", "When", "Note", "Confirm")
-private val SCHEDULED_STEP_LABELS = listOf("Route", "When", "Repeat", "Note", "Confirm")
-private val WEEK_DAYS = listOf(
-    DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY, DayOfWeek.THURSDAY,
-    DayOfWeek.FRIDAY, DayOfWeek.SATURDAY, DayOfWeek.SUNDAY
-)
-
 // Request-a-Ride flow: a standalone ask with no driver picked yet - route + time, posted as
 // PENDING ("waiting for a driver") until some driver accepts it from their Requests tab. Distinct
 // from RequestSeatFlowScreen, which requests a seat on a ride you've already picked by browsing.
+// Phase 8B: presentation only (RideFlowScaffold + approved cards). State, validation and the submitted
+// draft are exactly as before.
 @Composable
 fun RequestRideFlowScreen(
     isSubmitting: Boolean,
     onSubmit: (StandaloneRequestDraft, onDone: (String?) -> Unit) -> Unit,
     onExit: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // The Route step. Defaults to the real picker; tests substitute a fake so later steps can be reached
+    // without a live geocoder / driving-route lookup.
+    routeStep: @Composable (onResult: (RoutePickerResult?) -> Unit) -> Unit = { CampusRoutePicker(onResult = it) }
 ) {
     var step by rememberSaveable { mutableStateOf(0) }
     var routePickerResult by remember { mutableStateOf<RoutePickerResult?>(null) }
@@ -71,33 +61,43 @@ fun RequestRideFlowScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
 
     // ASAP has no scheduling concept, so the Repeat step (and any days already picked there)
-    // never applies to it - drop straight from When to Note.
-    val stepLabels = if (isAsap) ASAP_STEP_LABELS else SCHEDULED_STEP_LABELS
+    // never applies to it - drop straight from When to Details.
+    val stepLabels = requestStepLabels(isAsap)
+    val currentLabel = stepLabels.getOrNull(step)
 
-    val canGoNext = when (stepLabels.getOrNull(step)) {
-        "Route" -> routePickerResult != null
-        "When" -> isAsap || isBookableDeparture(combineDateAndTime(date, time))
-        "Repeat" -> !repeatWeekly || repeatDays.isNotEmpty()
+    val canGoNext = when (currentLabel) {
+        STEP_ROUTE -> routePickerResult != null
+        STEP_WHEN -> isAsap || isBookableDeparture(combineDateAndTime(date, time))
+        STEP_REPEAT -> !repeatWeekly || repeatDays.isNotEmpty()
         else -> true
     }
+    val hint = when (currentLabel) {
+        STEP_ROUTE -> "Choose a campus and an approved point to continue."
+        STEP_WHEN -> whenHint(date != null, time != null, date != null && time != null && !canGoNext)
+        STEP_REPEAT -> "Pick at least one day to continue."
+        else -> null
+    }
 
-    StepWizardScaffold(
+    RideFlowScaffold(
         title = "Request a ride",
         stepLabels = stepLabels,
         currentStep = step,
         canGoNext = canGoNext,
+        hint = hint,
         isSubmitting = isSubmitting,
+        finalLabel = "Confirm request",
+        busyLabel = "Sending request…",
         onBackStep = { step-- },
         onNextStep = {
             if (step < stepLabels.lastIndex) {
                 step++
-                return@StepWizardScaffold
+                return@RideFlowScaffold
             }
-            val route = routePickerResult ?: return@StepWizardScaffold
+            val route = routePickerResult ?: return@RideFlowScaffold
             // The clock keeps moving while the passenger fills in later steps - re-check at submit.
             if (!isAsap && !isBookableDeparture(combineDateAndTime(date, time))) {
                 errorMessage = departureTooSoonMessage() + " Go back to When to change it."
-                return@StepWizardScaffold
+                return@RideFlowScaffold
             }
             val draft = StandaloneRequestDraft(
                 originLat = route.origin.point.latitude, originLng = route.origin.point.longitude,
@@ -113,49 +113,49 @@ fun RequestRideFlowScreen(
         },
         onExit = onExit,
         modifier = modifier
-    ) { contentPadding: PaddingValues ->
-        Column(
-            modifier = Modifier
-                .padding(contentPadding)
-                .padding(16.dp)
-                .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-        ) {
-            when (stepLabels.getOrNull(step)) {
-                "Route" -> CampusRoutePicker(onResult = { routePickerResult = it })
-                "When" -> WhenStep(
-                    isAsap, date, time,
-                    onAsapChange = { checked ->
-                        isAsap = checked
-                        // Clear any days picked before switching to ASAP so a stale selection
-                        // can't leak into the submitted draft or the Confirm summary.
-                        if (checked) {
-                            repeatWeekly = false
-                            repeatDays = emptySet()
-                        }
-                    },
-                    onDateChange = { date = it },
-                    onTimeChange = { time = it }
-                )
-                "Repeat" -> RepeatStep(
-                    repeatWeekly, repeatDays, repeatWeeks,
-                    onRepeatWeeklyChange = { weekly ->
-                        repeatWeekly = weekly
-                        if (!weekly) repeatDays = emptySet()
-                    },
-                    onDaysChange = { repeatDays = it },
-                    onWeeksChange = { repeatWeeks = it }
-                )
-                "Note" -> NoteStep(seats, note, onSeatsChange = { seats = it }, onNoteChange = { note = it })
-                else -> ConfirmStep(routePickerResult, isAsap, date, time, repeatDays, repeatWeeks, seats, note)
+    ) {
+        // The submit error lives with the Review step it belongs to; hidden while a retry is in flight.
+        if (currentLabel == STEP_REVIEW && !isSubmitting) {
+            errorMessage?.let {
+                FormBanner(it, FormBannerKind.Error, Modifier.testTag("ride-error"), title = "Request not sent")
             }
-            errorMessage?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 12.dp)) }
+        }
+        if (currentLabel != STEP_ROUTE && currentLabel != STEP_REVIEW) routePickerResult?.let { RideRouteRecap(it) }
+        when (currentLabel) {
+            STEP_ROUTE -> routeStep { routePickerResult = it }
+            STEP_WHEN -> RequestWhenStep(
+                isAsap, date, time,
+                onAsapChange = { checked ->
+                    isAsap = checked
+                    // Clear any days picked before switching to ASAP so a stale selection
+                    // can't leak into the submitted draft or the review summary.
+                    if (checked) {
+                        repeatWeekly = false
+                        repeatDays = emptySet()
+                    }
+                },
+                onDateChange = { date = it },
+                onTimeChange = { time = it }
+            )
+            STEP_REPEAT -> RideRepeatStep(
+                repeatWeekly, repeatDays, repeatWeeks,
+                onRepeatWeeklyChange = { weekly ->
+                    repeatWeekly = weekly
+                    if (!weekly) repeatDays = emptySet()
+                },
+                onDaysChange = { repeatDays = it },
+                onWeeksChange = { repeatWeeks = it },
+                daysTitle = "Also repeat on",
+                daysHelp = "Pick at least one day. Each day becomes its own request a driver can accept."
+            )
+            STEP_DETAILS -> RequestDetailsStep(seats, note, onSeatsChange = { seats = it }, onNoteChange = { note = it })
+            else -> RequestReviewStep(routePickerResult, isAsap, date, time, repeatDays, repeatWeeks, seats, note)
         }
     }
 }
 
 @Composable
-private fun WhenStep(
+internal fun RequestWhenStep(
     isAsap: Boolean,
     date: LocalDate?,
     time: LocalTime?,
@@ -163,87 +163,31 @@ private fun WhenStep(
     onDateChange: (LocalDate) -> Unit,
     onTimeChange: (LocalTime) -> Unit
 ) {
-    Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text("Leave ASAP", fontWeight = FontWeight.SemiBold)
-            Switch(checked = isAsap, onCheckedChange = onAsapChange)
-        }
-        if (!isAsap) {
-            DatePickerField("Pick a date", date, onDateChange, modifier = Modifier.padding(top = 12.dp), allowPastDates = false)
-            TimePickerField("Pick a time", time, onTimeChange, modifier = Modifier.padding(top = 8.dp))
-            if (date != null && time != null && !isBookableDeparture(combineDateAndTime(date, time))) {
-                Text(departureTooSoonMessage(), color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(top = 8.dp))
-            }
+    FormSectionCard("When do you need to leave?", Modifier.testTag("request-when")) {
+        AsapToggleRow(isAsap, onAsapChange, Modifier.testTag("request-asap"))
+        if (isAsap) {
+            FormInfoRow("ASAP requests don’t need a date or time and can’t repeat. Turn it off to pick a set time — scheduled requests add a Repeat step.")
+        } else {
+            DateTimeFields(date, time, onDateChange, onTimeChange)
+            FormInfoRow("Scheduled requests have 5 steps — a Repeat step is added after this one.")
         }
     }
 }
 
 @Composable
-private fun RepeatStep(
-    repeatWeekly: Boolean,
-    repeatDays: Set<DayOfWeek>,
-    repeatWeeks: Int,
-    onRepeatWeeklyChange: (Boolean) -> Unit,
-    onDaysChange: (Set<DayOfWeek>) -> Unit,
-    onWeeksChange: (Int) -> Unit
-) {
-    Column {
-        Text("How often?", fontWeight = FontWeight.SemiBold)
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-            FilterChip(selected = !repeatWeekly, onClick = { onRepeatWeeklyChange(false) }, label = { Text("One-time only") })
-            FilterChip(selected = repeatWeekly, onClick = { onRepeatWeeklyChange(true) }, label = { Text("Repeat weekly") })
-        }
-        if (!repeatWeekly) return@Column
-        Text("Also want this on:", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp))
-        Text(
-            "Pick at least one day. Each day becomes its own request a driver can accept.",
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
-        )
-        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(top = 8.dp)) {
-            items(WEEK_DAYS) { day ->
-                FilterChip(
-                    selected = repeatDays.contains(day),
-                    onClick = { onDaysChange(if (repeatDays.contains(day)) repeatDays - day else repeatDays + day) },
-                    label = { Text(day.name.take(3)) }
-                )
-            }
-        }
-        if (repeatDays.isNotEmpty()) {
-            Text("For how many weeks?", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 16.dp))
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                OutlinedButton(onClick = { if (repeatWeeks > 1) onWeeksChange(repeatWeeks - 1) }) { Text("-") }
-                Text(repeatWeeks.toString(), modifier = Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleMedium)
-                OutlinedButton(onClick = { if (repeatWeeks < 12) onWeeksChange(repeatWeeks + 1) }) { Text("+") }
-            }
-        }
+internal fun RequestDetailsStep(seats: Int, note: String, onSeatsChange: (Int) -> Unit, onNoteChange: (String) -> Unit) {
+    FormSectionCard("Seats needed", Modifier.testTag("request-seats")) {
+        CountStepper(seats, 1, MAX_REQUEST_SEATS, onSeatsChange, unit = if (seats == 1) "seat" else "seats", subject = "seats needed")
+        SeatBlocks(seats)
+        FormInfoRow("You can request 1 to $MAX_REQUEST_SEATS seats.")
+    }
+    FormSectionCard("Note to driver", Modifier.testTag("request-note"), trailing = { FormStatusPill("Optional") }) {
+        OptionalNoteField(note, onNoteChange, label = "Anything the driver should know", subject = "Note to driver")
     }
 }
 
 @Composable
-private fun NoteStep(seats: Int, note: String, onSeatsChange: (Int) -> Unit, onNoteChange: (String) -> Unit) {
-    Column {
-        Text("Seats needed", fontWeight = FontWeight.SemiBold)
-        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-            OutlinedButton(onClick = { if (seats > 1) onSeatsChange(seats - 1) }) { Text("-") }
-            Text(seats.toString(), modifier = Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleMedium)
-            OutlinedButton(onClick = { if (seats < 4) onSeatsChange(seats + 1) }) { Text("+") }
-        }
-        OutlinedTextField(
-            value = note,
-            onValueChange = onNoteChange,
-            label = { Text("Note to driver (optional)") },
-            modifier = Modifier.fillMaxWidth().padding(top = 16.dp)
-        )
-    }
-}
-
-@Composable
-private fun ConfirmStep(
+internal fun RequestReviewStep(
     routePickerResult: RoutePickerResult?,
     isAsap: Boolean,
     date: LocalDate?,
@@ -254,23 +198,27 @@ private fun ConfirmStep(
     note: String
 ) {
     val route = routePickerResult ?: return
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Review your request", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-            Text("${route.origin.name} → ${route.destination.name}")
-            Text(if (isAsap) "Leaving ASAP" else "Scheduled${if (date != null && time != null) " for $date at $time" else ""}")
-            Text("$seats seat(s)")
-            if (repeatDays.isNotEmpty()) {
-                Text("Also wants: ${repeatDays.sortedBy { it.value }.joinToString(", ") { it.name.take(3) }} for $repeatWeeks week(s)")
-            } else if (!isAsap) {
-                Text("One-time trip")
+    FormSectionCard("Review your request", Modifier.testTag("request-review")) {
+        ReviewSection("ROUTE") { ReviewRouteBlock(route) }
+        ReviewDivider()
+        ReviewSection("WHEN") {
+            if (isAsap) {
+                Text("Leaving ASAP", fontWeight = FontWeight.Bold)
+                Text("No set time — waits for a driver.", style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            } else {
+                if (date != null && time != null) Text(departureSummary(date, time), fontWeight = FontWeight.Bold)
+                Text(
+                    repeatSummary(repeatDays, repeatWeeks)?.let { "Also wants: $it" } ?: "One-time trip",
+                    style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
-            note.takeIf { it.isNotBlank() }?.let { Text("Note: $it") }
-            Text(
-                "No fare shown - request sent, waiting for a driver.",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
+        ReviewDivider()
+        ReviewSection("SEATS") { Text(seatsNeededLabel(seats), fontWeight = FontWeight.Bold) }
+        note.trim().takeIf { it.isNotEmpty() }?.let {
+            ReviewDivider()
+            ReviewSection("NOTE") { Text("“$it”") }
+        }
+        FormInfoRow("No fare is shown. Your request is sent and waits for a driver to accept.")
     }
 }
