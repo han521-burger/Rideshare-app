@@ -65,6 +65,26 @@ Vehicles and Requests.
 **Instrumented UI tests (`app/src/androidTest/...`)** — Compose tests for Home, Activity,
 Profile, Vehicles, Requests, completing a ride, and accessibility semantics.
 
+**Domain logic suite (`...domain` packages, JVM only, no emulator):** one place to point at when
+asked "is the logic tested separately from the UI?" - routing and hub data, nearest-hub selection,
+seat and vehicle rules, booking/overlap rules, the CO2 formula, impact aggregation and the demo-history
+generator/seeder. Run just these with:
+
+```
+./gradlew :app:testDebugUnitTest --tests "*.domain.*"
+./gradlew :backend:test --tests "*.domain.*"
+```
+
+- App (`app/src/test/.../domain`): `ApprovedLocationLogicTest` (25 hubs + 5 campuses unique and valid,
+  haversine, nearest-hub ranking: known references, brute-force agreement, stable ties, prefix
+  property) and `VehicleRulesParityTest` (the app's fuel/body/seat choices match the backend's rules
+  and emissions factors; the backend source is parsed because the modules cannot import each other).
+  `ApprovedLocationLogicTest` also pins that the app's hub/campus lists equal the backend's.
+- Backend (`backend/src/test/.../domain`): `EmissionsTest`, `HubDatasetTest`, `TripRulesTest`,
+  `SeatAndVehicleRulesTest`, `ImpactAggregationTest` (only COMPLETED driven rides count; passenger and
+  non-completed rides do not), `DemoHistoryGeneratorTest`, `DemoHistorySeederTest` (explicit target,
+  idempotent, removable, valid under the schema, and the real dashboard/analytics compute from it).
+
 **Not covered by automated tests yet:** the Offer/Request ride step flows (one-time/repeat
 choice, 30-minute rule in the pickers), the conflict pop-up and Undo bar in the UI, sign-in
 screen UI, expired-request "Request again", and Messages. These are checked by hand on two

@@ -51,6 +51,23 @@ which works while the server is running:
 It prints a 12-character temporary password and signs that account out everywhere; pass it on and
 ask them to change it.
 
+**Demo completed-ride history** (synthetic, for presenting Activity / Impact): an operator can give
+one existing account a deterministic set of ~32 COMPLETED rides over ~10 weeks, from a terminal:
+
+```
+./gradlew :backend:seedDemoHistory --args="someone@student.monash.edu"            # seed (idempotent)
+./gradlew :backend:seedDemoHistory --args="someone@student.monash.edu --remove"   # delete it again
+```
+
+The target (email or user id) must already exist and have a registered vehicle - it is never created
+or edited. Driven rides use that vehicle; the rest are rides the account took as a passenger on
+clearly-named synthetic "Demo Driver/Passenger" accounts (no password, `@demo.invalid`). Everything
+is ordinary rows in an id namespace starting `demohist-`, so `--remove` deletes only demo records,
+and re-running the seed does nothing. There is no HTTP endpoint and no automatic seeding. Impact
+figures are NOT stored: the normal dashboard/analytics code computes them from the rows
+(`DemoHistoryGenerator.kt` plans, `DemoHistorySeeder.kt` writes). Like `resetPassword` it opens
+`rideshare-backend.db` in the working directory - check which backend you are pointing at first.
+
 Passwords are stored as PBKDF2 hashes (`Passwords.kt`). Every other request must send
 `Authorization: Bearer <token>`; `Auth.kt`'s `requireUserId()` resolves it via the `sessions`
 table (30-day expiry). Backend tests may send a userId as the token instead - only because the

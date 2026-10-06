@@ -57,6 +57,18 @@ tasks.register('resetPassword', JavaExec) {
     workingDir = projectDir
 }
 
+// Explicit, operator-run SYNTHETIC demo history for one existing account (see
+// DemoHistorySeeder.kt). Idempotent; --remove deletes only the demo records again:
+//   ./gradlew :backend:seedDemoHistory --args="someone@student.monash.edu"
+//   ./gradlew :backend:seedDemoHistory --args="someone@student.monash.edu --remove"
+tasks.register('seedDemoHistory', JavaExec) {
+    group = 'application'
+    description = 'Seeds (or with --remove, removes) synthetic completed-ride history for one account.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.example.ds04_monash_rideshare_application.backend.SeedDemoHistoryTool'
+    workingDir = projectDir
+}
+
 test {
     useJUnitPlatform()
     // Lets tests call as a seeded user by sending its userId as the bearer token (see Auth.kt).
