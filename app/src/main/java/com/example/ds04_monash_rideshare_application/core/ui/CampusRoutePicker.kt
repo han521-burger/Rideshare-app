@@ -234,6 +234,9 @@ fun CampusRoutePicker(onResult: (RoutePickerResult?) -> Unit, modifier: Modifier
             }
         }
 
+        // Informational only (prototype demand): never changes the campus, hub or route above.
+        DemandZonesCard(campus = campus, markers = endpoints?.let { listOf(it.first, it.second) }.orEmpty())
+
         // 5 + 6: selected route context
         if (endpoints != null) {
             FormSectionCard("Your route", Modifier.testTag("route-card")) {

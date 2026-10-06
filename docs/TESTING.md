@@ -85,6 +85,11 @@ generator/seeder. Run just these with:
   non-completed rides do not), `DemoHistoryGeneratorTest`, `DemoHistorySeederTest` (explicit target,
   idempotent, removable, valid under the schema, and the real dashboard/analytics compute from it).
 
+**Demand zones (prototype, synthetic data):** `DemandAggregationTest`, `SyntheticDemandTest` and
+`DemandPaletteTest` (app `...domain` package) cover time bucketing, per-hub aggregation, normalisation,
+ranking, determinism of the synthetic history and the zone colours; `DemandZonesCardTest`
+(androidTest) covers the card's toggle, disclosure and large-text behaviour. See `docs/DEMAND.md`.
+
 **Not covered by automated tests yet:** the Offer/Request ride step flows (one-time/repeat
 choice, 30-minute rule in the pickers), the conflict pop-up and Undo bar in the UI, sign-in
 screen UI, expired-request "Request again", and Messages. These are checked by hand on two
