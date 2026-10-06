@@ -182,26 +182,23 @@ class RequestsScreenTest {
         compose.runOnIdle { assertEquals(1, searches) }
     }
 
-    @Test fun bannerReservesMeasuredSpaceAndReleasesItAfterExit() {
+    // The banner floats over the page like a phone notification: the content never moves when it
+    // appears or goes away, so dismissing it can't leave a blank gap.
+    @Test fun bannerFloatsOverContentWithoutMovingIt() {
         val banner = mutableStateOf<RideRequestSummary?>(request().copy(rideId = "ride", ride = ride()))
-        val error = mutableStateOf<String?>(null)
         compose.setContent {
             BottomNavScaffold(AppMode.DRIVER, {}, AppDestination.Requests, {}, 2, banner.value, 2, false,
-                error.value, {}, {}, {}, "Amara") { padding ->
+                null, {}, {}, {}, "Amara") { padding ->
                 Box(Modifier.padding(padding).fillMaxSize().testTag("reserved-content")) { Text("Requests content") }
             }
         }
         compose.waitForIdle()
-        val initial = compose.onNodeWithTag("reserved-content").fetchSemanticsNode().boundsInRoot.top
-        assertTrue(initial >= compose.onNodeWithTag("global-request-banner").fetchSemanticsNode().boundsInRoot.bottom)
-        compose.runOnIdle { error.value = "Unable to accept this request. Please review the request details before trying again." }
-        compose.waitForIdle()
-        assertTrue(compose.onNodeWithTag("reserved-content").fetchSemanticsNode().boundsInRoot.top >=
-            compose.onNodeWithTag("global-request-banner").fetchSemanticsNode().boundsInRoot.bottom)
+        compose.onNodeWithTag("global-request-banner").assertIsDisplayed()
+        val withBanner = compose.onNodeWithTag("reserved-content").fetchSemanticsNode().boundsInRoot.top
         compose.runOnIdle { banner.value = null }
         compose.waitForIdle()
         compose.onNodeWithTag("global-request-banner").assertDoesNotExist()
-        assertTrue(compose.onNodeWithTag("reserved-content").fetchSemanticsNode().boundsInRoot.top < initial)
+        assertEquals(withBanner, compose.onNodeWithTag("reserved-content").fetchSemanticsNode().boundsInRoot.top)
     }
     @Test fun largeTextBannerKeepsContentAndAllAttachedActionsReachable() {
         val banner = mutableStateOf(request())

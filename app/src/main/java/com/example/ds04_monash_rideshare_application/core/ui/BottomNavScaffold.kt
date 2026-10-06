@@ -15,8 +15,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.calculateStartPadding
-import androidx.compose.foundation.layout.calculateEndPadding
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -39,15 +37,14 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import com.example.ds04_monash_rideshare_application.feature.activity.ActivityHeader
 import com.example.ds04_monash_rideshare_application.feature.activity.activityColorScheme
@@ -98,9 +95,7 @@ fun BottomNavScaffold(
     )
     val accent = colorScheme.primary
     val density = LocalDensity.current
-    val layoutDirection = LocalLayoutDirection.current
     var brandHeaderHeight by remember { mutableStateOf(0.dp) }
-    var bannerHeight by remember { mutableStateOf(0.dp) }
     var bottomBarHeight by remember { mutableStateOf(0.dp) }
     var displayedRequest by remember { mutableStateOf(driverRequest) }
     // Swiping a banner away hides it for good, like a real notification: the caller remembers the
@@ -177,16 +172,9 @@ fun BottomNavScaffold(
                         }
                     }
                 },
-                content = { padding ->
-                    // Only Requests opts into reservation; other tabs retain their validated layout.
-                    val occupied = if (currentTab == AppDestination.Requests) bannerHeight else 0.dp
-                    content(PaddingValues(
-                        start = padding.calculateStartPadding(layoutDirection),
-                        top = padding.calculateTopPadding() + occupied,
-                        end = padding.calculateEndPadding(layoutDirection),
-                        bottom = padding.calculateBottomPadding()
-                    ))
-                }
+                // The request banner floats over the content like a phone notification - no space is
+                // reserved for it, so swiping it away never leaves a gap behind.
+                content = { padding -> content(padding) }
             )
 
             AnimatedVisibility(
@@ -199,25 +187,26 @@ fun BottomNavScaffold(
                         else Modifier.statusBarsPadding().padding(top = 72.dp))
                     .padding(horizontal = 12.dp)
                     .widthIn(max = 600.dp)
-                    .onSizeChanged { bannerHeight = with(density) { it.height.toDp() } }
                     .testTag("global-request-banner")
                     .zIndex(2f)
             ) {
-                // Keep space during fade/slide exit; release it when animated content is disposed.
-                DisposableEffect(Unit) { onDispose { bannerHeight = 0.dp } }
                 (driverRequest ?: displayedRequest)?.let { request ->
-                    DriverRequestNotification(
-                        modifier = if (currentTab == AppDestination.Requests)
-                            Modifier.heightIn(max = bannerLimit).verticalScroll(rememberScrollState()) else Modifier,
-                        request = request,
-                        totalWaiting = driverRequestCount,
-                        isActionInFlight = isRequestActionInFlight,
-                        errorMessage = requestActionError,
-                        onReview = { onReviewDriverRequest(request.requestId) },
-                        onAccept = { onAcceptDriverRequest(request.requestId) },
-                        onDecline = { onDeclineDriverRequest(request.requestId) },
-                        onSwipeDismiss = { onDismissDriverRequest(request.requestId) }
-                    )
+                    // Keyed by request so the next request starts with fresh swipe state - otherwise it
+                    // would inherit the previous banner's swiped-off position and show as a blank box.
+                    key(request.requestId) {
+                        DriverRequestNotification(
+                            // Floating over the content, so cap its height (large text, long errors).
+                            modifier = Modifier.heightIn(max = bannerLimit).verticalScroll(rememberScrollState()),
+                            request = request,
+                            totalWaiting = driverRequestCount,
+                            isActionInFlight = isRequestActionInFlight,
+                            errorMessage = requestActionError,
+                            onReview = { onReviewDriverRequest(request.requestId) },
+                            onAccept = { onAcceptDriverRequest(request.requestId) },
+                            onDecline = { onDeclineDriverRequest(request.requestId) },
+                            onSwipeDismiss = { onDismissDriverRequest(request.requestId) }
+                        )
+                    }
                 }
             }
         }
