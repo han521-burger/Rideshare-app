@@ -247,10 +247,17 @@ private fun IncomingRequestsList(requests: List<RideRequestSummary>, resource: R
                 }
             }
         }) {
-        items(sorted, key = { it.requestId }) { request ->
-            val route = routesByRequestId[request.requestId]
-            RequestCard(request, true, { onOpenRequest(request.requestId) },
-                distanceLabel = if (resolvedPoint != null) route?.let { drivingDistance(it.distanceMeters, it.estimatedDurationSeconds) } else null)
+        // Soonest first (unless sorting by distance), with repeating asks grouped into one card.
+        items(groupIncomingRequests(sorted, keepOrder = resolvedPoint != null), key = { it.key }) { entry ->
+            when (entry) {
+                is RequestSeries -> RequestSeriesCard(entry, onOpenRequest)
+                is SingleRequest -> {
+                    val request = entry.request
+                    val route = routesByRequestId[request.requestId]
+                    RequestCard(request, true, { onOpenRequest(request.requestId) },
+                        distanceLabel = if (resolvedPoint != null) route?.let { drivingDistance(it.distanceMeters, it.estimatedDurationSeconds) } else null)
+                }
+            }
         }
     }
 }

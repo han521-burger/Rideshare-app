@@ -2,12 +2,18 @@ package com.example.ds04_monash_rideshare_application.feature.requests
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
@@ -162,6 +168,44 @@ internal fun RequestsSkeletons() {
                     }
                 }
             }
+        }
+    }
+}
+
+// A passenger's repeating ask as one card. Tapping it shows each date; each date opens its own
+// request, so the driver can still accept some dates and leave the rest.
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+internal fun RequestSeriesCard(series: RequestSeries, onOpenRequest: (String) -> Unit) {
+    val first = series.requests.first()
+    var expanded by rememberSaveable(series.key) { mutableStateOf(false) }
+    RequestsCard(series.key, onClick = { expanded = !expanded }) {
+        first.passenger?.let { Text(it.displayName, fontWeight = FontWeight.SemiBold) }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            RequestsChip("Repeats · ${series.requests.size} dates")
+            Text(seriesSummary(series), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        requestPlaces(first)?.let { CompactRoute(it) }
+        first.note?.takeIf(String::isNotBlank)?.let { Text("“$it”", style = MaterialTheme.typography.bodySmall) }
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        if (expanded) {
+            series.requests.forEach { request ->
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 48.dp)
+                        .clickable(role = Role.Button, onClickLabel = "Review this date") { onOpenRequest(request.requestId) }
+                        .testTag("series-date-${request.requestId}"),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(requestTime(request), Modifier.weight(1f), style = MaterialTheme.typography.bodyMedium)
+                    CardAffordance("Review")
+                }
+            }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+        }
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("${first.seatsRequested} ${if (first.seatsRequested == 1) "seat" else "seats"} each",
+                style = MaterialTheme.typography.bodySmall)
+            CardAffordance(if (expanded) "Hide dates" else "Show dates")
         }
     }
 }

@@ -166,6 +166,8 @@ fun RideshareNavHost(
                 viewModel.loadMyRequests()
                 viewModel.loadIncomingRequests()
                 viewModel.loadMyDriverRides()
+                // Accepting as a new ride caps its seats at the driver's own car.
+                viewModel.loadVehicles()
             }
             AppDestination.Messages -> viewModel.selectedRideId?.let { viewModel.loadMessages(it) }
             AppDestination.Leaderboard -> viewModel.loadLeaderboard()
@@ -419,6 +421,7 @@ fun RideshareNavHost(
                     },
                 isActionInFlight = viewModel.actionInFlight,
                 actionErrorMessage = viewModel.requestActionError,
+                maxPassengerSeats = viewModel.vehicles.data.orEmpty().firstOrNull()?.let { it.seatCapacity - 1 },
                 onAcceptAttached = {
                     request?.let {
                         viewModel.respondToRequest(it.requestId, RequestStatus.ACCEPTED) { success, _ ->

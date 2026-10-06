@@ -1,6 +1,16 @@
 package com.example.ds04_monash_rideshare_application.feature.requests
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -30,7 +40,6 @@ import com.example.ds04_monash_rideshare_application.Repository.Remote.RequestSt
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideRequestSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
 import com.example.ds04_monash_rideshare_application.core.ui.CountStepper
-import com.example.ds04_monash_rideshare_application.core.ui.DetailCard
 import com.example.ds04_monash_rideshare_application.core.ui.FieldMessage
 import com.example.ds04_monash_rideshare_application.core.ui.FormBanner
 import com.example.ds04_monash_rideshare_application.core.ui.FormBannerKind
@@ -67,10 +76,11 @@ fun RequestDetailScreen(
     onDecline: () -> Unit,
     onCancel: () -> Unit,
     onNavigateBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Passenger seats the driver's own car can take (capacity minus the driver); null = no vehicle.
+    maxPassengerSeats: Int? = null
 ) {
-    var pickingRide by remember { mutableStateOf(false) }
-    var newRideSeats by remember(request?.seatsRequested) { mutableStateOf(request?.seatsRequested ?: 1) }
+    var choosingHowToAccept by remember { mutableStateOf(false) }
 
     RideshareScaffold(title = "Request detail", canNavigateBack = true, onNavigateBack = onNavigateBack, modifier = modifier) { contentPadding ->
         if (request == null) {
@@ -141,7 +151,7 @@ fun RequestDetailScreen(
                             border = BorderStroke(1.dp, colors.outline)
                         ) { Text("Decline") }
                         Button(
-                            onClick = { if (isStandalone) pickingRide = true else onAcceptAttached() },
+                            onClick = { if (isStandalone) choosingHowToAccept = true else onAcceptAttached() },
                             enabled = !isActionInFlight,
                             modifier = Modifier.weight(1.4f).heightIn(min = 52.dp)
                         ) { Text("Accept") }
@@ -156,39 +166,110 @@ fun RequestDetailScreen(
                 }
             }
 
-            if (pickingRide) {
-                if (myOpenRidesForAccept.isNotEmpty()) {
-                    Text("Attach to one of your posted rides", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
-                        modifier = Modifier.padding(top = 8.dp))
-                    myOpenRidesForAccept.forEach { ride ->
-                        DetailCard(modifier = Modifier.fillMaxWidth(), onClick = { onAcceptStandalone(ride.rideId) }) {
-                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                RouteTimeline(describeLocation(ride.originLat, ride.originLng), describeLocation(ride.destinationLat, ride.destinationLng))
-                                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                                    FormStatusPill(formatTime(ride.departureTime))
-                                    FormStatusPill("${ride.seatsAvailable} seat(s) free")
-                                }
-                            }
+            if (choosingHowToAccept) {
+                AcceptChoiceDialog(
+                    request = request,
+                    myOpenRides = myOpenRidesForAccept,
+                    maxPassengerSeats = maxPassengerSeats,
+                    isActionInFlight = isActionInFlight,
+                    onAttach = { rideId -> choosingHowToAccept = false; onAcceptStandalone(rideId) },
+                    onCreate = { seats -> choosingHowToAccept = false; onCreateRideAndAccept(seats) },
+                    onDismiss = { choosingHowToAccept = false }
+                )
+            }
+        }
+    }
+}
+
+private const val NEW_RIDE = "new-ride"
+
+// The one place an open ask gets accepted: pick one of your posted rides, or a new ride using the
+// ask's route and time - its seats capped by your own car (the backend enforces the same limit).
+@Composable
+private fun AcceptChoiceDialog(
+    request: RideRequestSummary,
+    myOpenRides: List<RideSummary>,
+    maxPassengerSeats: Int?,
+    isActionInFlight: Boolean,
+    onAttach: (rideId: String) -> Unit,
+    onCreate: (seats: Int) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val colors = MaterialTheme.colorScheme
+    val needed = request.seatsRequested
+    var choice by remember { mutableStateOf(myOpenRides.firstOrNull()?.rideId ?: NEW_RIDE) }
+    var seats by remember { mutableStateOf(needed) }
+    val carFits = maxPassengerSeats != null && needed <= maxPassengerSeats
+    val canConfirm = !isActionInFlight && (choice != NEW_RIDE || carFits)
+    val passengerName = request.passenger?.displayName ?: "this passenger"
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(28.dp),
+        title = { Text("Accept $passengerName") },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (myOpenRides.isNotEmpty()) {
+                    Text("Add them to one of your rides", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                    myOpenRides.forEach { ride ->
+                        ChoiceRow(
+                            selected = choice == ride.rideId,
+                            title = "${describeLocation(ride.originLat, ride.originLng)} → ${describeLocation(ride.destinationLat, ride.destinationLng)}",
+                            subtitle = "${formatTime(ride.departureTime)} · ${ride.seatsAvailable} seat(s) free",
+                            onSelect = { choice = ride.rideId }
+                        )
+                    }
+                    Text("Or", style = MaterialTheme.typography.bodySmall, color = colors.onSurfaceVariant)
+                }
+                ChoiceRow(
+                    selected = choice == NEW_RIDE,
+                    title = "New ride for this request",
+                    subtitle = "Uses their route and time",
+                    onSelect = { choice = NEW_RIDE }
+                )
+                if (choice == NEW_RIDE) {
+                    when {
+                        maxPassengerSeats == null -> FormInfoRow("Register your vehicle in Profile first - a new ride uses your car.")
+                        !carFits -> FieldMessage(
+                            "They need $needed seats but your car takes up to $maxPassengerSeats passengers.", isError = true
+                        )
+                        else -> {
+                            Text("Seats to offer on the new ride", style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
+                            CountStepper(seats.coerceIn(needed, maxPassengerSeats), needed, maxPassengerSeats, { seats = it },
+                                unit = if (seats == 1) "seat" else "seats", subject = "seats on the new ride")
+                            FieldMessage("At least $needed for this request · your car takes up to $maxPassengerSeats.", isError = false)
                         }
                     }
                 }
-
-                // Always available, not just as a fallback - accepting doesn't require having
-                // already posted a matching ride first.
-                FormSectionCard(
-                    if (myOpenRidesForAccept.isEmpty()) "Create a ride for this" else "Or create a new ride",
-                    supporting = "Total seats on the new ride - at least ${request.seatsRequested} to cover this request."
-                ) {
-                    CountStepper(newRideSeats, request.seatsRequested, 8, { newRideSeats = it },
-                        unit = if (newRideSeats == 1) "seat" else "seats", subject = "seats on the new ride")
-                    FieldMessage("Uses this request's route and time.", isError = false)
-                    Button(
-                        onClick = { onCreateRideAndAccept(newRideSeats) },
-                        enabled = !isActionInFlight,
-                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
-                    ) { Text("Create ride & accept") }
-                }
             }
+        },
+        confirmButton = {
+            TextButton(enabled = canConfirm, onClick = {
+                if (choice == NEW_RIDE) onCreate(seats.coerceIn(needed, maxPassengerSeats ?: needed)) else onAttach(choice)
+            }) { Text("Accept") }
+        },
+        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
+    )
+}
+
+@Composable
+private fun ChoiceRow(selected: Boolean, title: String, subtitle: String, onSelect: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(14.dp)
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).clip(shape)
+            .background(if (selected) colors.primaryContainer else colors.surface)
+            .border(if (selected) 1.5.dp else 1.dp, if (selected) colors.primary else colors.outlineVariant, shape)
+            .selectable(selected = selected, role = Role.RadioButton, onClick = onSelect)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        RadioButton(selected = selected, onClick = null)
+        Column(Modifier.weight(1f)) {
+            Text(title, fontWeight = FontWeight.SemiBold, color = if (selected) colors.onPrimaryContainer else colors.onSurface)
+            Text(subtitle, style = MaterialTheme.typography.bodySmall,
+                color = if (selected) colors.onPrimaryContainer else colors.onSurfaceVariant)
         }
     }
 }

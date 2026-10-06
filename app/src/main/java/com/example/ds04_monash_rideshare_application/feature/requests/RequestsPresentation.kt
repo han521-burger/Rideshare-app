@@ -6,6 +6,9 @@ import com.example.ds04_monash_rideshare_application.core.state.Resource
 import com.example.ds04_monash_rideshare_application.ui.describeLocation
 import com.example.ds04_monash_rideshare_application.ui.requestStatusLabel
 import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.TextStyle
 import java.util.Date
 import java.util.Locale
 
@@ -68,4 +71,64 @@ internal fun requestPlaces(request: RideRequestSummary): Pair<String, String>? {
     val destLat = request.destinationLat ?: return null
     val destLng = request.destinationLng ?: return null
     return describeLocation(lat, lng) to describeLocation(destLat, destLng)
+}
+
+// ---------------------------------------------------------------------------------------------
+// Driver inbox: soonest first, with a passenger's repeating ask shown as one series card
+// ---------------------------------------------------------------------------------------------
+
+internal sealed interface IncomingEntry { val key: String }
+internal data class SingleRequest(val request: RideRequestSummary) : IncomingEntry {
+    override val key get() = request.requestId
+}
+/** Two or more open asks from one passenger for the same route, time of day and seats - a "repeat weekly" request. */
+internal data class RequestSeries(val requests: List<RideRequestSummary>) : IncomingEntry {
+    override val key get() = "series-${requests.first().requestId}"
+}
+
+/** When the trip leaves: the attached ride's time, else the ask's own time. Null for ASAP. */
+internal fun requestDeparture(request: RideRequestSummary): Long? = request.ride?.departureTime ?: request.desiredDepartureTime
+
+private fun seriesKey(request: RideRequestSummary, zone: ZoneId): String? {
+    if (request.rideId != null || request.isAsap) return null
+    val time = request.desiredDepartureTime ?: return null
+    val local = Instant.ofEpochMilli(time).atZone(zone).toLocalTime()
+    return listOf(request.passengerId, request.originLat, request.originLng, request.destinationLat,
+        request.destinationLng, request.seatsRequested, local).joinToString("|")
+}
+
+/**
+ * [requests] arrive already filtered. Unless the driver chose distance sort ([keepOrder]), they're
+ * ordered soonest first (ASAP asks at the top). A passenger's repeating ask collapses into one
+ * [RequestSeries] placed where its earliest date falls.
+ */
+internal fun groupIncomingRequests(
+    requests: List<RideRequestSummary>,
+    keepOrder: Boolean,
+    zone: ZoneId = ZoneId.systemDefault()
+): List<IncomingEntry> {
+    val ordered = if (keepOrder) requests else requests.sortedWith(
+        compareBy<RideRequestSummary> { requestDeparture(it) != null }
+            .thenBy { requestDeparture(it) ?: it.createdAt }
+    )
+    val byKey = ordered.groupBy { seriesKey(it, zone) }
+    val placed = mutableSetOf<String>()
+    return ordered.mapNotNull { request ->
+        val key = seriesKey(request, zone)
+        val group = key?.let { byKey[it] }
+        when {
+            group == null || group.size < 2 -> SingleRequest(request)
+            key in placed -> null
+            else -> { placed += key; RequestSeries(group.sortedBy { requestDeparture(it) }) }
+        }
+    }
+}
+
+/** e.g. "Every Thu · 8:00 AM" or "Mon, Tue, Wed · 8:00 AM". */
+internal fun seriesSummary(series: RequestSeries, zone: ZoneId = ZoneId.systemDefault()): String {
+    val times = series.requests.mapNotNull(::requestDeparture).map { Instant.ofEpochMilli(it).atZone(zone) }
+    val days = times.map { it.dayOfWeek }.distinct().sorted()
+    val dayText = days.joinToString(", ") { it.getDisplayName(TextStyle.SHORT, Locale.getDefault()) }
+    val time = times.firstOrNull()?.let { SimpleDateFormat("h:mm a", Locale.getDefault()).format(Date(it.toInstant().toEpochMilli())) } ?: ""
+    return (if (days.size == 1) "Every $dayText" else dayText) + " · " + time
 }
