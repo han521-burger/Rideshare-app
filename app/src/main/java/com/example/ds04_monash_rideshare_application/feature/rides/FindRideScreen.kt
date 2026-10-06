@@ -1,6 +1,22 @@
 package com.example.ds04_monash_rideshare_application.feature.rides
 
 import androidx.compose.foundation.layout.Arrangement
+import com.example.ds04_monash_rideshare_application.core.ui.RouteTimeline
+import com.example.ds04_monash_rideshare_application.core.ui.PickerChoice
+import com.example.ds04_monash_rideshare_application.core.ui.FormStatusPill
+import com.example.ds04_monash_rideshare_application.core.ui.FormSectionCard
+import com.example.ds04_monash_rideshare_application.core.ui.FormBannerKind
+import com.example.ds04_monash_rideshare_application.core.ui.FormBanner
+import com.example.ds04_monash_rideshare_application.core.ui.CountStepper
+import com.example.ds04_monash_rideshare_application.core.ui.ChoiceChipGroup
+import androidx.compose.material3.Icon
+import androidx.compose.material.icons.rounded.Search
+import androidx.compose.material.icons.rounded.Schedule
+import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.CalendarToday
+import androidx.compose.material.icons.Icons
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -10,9 +26,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -26,6 +40,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.ds04_monash_rideshare_application.core.ui.DetailCard
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSearchCriteria
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
 import com.example.ds04_monash_rideshare_application.core.state.Resource
@@ -143,95 +158,76 @@ fun FindRideScreen(
             item {
                 Text(
                     "Search existing offers before posting a new request.",
+                    style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
 
             item {
-                Card(modifier = Modifier.fillMaxWidth()) {
-                    Column(
-                        modifier = Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                FormSectionCard("Where are you travelling?") {
+                    ChoiceChipGroup(
+                        options = listOf(true, false),
+                        selected = when (MONASH_CLAYTON) {
+                            destination -> true
+                            origin -> false
+                            else -> null
+                        },
+                        label = { toMonash -> if (toMonash) "To Monash" else "From Monash" },
+                        onSelect = { toMonash ->
+                            if (toMonash) {
+                                destination = MONASH_CLAYTON
+                                if (origin == MONASH_CLAYTON) origin = null
+                            } else {
+                                origin = MONASH_CLAYTON
+                                if (destination == MONASH_CLAYTON) destination = null
+                            }
+                        },
+                        groupDescription = "Direction"
+                    )
+                    LocationPicker(label = "Pickup / closest station", selected = origin, onSelected = { origin = it })
+                    LocationPicker(label = "Drop-off point", selected = destination, onSelected = { destination = it })
+                }
+            }
+
+            item {
+                FormSectionCard("When and how many?") {
+                    DatePickerField(
+                        "Travel date", date, onDateSelected = { date = it }, allowPastDates = false,
+                        trigger = { value, onClick ->
+                            PickerChoice(Icons.Rounded.CalendarToday, "Travel date", value, "Choose a date", onClick)
+                        }
+                    )
+                    TimePickerField(
+                        "Preferred pickup time", time, onTimeSelected = { time = it },
+                        trigger = { value, onClick ->
+                            PickerChoice(Icons.Rounded.Schedule, "Preferred pickup time", value, "Choose a time", onClick)
+                        }
+                    )
+                    CountStepper(seatsNeeded, 1, 8, { seatsNeeded = it },
+                        unit = if (seatsNeeded == 1) "passenger" else "passengers", subject = "passengers")
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    validationMessage?.let { FormBanner(it, FormBannerKind.Error) }
+                    Button(
+                        onClick = {
+                            val validation = validateRideSearch(
+                                origin = origin,
+                                destination = destination,
+                                date = date,
+                                time = time,
+                                seatsNeeded = seatsNeeded
+                            )
+                            validationMessage = validation.errorMessage
+                            validation.criteria?.let(onSearch)
+                        },
+                        enabled = !searchResults.isLoading,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
                     ) {
-                        Text(
-                            "Where are you travelling?",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.SemiBold
-                        )
-
-                        Text("Direction", fontWeight = FontWeight.SemiBold)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            FilterChip(
-                                selected = destination == MONASH_CLAYTON,
-                                onClick = {
-                                    destination = MONASH_CLAYTON
-                                    if (origin == MONASH_CLAYTON) origin = null
-                                },
-                                label = { Text("To Monash") }
-                            )
-                            FilterChip(
-                                selected = origin == MONASH_CLAYTON,
-                                onClick = {
-                                    origin = MONASH_CLAYTON
-                                    if (destination == MONASH_CLAYTON) destination = null
-                                },
-                                label = { Text("From Monash") }
-                            )
-                        }
-
-                        LocationPicker(
-                            label = "Pickup / closest station",
-                            selected = origin,
-                            onSelected = { origin = it }
-                        )
-                        LocationPicker(
-                            label = "Drop-off point",
-                            selected = destination,
-                            onSelected = { destination = it }
-                        )
-
-                        DatePickerField("Travel date", date, onDateSelected = { date = it }, allowPastDates = false)
-                        TimePickerField("Preferred pickup time", time, onTimeSelected = { time = it })
-
-                        Text("Passengers", fontWeight = FontWeight.SemiBold)
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = { if (seatsNeeded > 1) seatsNeeded-- }
-                            ) { Text("−") }
-                            Text(
-                                seatsNeeded.toString(),
-                                style = MaterialTheme.typography.titleLarge,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            OutlinedButton(
-                                onClick = { if (seatsNeeded < 8) seatsNeeded++ }
-                            ) { Text("+") }
-                        }
-
-                        validationMessage?.let {
-                            Text(it, color = MaterialTheme.colorScheme.error)
-                        }
-
-                        Button(
-                            onClick = {
-                                val validation = validateRideSearch(
-                                    origin = origin,
-                                    destination = destination,
-                                    date = date,
-                                    time = time,
-                                    seatsNeeded = seatsNeeded
-                                )
-                                validationMessage = validation.errorMessage
-                                validation.criteria?.let(onSearch)
-                            },
-                            enabled = !searchResults.isLoading,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("Find matching rides")
-                        }
+                        Icon(Icons.Rounded.Search, null, Modifier.size(20.dp))
+                        Text("Find matching rides", Modifier.padding(start = 8.dp))
                     }
                 }
             }
@@ -257,10 +253,10 @@ fun FindRideScreen(
                         }
                     }
                     searchResults.errorMessage != null -> item {
-                        Text(searchResults.errorMessage, color = MaterialTheme.colorScheme.error)
+                        FormBanner(searchResults.errorMessage, FormBannerKind.Error, title = "Couldn’t search rides")
                     }
                     searchResults.data.isNullOrEmpty() -> item {
-                        Card(modifier = Modifier.fillMaxWidth()) {
+                        DetailCard(modifier = Modifier.fillMaxWidth()) {
                             Column(
                                 modifier = Modifier.padding(16.dp),
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -295,13 +291,9 @@ private fun LocationPicker(
     onSelected: (NamedLocation) -> Unit
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(label, fontWeight = FontWeight.SemiBold)
+        Text(label, style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.SemiBold)
         selected?.let {
-            Text(
-                "Selected: ${it.name}",
-                color = MaterialTheme.colorScheme.primary,
-                style = MaterialTheme.typography.bodySmall
-            )
+            FormStatusPill(it.name, success = true, icon = { Icon(Icons.Rounded.Check, null, Modifier.size(14.dp)) })
         }
         PlaceSearchField(
             label = if (selected == null) "Search places" else "Change",
@@ -317,7 +309,7 @@ private fun MatchRideCard(
     ride: RideSummary,
     onOpenRide: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
+    DetailCard(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(5.dp)
@@ -332,28 +324,23 @@ private fun MatchRideCard(
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold
                 )
-                ride.matchScoreTotal?.let { score ->
-                    Text(
-                        "%.0f%% match".format(score),
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
+                ride.matchScoreTotal?.let { score -> FormStatusPill("%.0f%% match".format(score)) }
             }
-            Text(
-                "${describeLocation(ride.originLat, ride.originLng)} → " +
-                    describeLocation(ride.destinationLat, ride.destinationLng)
+            RouteTimeline(
+                describeLocation(ride.originLat, ride.originLng),
+                describeLocation(ride.destinationLat, ride.destinationLng)
             )
             Text(
-                SimpleDateFormat("EEE d MMM, h:mm a", Locale.getDefault())
-                    .format(Date(ride.departureTime))
+                SimpleDateFormat("EEE d MMM, h:mm a", Locale.getDefault()).format(Date(ride.departureTime)),
+                fontWeight = FontWeight.SemiBold
             )
             Text(
                 "${ride.seatsAvailable} seat(s) free · %.1f km · about ${ride.estimatedDurationSeconds / 60} min"
                     .format(ride.distanceMeters / 1000.0),
+                style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            Button(onClick = onOpenRide, modifier = Modifier.fillMaxWidth().padding(top = 6.dp)) {
+            Button(onClick = onOpenRide, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(top = 6.dp)) {
                 Text("View details and request a seat")
             }
         }

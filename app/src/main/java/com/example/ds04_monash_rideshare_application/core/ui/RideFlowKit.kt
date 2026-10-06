@@ -79,7 +79,7 @@ import com.example.ds04_monash_rideshare_application.feature.activity.activityCo
 
 // Building blocks for the Request Ride / Offer Ride wizards (Phase 8A design). They extend the form
 // language in FormKit.kt (cards, chips, banners, action bar) and only use MaterialTheme tokens.
-// StepWizard.kt is deliberately left alone: Request Seat still uses it.
+// Request Seat uses the same shell (the old StepWizard.kt was removed once nothing used it).
 
 /** The branded scheme shared by Home / Requests / Activity / Profile / Vehicle. */
 @Composable

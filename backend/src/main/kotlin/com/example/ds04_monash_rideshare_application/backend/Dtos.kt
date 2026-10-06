@@ -250,7 +250,9 @@ data class MessageDto(
     val rideId: String,
     val senderId: String,
     val body: String,
-    val sentAt: Long
+    val sentAt: Long,
+    // The sender's display name, so the chat can show it instead of an account id.
+    val senderName: String? = null
 )
 
 @Serializable

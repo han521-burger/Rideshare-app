@@ -336,7 +336,7 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         matchScoreTotal = dto.matchScore?.total
     )
 
-    private fun toMessageSummary(dto: MessageDto) = MessageSummary(dto.messageId, dto.rideId, dto.senderId, dto.body, dto.sentAt)
+    private fun toMessageSummary(dto: MessageDto) = MessageSummary(dto.messageId, dto.rideId, dto.senderId, dto.body, dto.sentAt, dto.senderName)
 
     private fun toDashboardSummary(dto: DashboardResponseDto) = DashboardSummary(
         totalRidesCompleted = dto.totalRidesCompleted,

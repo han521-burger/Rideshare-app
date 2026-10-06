@@ -9,6 +9,7 @@ import com.example.ds04_monash_rideshare_application.backend.Rides
 import com.example.ds04_monash_rideshare_application.backend.SendMessageRequest
 import com.example.ds04_monash_rideshare_application.backend.ValidationException
 import com.example.ds04_monash_rideshare_application.backend.requireUserId
+import com.example.ds04_monash_rideshare_application.backend.Users
 import com.example.ds04_monash_rideshare_application.backend.toMessageDto
 import io.ktor.server.application.ApplicationCall
 import io.ktor.server.application.call
@@ -50,9 +51,11 @@ fun Route.messageRoutes() {
         requireRideParticipant(userId, rideId)
 
         val messages = transaction {
-            Messages.selectAll().where { Messages.rideId eq rideId }
-                .orderBy(Messages.sentAt)
-                .map { it.toMessageDto() }
+            val rows = Messages.selectAll().where { Messages.rideId eq rideId }.orderBy(Messages.sentAt).toList()
+            val senderIds = rows.map { it[Messages.senderId] }.toSet()
+            val names = if (senderIds.isEmpty()) emptyMap() else Users.selectAll()
+                .where { Users.userId inList senderIds }.associate { it[Users.userId] to it[Users.displayName] }
+            rows.map { it.toMessageDto(names[it[Messages.senderId]]) }
         }
         call.respond(messages)
     }
@@ -76,7 +79,8 @@ fun Route.messageRoutes() {
             }
         }
         val dto = transaction {
-            Messages.selectAll().where { Messages.messageId eq messageId }.map { it.toMessageDto() }.first()
+            val name = Users.selectAll().where { Users.userId eq userId }.firstOrNull()?.get(Users.displayName)
+            Messages.selectAll().where { Messages.messageId eq messageId }.map { it.toMessageDto(name) }.first()
         }
         call.respond(dto)
     }

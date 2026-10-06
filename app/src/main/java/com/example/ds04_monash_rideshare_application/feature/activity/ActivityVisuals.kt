@@ -43,12 +43,17 @@ fun activityColorScheme(dark: Boolean = isSystemInDarkTheme(), mode: AppMode = L
     if (mode == AppMode.DRIVER) return base
     return if (dark) base.copy(
         primary = Color(0xFFA7C4DE), onPrimary = Color(0xFF102E44),
-        primaryContainer = Color(0xFF263F54), onPrimaryContainer = Color(0xFFD9E9F6)
+        primaryContainer = Color(0xFF263F54), onPrimaryContainer = Color(0xFFD9E9F6),
+        surfaceTint = Color(0xFFA7C4DE), inversePrimary = Color(0xFF2F5D7C)
     ) else base.copy(
         primary = Color(0xFF2F5D7C), onPrimary = Color.White,
-        primaryContainer = Color(0xFFDCE8F2), onPrimaryContainer = Color(0xFF173A54)
+        primaryContainer = Color(0xFFDCE8F2), onPrimaryContainer = Color(0xFF173A54),
+        surfaceTint = Color(0xFF2F5D7C), inversePrimary = Color(0xFFA7C4DE)
     )
 }
+
+// Every colour role is set on purpose: anything left out falls back to Material's default lavender
+// palette, which used to show up as purple pop-ups, chips and picker dials.
 
 private fun baseColorScheme(dark: Boolean): ColorScheme = if (dark) darkColorScheme(
     primary = Color(0xFFFFB77F), onPrimary = Color(0xFF512400),
@@ -59,7 +64,16 @@ private fun baseColorScheme(dark: Boolean): ColorScheme = if (dark) darkColorSch
     surface = Color(0xFF202630), onSurface = Color(0xFFECEEF4),
     surfaceVariant = Color(0xFF303741), onSurfaceVariant = Color(0xFFCCBFB4),
     outline = Color(0xFF9F9186), outlineVariant = Color(0xFF51473F),
-    error = Color(0xFFFFB4AB)
+    error = Color(0xFFFFB4AB), onError = Color(0xFF690005),
+    errorContainer = Color(0xFF8C1D18), onErrorContainer = Color(0xFFF9DEDC),
+    tertiary = Color(0xFFE5C46A), onTertiary = Color(0xFF3F2E00),
+    tertiaryContainer = Color(0xFF5A4500), onTertiaryContainer = Color(0xFFFCE7B0),
+    surfaceTint = Color(0xFFFFB77F),
+    inverseSurface = Color(0xFFECEEF4), inverseOnSurface = Color(0xFF2E3440), inversePrimary = Color(0xFFA44708),
+    surfaceDim = Color(0xFF171B22), surfaceBright = Color(0xFF3A404A),
+    surfaceContainerLowest = Color(0xFF12161C), surfaceContainerLow = Color(0xFF1C2129),
+    surfaceContainer = Color(0xFF20262F), surfaceContainerHigh = Color(0xFF2A303A),
+    surfaceContainerHighest = Color(0xFF353B45)
 ) else lightColorScheme(
     primary = Color(0xFFA44708), onPrimary = Color.White,
     primaryContainer = Color(0xFFFFDEC3), onPrimaryContainer = Color(0xFF78330A),
@@ -69,7 +83,16 @@ private fun baseColorScheme(dark: Boolean): ColorScheme = if (dark) darkColorSch
     surface = Color(0xFFFFFEFB), onSurface = Color(0xFF202D45),
     surfaceVariant = Color(0xFFF8E9D9), onSurfaceVariant = Color(0xFF715D4D),
     outline = Color(0xFF9D8270), outlineVariant = Color(0xFFE6D4C3),
-    error = Color(0xFFAD3530)
+    error = Color(0xFFAD3530), onError = Color.White,
+    errorContainer = Color(0xFFF9DEDC), onErrorContainer = Color(0xFF5C1A16),
+    tertiary = Color(0xFF7A5A00), onTertiary = Color.White,
+    tertiaryContainer = Color(0xFFFCE7B0), onTertiaryContainer = Color(0xFF3F2E00),
+    surfaceTint = Color(0xFFA44708),
+    inverseSurface = Color(0xFF343A46), inverseOnSurface = Color(0xFFF5EEE6), inversePrimary = Color(0xFFFFB77F),
+    surfaceDim = Color(0xFFE9DCCD), surfaceBright = Color(0xFFFFFEFB),
+    surfaceContainerLowest = Color(0xFFFFFEFB), surfaceContainerLow = Color(0xFFFDF8F2),
+    surfaceContainer = Color(0xFFF9F0E6), surfaceContainerHigh = Color(0xFFF5EADD),
+    surfaceContainerHighest = Color(0xFFF1E4D5)
 )
 
 @Composable

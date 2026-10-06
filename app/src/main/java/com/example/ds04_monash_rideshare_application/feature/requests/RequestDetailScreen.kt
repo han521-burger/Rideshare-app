@@ -1,13 +1,20 @@
 package com.example.ds04_monash_rideshare_application.feature.requests
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -16,24 +23,37 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RequestStatus
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideRequestSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
+import com.example.ds04_monash_rideshare_application.core.ui.CountStepper
+import com.example.ds04_monash_rideshare_application.core.ui.DetailCard
+import com.example.ds04_monash_rideshare_application.core.ui.FieldMessage
+import com.example.ds04_monash_rideshare_application.core.ui.FormBanner
+import com.example.ds04_monash_rideshare_application.core.ui.FormBannerKind
+import com.example.ds04_monash_rideshare_application.core.ui.FormInfoRow
+import com.example.ds04_monash_rideshare_application.core.ui.FormSectionCard
+import com.example.ds04_monash_rideshare_application.core.ui.FormStatusPill
+import com.example.ds04_monash_rideshare_application.core.ui.ReviewDivider
+import com.example.ds04_monash_rideshare_application.core.ui.ReviewSection
 import com.example.ds04_monash_rideshare_application.core.ui.RideshareScaffold
+import com.example.ds04_monash_rideshare_application.core.ui.RouteTimeline
 import com.example.ds04_monash_rideshare_application.ui.describeLocation
 import com.example.ds04_monash_rideshare_application.ui.requestStatusLabel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
+private fun formatTime(millis: Long) = SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault()).format(Date(millis))
+
 // A pending request's own screen, separate from Ride Detail - a standalone request (rideId ==
 // null) has no ride yet to show a map/driver for, so it needs somewhere else to live. Also used
 // for an already-attached request when there's nothing ride-specific worth a full Ride Detail
 // trip yet (still PENDING/REJECTED).
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RequestDetailScreen(
     request: RideRequestSummary?,
@@ -54,105 +74,100 @@ fun RequestDetailScreen(
 
     RideshareScaffold(title = "Request detail", canNavigateBack = true, onNavigateBack = onNavigateBack, modifier = modifier) { contentPadding ->
         if (request == null) {
-            Text("Request not found.", modifier = Modifier.padding(contentPadding).padding(16.dp))
+            Column(Modifier.padding(contentPadding).padding(16.dp)) {
+                FormInfoRow("This request couldn't be found - it may have been cancelled or expired.")
+            }
             return@RideshareScaffold
         }
 
         val isPassenger = request.passengerId == currentUserId
         val isStandalone = request.rideId == null
+        val colors = MaterialTheme.colorScheme
 
-        Column(modifier = Modifier.padding(contentPadding).padding(16.dp).fillMaxSize()) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    Text(requestStatusLabel(request.status), color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.SemiBold)
+        Column(
+            modifier = Modifier.padding(contentPadding).fillMaxSize().verticalScroll(rememberScrollState())
+                .padding(16.dp).navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            FormSectionCard(
+                if (isStandalone) "Ride request" else "Seat request",
+                trailing = { FormStatusPill(requestStatusLabel(request.status), success = request.status == RequestStatus.ACCEPTED) }
+            ) {
+                val ride = request.ride
+                val origin = if (isStandalone) request.originLat?.let { lat -> request.originLng?.let { describeLocation(lat, it) } }
+                    else ride?.let { describeLocation(it.originLat, it.originLng) }
+                val destination = if (isStandalone) request.destinationLat?.let { lat -> request.destinationLng?.let { describeLocation(lat, it) } }
+                    else ride?.let { describeLocation(it.destinationLat, it.destinationLng) }
+                if (origin != null && destination != null) RouteTimeline(origin, destination)
 
-                    if (isStandalone) {
-                        val originLat = request.originLat
-                        val originLng = request.originLng
-                        val destLat = request.destinationLat
-                        val destLng = request.destinationLng
-                        if (originLat != null && originLng != null && destLat != null && destLng != null) {
-                            Text(
-                                "${describeLocation(originLat, originLng)} → ${describeLocation(destLat, destLng)}",
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                        Text(
-                            if (request.isAsap) "Leaving ASAP" else request.desiredDepartureTime?.let {
-                                SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault()).format(Date(it))
-                            } ?: "No time set"
-                        )
-                        if (request.repeatDaysOfWeek.isNotEmpty()) {
-                            Text("Also wants this repeated (${request.repeatDaysOfWeek.size} day(s)/week)")
-                        }
-                        request.matchScoreTotal?.let { score ->
-                            Text(
-                                if (score >= 50) "Roughly matches one of your posted routes" else "Weak match with your posted routes",
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                        }
-                    } else {
-                        val ride = request.ride
-                        if (ride != null) {
-                            Text(
-                                "${describeLocation(ride.originLat, ride.originLng)} → ${describeLocation(ride.destinationLat, ride.destinationLng)}",
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Text(SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault()).format(Date(ride.departureTime)))
-                        }
+                ReviewDivider()
+                ReviewSection("WHEN") {
+                    Text(
+                        when {
+                            !isStandalone && ride != null -> formatTime(ride.departureTime)
+                            request.isAsap -> "Leaving as soon as possible"
+                            else -> request.desiredDepartureTime?.let(::formatTime) ?: "No time set"
+                        },
+                        fontWeight = FontWeight.Bold
+                    )
+                    if (isStandalone && request.repeatDaysOfWeek.isNotEmpty()) {
+                        Text("Also wants this repeated (${request.repeatDaysOfWeek.size} day(s)/week)")
                     }
-
-                    Text("${request.seatsRequested} seat(s)")
-                    request.passenger?.let { passenger -> Text("From ${passenger.displayName}") }
-                    request.note?.takeIf { it.isNotBlank() }?.let { Text("Note: $it") }
+                }
+                ReviewDivider()
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    FormStatusPill("${request.seatsRequested} ${if (request.seatsRequested == 1) "seat" else "seats"}")
+                    request.passenger?.let { FormStatusPill("From ${it.displayName}") }
+                    request.matchScoreTotal?.takeIf { isStandalone }?.let { score ->
+                        FormStatusPill(if (score >= 50) "Matches one of your routes" else "Weak match with your routes")
+                    }
+                }
+                request.note?.takeIf { it.isNotBlank() }?.let { note ->
+                    ReviewSection("NOTE") { Text(note) }
                 }
             }
 
-            actionErrorMessage?.let {
-                Text(
-                    text = it,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.padding(top = 12.dp)
-                )
-            }
+            actionErrorMessage?.let { FormBanner(it, FormBannerKind.Error) }
 
             if (request.status == RequestStatus.PENDING) {
-                Row(modifier = Modifier.fillMaxWidth().padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     if (!isPassenger) {
+                        // On an open ask (no ride yet) Decline only hides it from this driver; it stays
+                        // open for others (backend PUT /requests/{id} REJECTED).
+                        OutlinedButton(
+                            onClick = onDecline, enabled = !isActionInFlight,
+                            modifier = Modifier.weight(1f).heightIn(min = 52.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.onSurface),
+                            border = BorderStroke(1.dp, colors.outline)
+                        ) { Text("Decline") }
                         Button(
-                            onClick = {
-                                if (isStandalone) pickingRide = true else onAcceptAttached()
-                            },
+                            onClick = { if (isStandalone) pickingRide = true else onAcceptAttached() },
                             enabled = !isActionInFlight,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1.4f).heightIn(min = 52.dp)
                         ) { Text("Accept") }
-                    }
-                    // On an open ask (no ride yet) Decline only hides it from this driver; it stays
-                    // open for others (backend PUT /requests/{id} REJECTED).
-                    if (!isPassenger) {
-                        OutlinedButton(onClick = onDecline, enabled = !isActionInFlight, modifier = Modifier.weight(1f)) { Text("Decline") }
-                    }
-                    if (isPassenger) {
-                        OutlinedButton(onClick = onCancel, enabled = !isActionInFlight, modifier = Modifier.weight(1f)) { Text("Cancel") }
+                    } else {
+                        OutlinedButton(
+                            onClick = onCancel, enabled = !isActionInFlight,
+                            modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.error),
+                            border = BorderStroke(1.dp, colors.error)
+                        ) { Text("Cancel my request") }
                     }
                 }
             }
 
             if (pickingRide) {
                 if (myOpenRidesForAccept.isNotEmpty()) {
-                    Text("Attach to one of your posted rides", fontWeight = FontWeight.SemiBold, modifier = Modifier.padding(top = 20.dp))
+                    Text("Attach to one of your posted rides", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(top = 8.dp))
                     myOpenRidesForAccept.forEach { ride ->
-                        Card(
-                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                            onClick = { onAcceptStandalone(ride.rideId) }
-                        ) {
-                            Column(modifier = Modifier.padding(16.dp)) {
-                                Text(
-                                    "${describeLocation(ride.originLat, ride.originLng)} → ${describeLocation(ride.destinationLat, ride.destinationLng)}",
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                                Text(SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault()).format(Date(ride.departureTime)))
-                                Text("${ride.seatsAvailable} seat(s) free")
+                        DetailCard(modifier = Modifier.fillMaxWidth(), onClick = { onAcceptStandalone(ride.rideId) }) {
+                            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                RouteTimeline(describeLocation(ride.originLat, ride.originLng), describeLocation(ride.destinationLat, ride.destinationLng))
+                                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    FormStatusPill(formatTime(ride.departureTime))
+                                    FormStatusPill("${ride.seatsAvailable} seat(s) free")
+                                }
                             }
                         }
                     }
@@ -160,30 +175,18 @@ fun RequestDetailScreen(
 
                 // Always available, not just as a fallback - accepting doesn't require having
                 // already posted a matching ride first.
-                Text(
+                FormSectionCard(
                     if (myOpenRidesForAccept.isEmpty()) "Create a ride for this" else "Or create a new ride",
-                    fontWeight = FontWeight.SemiBold,
-                    modifier = Modifier.padding(top = 20.dp)
-                )
-                Card(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
-                    Column(modifier = Modifier.padding(16.dp)) {
-                        Text("Total seats on the new ride")
-                        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(top = 4.dp)) {
-                            OutlinedButton(onClick = { if (newRideSeats > request.seatsRequested) newRideSeats-- }) { Text("-") }
-                            Text(newRideSeats.toString(), modifier = Modifier.padding(horizontal = 16.dp), style = MaterialTheme.typography.titleMedium)
-                            OutlinedButton(onClick = { if (newRideSeats < 8) newRideSeats++ }) { Text("+") }
-                        }
-                        Text(
-                            "At least ${request.seatsRequested} to cover this request.",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                        Button(
-                            onClick = { onCreateRideAndAccept(newRideSeats) },
-                            enabled = !isActionInFlight,
-                            modifier = Modifier.fillMaxWidth().padding(top = 12.dp)
-                        ) { Text("Create ride & accept") }
-                    }
+                    supporting = "Total seats on the new ride - at least ${request.seatsRequested} to cover this request."
+                ) {
+                    CountStepper(newRideSeats, request.seatsRequested, 8, { newRideSeats = it },
+                        unit = if (newRideSeats == 1) "seat" else "seats", subject = "seats on the new ride")
+                    FieldMessage("Uses this request's route and time.", isError = false)
+                    Button(
+                        onClick = { onCreateRideAndAccept(newRideSeats) },
+                        enabled = !isActionInFlight,
+                        modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)
+                    ) { Text("Create ride & accept") }
                 }
             }
         }

@@ -138,7 +138,8 @@ data class MessageSummary(
     val rideId: String,
     val senderId: String,
     val body: String,
-    val sentAt: Long
+    val sentAt: Long,
+    val senderName: String? = null
 )
 
 data class RatingSummary(

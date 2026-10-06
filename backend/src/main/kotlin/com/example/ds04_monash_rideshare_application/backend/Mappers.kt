@@ -100,12 +100,13 @@ fun ResultRow.toRideRequestDto() = RideRequestDto(
     repeatWeeks = this[RideRequests.repeatWeeks]
 )
 
-fun ResultRow.toMessageDto() = MessageDto(
+fun ResultRow.toMessageDto(senderName: String? = null) = MessageDto(
     messageId = this[Messages.messageId],
     rideId = this[Messages.rideId],
     senderId = this[Messages.senderId],
     body = this[Messages.body],
-    sentAt = this[Messages.sentAt]
+    sentAt = this[Messages.sentAt],
+    senderName = senderName
 )
 
 fun ResultRow.toRatingDto() = RatingDto(

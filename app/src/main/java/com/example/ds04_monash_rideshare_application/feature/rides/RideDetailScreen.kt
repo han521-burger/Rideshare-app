@@ -2,19 +2,39 @@ package com.example.ds04_monash_rideshare_application.feature.rides
 
 import android.content.Intent
 import android.net.Uri
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.selection.toggleable
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.Chat
+import androidx.compose.material.icons.rounded.DirectionsCar
+import androidx.compose.material.icons.rounded.Share
+import androidx.compose.material.icons.rounded.Star
+import androidx.compose.material.icons.rounded.StarBorder
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.Card
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -28,7 +48,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RequestStatus
@@ -36,14 +61,25 @@ import com.example.ds04_monash_rideshare_application.Repository.Remote.RideReque
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideStatus
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
 import com.example.ds04_monash_rideshare_application.core.state.Resource
+import com.example.ds04_monash_rideshare_application.core.ui.DetailCard
+import com.example.ds04_monash_rideshare_application.core.ui.FormBanner
+import com.example.ds04_monash_rideshare_application.core.ui.FormBannerKind
+import com.example.ds04_monash_rideshare_application.core.ui.FormInfoRow
+import com.example.ds04_monash_rideshare_application.core.ui.FormSectionCard
+import com.example.ds04_monash_rideshare_application.core.ui.FormStatusPill
+import com.example.ds04_monash_rideshare_application.core.ui.ReviewDivider
+import com.example.ds04_monash_rideshare_application.core.ui.ReviewSection
 import com.example.ds04_monash_rideshare_application.core.ui.RideshareScaffold
 import com.example.ds04_monash_rideshare_application.core.ui.RouteMiniMap
+import com.example.ds04_monash_rideshare_application.core.ui.RouteTimeline
 import com.example.ds04_monash_rideshare_application.ui.describeLocation
 import com.example.ds04_monash_rideshare_application.ui.requestStatusLabel
 import com.example.ds04_monash_rideshare_application.ui.rideStatusLabel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+
+private fun formatDeparture(millis: Long) = SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault()).format(Date(millis))
 
 // One screen for both sides of a ride: passengers see driver/vehicle info, their own request
 // status and a way to request/cancel/rate; drivers see the passenger list, accept/reject,
@@ -87,11 +123,9 @@ fun RideDetailScreen(
                 verticalArrangement = Arrangement.Center
             ) { CircularProgressIndicator() }
 
-            rideDetails.errorMessage != null -> Text(
-                rideDetails.errorMessage,
-                color = MaterialTheme.colorScheme.error,
-                modifier = Modifier.padding(contentPadding).padding(16.dp)
-            )
+            rideDetails.errorMessage != null -> Column(Modifier.padding(contentPadding).padding(16.dp)) {
+                FormBanner(rideDetails.errorMessage, FormBannerKind.Error, title = "Couldn’t load this ride")
+            }
 
             else -> {
                 val ride = rideDetails.data ?: return@RideshareScaffold
@@ -99,7 +133,7 @@ fun RideDetailScreen(
 
                 LazyColumn(
                     modifier = Modifier.padding(contentPadding).fillMaxSize(),
-                    contentPadding = androidx.compose.foundation.layout.PaddingValues(16.dp),
+                    contentPadding = PaddingValues(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item {
@@ -112,20 +146,7 @@ fun RideDetailScreen(
                     item { RideSummaryCard(ride) }
 
                     requestActionError?.let { error ->
-                        item { Text(error, color = MaterialTheme.colorScheme.error) }
-                    }
-
-                    if (ride.stops.isNotEmpty()) {
-                        item {
-                            Card(modifier = Modifier.fillMaxWidth()) {
-                                Column(modifier = Modifier.padding(12.dp)) {
-                                    Text("Stops along the way", fontWeight = FontWeight.SemiBold)
-                                    ride.stops.sortedBy { it.sequence }.forEach { stop ->
-                                        Text("• ${stop.label ?: describeLocation(stop.lat, stop.lng)}")
-                                    }
-                                }
-                            }
-                        }
+                        item { FormBanner(error, FormBannerKind.Error) }
                     }
 
                     if (isDriver) {
@@ -140,9 +161,12 @@ fun RideDetailScreen(
                                 onToggle = onSetEnRoute
                             )
                         }
-                        item { Text("Passengers", style = MaterialTheme.typography.titleMedium) }
+                        item {
+                            Text("Passengers", Modifier.padding(top = 4.dp), style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold)
+                        }
                         if (incomingRequestsForRide.isEmpty()) {
-                            item { Text("No requests yet for this ride.") }
+                            item { FormInfoRow("No requests yet for this ride.") }
                         }
                         items(incomingRequestsForRide, key = { it.requestId }) { request ->
                             PassengerRequestCard(
@@ -159,9 +183,7 @@ fun RideDetailScreen(
                         }
                         if (ride.status in setOf(RideStatus.OPEN, RideStatus.CONFIRMED)) {
                             item {
-                                OutlinedButton(onClick = onCancelRide, enabled = !isActionInFlight, modifier = Modifier.fillMaxWidth()) {
-                                    Text("Cancel this ride")
-                                }
+                                DangerButton("Cancel this ride", enabled = !isActionInFlight, onClick = onCancelRide)
                             }
                         }
                     } else {
@@ -173,7 +195,7 @@ fun RideDetailScreen(
                             myRequestForRide == null &&
                                 ride.seatsAvailable > 0 &&
                                 (ride.status == RideStatus.OPEN || ride.status == RideStatus.CONFIRMED) -> item {
-                                Button(onClick = onRequestSeat, modifier = Modifier.fillMaxWidth()) {
+                                Button(onClick = onRequestSeat, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
                                     Text("Request a seat")
                                 }
                             }
@@ -190,15 +212,9 @@ fun RideDetailScreen(
                         if (myRequestForRide?.status == RequestStatus.ACCEPTED) {
                             item {
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                                    OutlinedButton(onClick = onOpenChat, modifier = Modifier.weight(1f)) { Text("Chat") }
-                                    OutlinedButton(
-                                        onClick = { shareRide(context, ride) },
-                                        modifier = Modifier.weight(1f)
-                                    ) { Text("Share trip") }
-                                    OutlinedButton(
-                                        onClick = { showSosConfirm = true },
-                                        modifier = Modifier.weight(1f)
-                                    ) { Text("SOS") }
+                                    TripActionButton(Icons.AutoMirrored.Rounded.Chat, "Chat", Modifier.weight(1f), onClick = onOpenChat)
+                                    TripActionButton(Icons.Rounded.Share, "Share", Modifier.weight(1f)) { shareRide(context, ride) }
+                                    TripActionButton(Icons.Rounded.Warning, "SOS", Modifier.weight(1f), danger = true) { showSosConfirm = true }
                                 }
                             }
                         }
@@ -231,69 +247,83 @@ fun RideDetailScreen(
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun RideSummaryCard(ride: RideSummary) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(rideStatusLabel(ride.status), style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.primary)
-            Text(
-                "${describeLocation(ride.originLat, ride.originLng)} → ${describeLocation(ride.destinationLat, ride.destinationLng)}",
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.SemiBold
-            )
-            Text(SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault()).format(Date(ride.departureTime)))
-            Text("%.1f km · about %d min".format(ride.distanceMeters / 1000.0, ride.estimatedDurationSeconds / 60))
-            Text("${ride.seatsAvailable} of ${ride.seatsTotal} seats free")
-            if (ride.recurringGroupId != null) {
-                Text("Part of a repeating series", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-            }
-            ride.notes?.takeIf { it.isNotBlank() }?.let {
-                HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
-                Text("Driver's note: $it")
-            }
+    FormSectionCard("Trip", trailing = { FormStatusPill(rideStatusLabel(ride.status), success = ride.status == RideStatus.CONFIRMED) }) {
+        RouteTimeline(
+            describeLocation(ride.originLat, ride.originLng),
+            describeLocation(ride.destinationLat, ride.destinationLng),
+            via = ride.stops.sortedBy { it.sequence }.map { it.label ?: describeLocation(it.lat, it.lng) }
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            FormStatusPill(formatDeparture(ride.departureTime))
+            FormStatusPill("%.1f km · about %d min".format(ride.distanceMeters / 1000.0, ride.estimatedDurationSeconds / 60))
+            FormStatusPill("${ride.seatsAvailable} of ${ride.seatsTotal} seats free")
+            if (ride.recurringGroupId != null) FormStatusPill("Repeats weekly")
+        }
+        ride.notes?.takeIf { it.isNotBlank() }?.let {
+            ReviewDivider()
+            ReviewSection("DRIVER'S NOTE") { Text(it) }
         }
     }
 }
 
 @Composable
 private fun DriverInfoCard(ride: RideSummary) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Driver", style = MaterialTheme.typography.labelLarge)
-            Text(ride.driver?.displayName ?: ride.driverId, fontWeight = FontWeight.SemiBold)
-            val driver = ride.driver
-            val averageRating = driver?.averageRating
-            if (driver != null && averageRating != null) {
-                Text("%.1f / 5 (${driver.ratingCount} rating(s))".format(averageRating), color = MaterialTheme.colorScheme.onSurfaceVariant)
+    val colors = MaterialTheme.colorScheme
+    val name = ride.driver?.displayName ?: ride.driverId
+    FormSectionCard("Your driver") {
+        Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(44.dp).background(colors.primaryContainer, CircleShape).clearAndSetSemantics {},
+                contentAlignment = Alignment.Center) {
+                Text(name.trim().take(1).uppercase(), color = colors.onPrimaryContainer, fontWeight = FontWeight.Bold)
             }
-            ride.vehicle?.let { vehicle ->
-                Text(com.example.ds04_monash_rideshare_application.feature.profile.vehicleSummary(vehicle))
-            }
-            if (ride.driverEnRoute) {
-                Text("Driver is on the way", color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Bold)
+            Column(Modifier.weight(1f)) {
+                Text(name, fontWeight = FontWeight.Bold)
+                val driver = ride.driver
+                val averageRating = driver?.averageRating
+                if (driver != null && averageRating != null) {
+                    Text("★ %.1f · ${driver.ratingCount} rating(s)".format(averageRating),
+                        style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+                }
             }
         }
+        ride.vehicle?.let { vehicle ->
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Rounded.DirectionsCar, null, Modifier.size(20.dp), tint = colors.primary)
+                Text(com.example.ds04_monash_rideshare_application.feature.profile.vehicleSummary(vehicle),
+                    style = MaterialTheme.typography.bodyMedium)
+            }
+        }
+        if (ride.driverEnRoute) FormStatusPill("Driver is on the way", success = true)
     }
 }
 
+// Same look as the ride flows' toggle rows: one switch for the whole row.
 @Composable
 private fun DriverEnRouteCard(enRoute: Boolean, enabled: Boolean, onToggle: (Boolean) -> Unit) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Row(
-            modifier = Modifier.fillMaxWidth().padding(16.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text("I'm coming", fontWeight = FontWeight.SemiBold)
-                Text(
-                    "Lets your passengers know you're on the way (not live GPS tracking).",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(checked = enRoute, onCheckedChange = onToggle, enabled = enabled)
+    val colors = MaterialTheme.colorScheme
+    val shape = RoundedCornerShape(16.dp)
+    Row(
+        Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(shape)
+            .background(if (enRoute) colors.primaryContainer else colors.surface)
+            .border(if (enRoute) 1.5.dp else 1.dp, if (enRoute) colors.primary else colors.outlineVariant, shape)
+            .toggleable(value = enRoute, enabled = enabled, role = Role.Switch, onValueChange = onToggle)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Icon(Icons.Rounded.DirectionsCar, null, Modifier.size(24.dp), tint = colors.primary)
+        Column(Modifier.weight(1f)) {
+            Text("I'm coming", fontWeight = FontWeight.Bold, color = if (enRoute) colors.onPrimaryContainer else colors.onSurface)
+            Text(
+                if (enabled || enRoute) "Lets your passengers know you're on the way (not live GPS)."
+                else "Available once a passenger is confirmed.",
+                style = MaterialTheme.typography.bodySmall,
+                color = if (enRoute) colors.onPrimaryContainer else colors.onSurfaceVariant
+            )
         }
+        Switch(checked = enRoute, onCheckedChange = null, enabled = enabled)
     }
 }
 
@@ -308,32 +338,33 @@ private fun PassengerRequestCard(
     onReject: () -> Unit,
     onRate: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text(request.passenger?.displayName ?: request.passengerId, fontWeight = FontWeight.SemiBold)
-            Text("${request.seatsRequested} seat(s) · ${requestStatusLabel(request.status)}")
-            request.note?.takeIf { it.isNotBlank() }?.let { Text("Note: $it") }
+    val colors = MaterialTheme.colorScheme
+    DetailCard(modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(request.passenger?.displayName ?: request.passengerId, Modifier.weight(1f), fontWeight = FontWeight.Bold)
+                FormStatusPill(requestStatusLabel(request.status), success = request.status == RequestStatus.ACCEPTED)
+            }
+            Text("${request.seatsRequested} seat(s)", style = MaterialTheme.typography.bodyMedium, color = colors.onSurfaceVariant)
+            request.note?.takeIf { it.isNotBlank() }?.let { Text("“$it”", style = MaterialTheme.typography.bodyMedium) }
 
             when {
                 request.status == RequestStatus.PENDING -> {
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         OutlinedButton(
-                            onClick = onReject,
-                            enabled = !isActionInFlight,
-                            modifier = Modifier.weight(1f)
+                            onClick = onReject, enabled = !isActionInFlight,
+                            modifier = Modifier.weight(1f).heightIn(min = 48.dp),
+                            colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.onSurface),
+                            border = BorderStroke(1.dp, colors.outline)
                         ) { Text("Decline") }
                         Button(
-                            onClick = onAccept,
-                            enabled = !isActionInFlight,
-                            modifier = Modifier.weight(1f)
+                            onClick = onAccept, enabled = !isActionInFlight,
+                            modifier = Modifier.weight(1.4f).heightIn(min = 48.dp)
                         ) { Text("Accept") }
                     }
                 }
                 request.status == RequestStatus.ACCEPTED && rideCompleted -> {
-                    TextButton(onClick = onRate, modifier = Modifier.padding(top = 4.dp)) { Text("Rate this passenger") }
+                    RateButton("Rate this passenger", onRate)
                 }
             }
         }
@@ -347,46 +378,60 @@ private fun MyRequestCard(
     onCancel: () -> Unit,
     onRate: () -> Unit
 ) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(modifier = Modifier.padding(16.dp)) {
-            Text("Your request", fontWeight = FontWeight.SemiBold)
-            Text("${request.seatsRequested} seat(s) · ${requestStatusLabel(request.status)}")
-            request.note?.takeIf { it.isNotBlank() }?.let { Text("Your note: $it") }
+    FormSectionCard("Your request", trailing = {
+        FormStatusPill(requestStatusLabel(request.status), success = request.status == RequestStatus.ACCEPTED)
+    }) {
+        Text("${request.seatsRequested} seat(s)", fontWeight = FontWeight.Bold)
+        request.note?.takeIf { it.isNotBlank() }?.let { ReviewSection("YOUR NOTE") { Text(it) } }
 
-            when (request.status) {
-                RequestStatus.PENDING -> {
-                    Text(
-                        "Waiting for the driver to review your request.",
-                        modifier = Modifier.padding(top = 4.dp),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    OutlinedButton(
-                        onClick = onCancel,
-                        enabled = !isActionInFlight,
-                        modifier = Modifier.padding(top = 8.dp)
-                    ) { Text("Cancel request") }
-                }
-
-                RequestStatus.ACCEPTED -> {
-                    Text(
-                        "You're in! Message your driver or share your trip below.",
-                        modifier = Modifier.padding(top = 4.dp),
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    OutlinedButton(
-                        onClick = onCancel,
-                        enabled = !isActionInFlight,
-                        modifier = Modifier.padding(top = 8.dp)
-                    ) { Text("Cancel my seat") }
-                }
-
-                RequestStatus.COMPLETED -> TextButton(onClick = onRate, modifier = Modifier.padding(top = 4.dp)) {
-                    Text("Rate your driver")
-                }
-
-                else -> Unit
+        when (request.status) {
+            RequestStatus.PENDING -> {
+                FormInfoRow("Waiting for the driver to review your request.")
+                DangerButton("Cancel request", enabled = !isActionInFlight, onClick = onCancel)
             }
+
+            RequestStatus.ACCEPTED -> {
+                FormBanner("You're in! Message your driver or share your trip below.", FormBannerKind.Success)
+                DangerButton("Cancel my seat", enabled = !isActionInFlight, onClick = onCancel)
+            }
+
+            RequestStatus.COMPLETED -> RateButton("Rate your driver", onRate)
+
+            else -> Unit
         }
+    }
+}
+
+@Composable
+private fun TripActionButton(icon: ImageVector, label: String, modifier: Modifier = Modifier, danger: Boolean = false, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    val tint = if (danger) colors.error else colors.primary
+    OutlinedButton(
+        onClick = onClick, modifier = modifier.heightIn(min = 52.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = if (danger) colors.error else colors.onSurface),
+        border = BorderStroke(1.dp, if (danger) colors.error else colors.outline),
+        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 8.dp)
+    ) {
+        Icon(icon, null, Modifier.size(18.dp), tint = tint)
+        Text(label, Modifier.padding(start = 6.dp))
+    }
+}
+
+@Composable
+private fun DangerButton(label: String, enabled: Boolean, onClick: () -> Unit) {
+    val colors = MaterialTheme.colorScheme
+    OutlinedButton(
+        onClick = onClick, enabled = enabled, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+        colors = ButtonDefaults.outlinedButtonColors(contentColor = colors.error),
+        border = BorderStroke(1.dp, colors.error)
+    ) { Text(label) }
+}
+
+@Composable
+private fun RateButton(label: String, onClick: () -> Unit) {
+    Button(onClick = onClick, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+        Icon(Icons.Rounded.Star, null, Modifier.size(18.dp))
+        Text(label, Modifier.padding(start = 8.dp))
     }
 }
 
@@ -394,6 +439,8 @@ private fun MyRequestCard(
 private fun SosDialog(emergencyContactPhone: String?, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(28.dp),
+        icon = { Icon(Icons.Rounded.Warning, null, tint = MaterialTheme.colorScheme.error) },
         title = { Text("Call for help?") },
         text = {
             Text(
@@ -405,7 +452,10 @@ private fun SosDialog(emergencyContactPhone: String?, onDismiss: () -> Unit, onC
             )
         },
         confirmButton = {
-            TextButton(onClick = { onConfirm(emergencyContactPhone ?: "000") }) { Text("Open dialer") }
+            TextButton(
+                onClick = { onConfirm(emergencyContactPhone ?: "000") },
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
+            ) { Text("Open dialer") }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } }
     )
@@ -415,32 +465,34 @@ private fun SosDialog(emergencyContactPhone: String?, onDismiss: () -> Unit, onC
 private fun RatingDialog(displayName: String, onDismiss: () -> Unit, onSubmit: (Int, String?) -> Unit) {
     var stars by remember { mutableStateOf(5) }
     var comment by remember { mutableStateOf("") }
+    val colors = MaterialTheme.colorScheme
 
     AlertDialog(
         onDismissRequest = onDismiss,
+        shape = RoundedCornerShape(28.dp),
         title = { Text("Rate $displayName") },
         text = {
-            Column {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(2.dp), verticalAlignment = Alignment.CenterVertically) {
                     (1..5).forEach { value ->
-                        Text(
-                            text = if (value <= stars) "*" else "-",
-                            modifier = Modifier.padding(4.dp),
-                            fontWeight = FontWeight.Bold,
-                            color = if (value <= stars) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        IconButton(onClick = { stars = value }, modifier = Modifier.size(48.dp)) {
+                            Icon(
+                                if (value <= stars) Icons.Rounded.Star else Icons.Rounded.StarBorder,
+                                contentDescription = "$value star${if (value == 1) "" else "s"}",
+                                modifier = Modifier.size(32.dp),
+                                tint = if (value <= stars) colors.primary else colors.onSurfaceVariant
+                            )
+                        }
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    (1..5).forEach { value ->
-                        TextButton(onClick = { stars = value }) { Text(value.toString()) }
-                    }
-                }
+                Text("$stars out of 5", Modifier.semantics {}, style = MaterialTheme.typography.bodyMedium,
+                    color = colors.onSurfaceVariant)
                 OutlinedTextField(
                     value = comment,
                     onValueChange = { comment = it },
-                    label = { Text("Optional comment") },
-                    modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                    label = { Text("Comment (optional)") },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
                 )
             }
         },
@@ -454,7 +506,7 @@ private fun RatingDialog(displayName: String, onDismiss: () -> Unit, onSubmit: (
 private fun shareRide(context: android.content.Context, ride: RideSummary) {
     val text = "I'm sharing a Monash Rideshare trip: " +
         "${describeLocation(ride.originLat, ride.originLng)} to ${describeLocation(ride.destinationLat, ride.destinationLng)}, " +
-        "departing ${SimpleDateFormat("EEE d MMM, HH:mm", Locale.getDefault()).format(Date(ride.departureTime))}."
+        "departing ${formatDeparture(ride.departureTime)}."
     val intent = Intent(Intent.ACTION_SEND).apply {
         type = "text/plain"
         putExtra(Intent.EXTRA_TEXT, text)
