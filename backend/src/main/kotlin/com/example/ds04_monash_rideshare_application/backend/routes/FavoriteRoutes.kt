@@ -1,5 +1,6 @@
 package com.example.ds04_monash_rideshare_application.backend.routes
 
+import com.example.ds04_monash_rideshare_application.backend.readTransaction
 import com.example.ds04_monash_rideshare_application.backend.FavoriteDriverDto
 import com.example.ds04_monash_rideshare_application.backend.FavoriteDrivers
 import com.example.ds04_monash_rideshare_application.backend.NotFoundException
@@ -23,7 +24,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 fun Route.favoriteRoutes() {
     get("/favorites") {
         val userId = call.requireUserId()
-        val favorites = transaction {
+        val favorites = readTransaction {
             val rows = FavoriteDrivers.selectAll().where { FavoriteDrivers.passengerId eq userId }.toList()
             val driverIds = rows.map { it[FavoriteDrivers.driverId] }.toSet()
             val driversById = if (driverIds.isEmpty()) emptyMap() else {

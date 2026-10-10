@@ -40,9 +40,11 @@ interface RideApiService {
         seats: Int,
         note: String?,
         applyToRecurringGroup: Boolean,
-        callback: Callback<List<RideRequestSummary>>
+        clientRequestId: String?,
+        journeyIntentId: String?,
+        callback: Callback<RequestSubmissionResult>
     )
-    fun createStandaloneRequest(draft: StandaloneRequestDraft, callback: Callback<RideRequestSummary>)
+    fun createStandaloneRequest(draft: StandaloneRequestDraft, callback: Callback<RequestSubmissionResult>)
     fun fetchIncomingRequests(callback: Callback<List<RideRequestSummary>>)
     fun fetchMyRequests(callback: Callback<List<RideRequestSummary>>)
     fun respondToRequest(
@@ -54,6 +56,9 @@ interface RideApiService {
         callback: Callback<RideRequestSummary>
     )
     fun undoAccept(requestId: String, callback: Callback<RideRequestSummary>)
+
+    // The signed-in user's own schedule warnings. Defaults to "none" so a stand-in that predates them needs no change.
+    fun fetchScheduleWarnings(callback: Callback<List<ScheduleWarning>>) { callback.onSuccess(emptyList()) }
 
     fun fetchMessages(rideId: String, callback: Callback<List<MessageSummary>>)
     fun sendMessage(rideId: String, body: String, callback: Callback<MessageSummary>)

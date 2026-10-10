@@ -9,7 +9,7 @@ internal data class Outcome(val label: String, val count: Int, val fraction: Flo
 internal fun outcomeDistribution(counts: RequestFunnelCounts): List<Outcome> {
     val values = listOf("Pending" to counts.pending, "Accepted" to counts.accepted,
         "Completed" to counts.completed, "Rejected" to counts.rejected,
-        "Cancelled" to counts.cancelled, "Expired" to counts.expired)
+        "Cancelled" to counts.cancelled, "Expired" to counts.expired, "Schedule conflict" to counts.conflicted)
     return values.map { (name, count) -> Outcome(name, count, magnitude(count, counts.total)) }
 }
 internal fun magnitude(value: Int, total: Int): Float =

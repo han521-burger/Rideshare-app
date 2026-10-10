@@ -1,5 +1,6 @@
 package com.example.ds04_monash_rideshare_application.backend.routes
 
+import com.example.ds04_monash_rideshare_application.backend.readTransaction
 import com.example.ds04_monash_rideshare_application.backend.ForbiddenException
 import com.example.ds04_monash_rideshare_application.backend.NotFoundException
 import com.example.ds04_monash_rideshare_application.backend.Rides
@@ -22,7 +23,7 @@ import org.jetbrains.exposed.sql.update
 fun Route.userRoutes() {
     get("/users/me") {
         val userId = call.requireUserId()
-        val dto = transaction {
+        val dto = readTransaction {
             Users.selectAll().where { Users.userId eq userId }
                 .map { it.toUserDto() }
                 .firstOrNull()
@@ -44,7 +45,7 @@ fun Route.userRoutes() {
                 it[emergencyContactPhone] = body.emergencyContactPhone
             }
         }
-        val dto = transaction {
+        val dto = readTransaction {
             Users.selectAll().where { Users.userId eq userId }.map { it.toUserDto() }.first()
         }
         call.respond(dto)
@@ -57,7 +58,7 @@ fun Route.userRoutes() {
         val targetId = call.parameters["id"] ?: throw NotFoundException()
         if (callerId != targetId) throw ForbiddenException("You can only view your own ride history")
 
-        val rides = transaction {
+        val rides = readTransaction {
             enrichRideDtos(Rides.selectAll().where { Rides.driverId eq targetId }.toList())
         }
         call.respond(rides)

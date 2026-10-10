@@ -38,6 +38,8 @@ fun deleteAccount(userId: String, at: Long) {
         .forEach { cancelRequest(it, at) }
 
     FavoriteDrivers.deleteWhere { (FavoriteDrivers.passengerId eq userId) or (FavoriteDrivers.driverId eq userId) }
+    // A schedule warning describes this person's own previous trip: it goes with the rest of their private details.
+    ScheduleWarnings.deleteWhere { ScheduleWarnings.userId eq userId }
     // The vehicle row stays because past rides point at it (make/model/fuel feed other people's
     // CO2 history); only the identifying plate is removed.
     Vehicles.update({ Vehicles.ownerId eq userId }) { it[registrationMasked] = null }

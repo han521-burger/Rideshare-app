@@ -25,7 +25,7 @@ class MatchingRouteTest {
         val departure = 1_800_000_000_000L
         val statuses = listOf(RideStatus.OPEN, RideStatus.CONFIRMED, RideStatus.CANCELLED, RideStatus.COMPLETED)
         testApplication {
-            application { module("jdbc:sqlite:${databaseFile.absolutePath.replace('\\', '/')}") }
+            application { module("jdbc:sqlite:${databaseFile.absolutePath.replace('\\', '/')}", testTravelTimes()) }
             startApplication()
             transaction {
                 for (rideStatus in statuses) {

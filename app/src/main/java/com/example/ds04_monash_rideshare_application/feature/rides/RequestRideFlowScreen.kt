@@ -12,11 +12,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import com.example.ds04_monash_rideshare_application.Repository.Remote.StandaloneRequestDraft
+import com.example.ds04_monash_rideshare_application.core.state.RequestSubmitError
 import com.example.ds04_monash_rideshare_application.core.ui.AsapToggleRow
 import com.example.ds04_monash_rideshare_application.core.ui.CampusRoutePicker
 import com.example.ds04_monash_rideshare_application.core.ui.CountStepper
-import com.example.ds04_monash_rideshare_application.core.ui.FormBanner
-import com.example.ds04_monash_rideshare_application.core.ui.FormBannerKind
 import com.example.ds04_monash_rideshare_application.core.ui.FormInfoRow
 import com.example.ds04_monash_rideshare_application.core.ui.FormSectionCard
 import com.example.ds04_monash_rideshare_application.core.ui.FormStatusPill
@@ -41,12 +40,14 @@ import java.time.LocalTime
 @Composable
 fun RequestRideFlowScreen(
     isSubmitting: Boolean,
-    onSubmit: (StandaloneRequestDraft, onDone: (String?) -> Unit) -> Unit,
+    onSubmit: (StandaloneRequestDraft, onDone: (RequestSubmitError?) -> Unit) -> Unit,
     onExit: () -> Unit,
     modifier: Modifier = Modifier,
     // The Route step. Defaults to the real picker; tests substitute a fake so later steps can be reached
     // without a live geocoder / driving-route lookup.
-    routeStep: @Composable (onResult: (RoutePickerResult?) -> Unit) -> Unit = { CampusRoutePicker(onResult = it) }
+    routeStep: @Composable (onResult: (RoutePickerResult?) -> Unit) -> Unit = { CampusRoutePicker(onResult = it) },
+    // Opens the request the backend says this one duplicates (shown as a "View" action on the banner).
+    onViewRequest: (String) -> Unit = {}
 ) {
     var step by rememberSaveable { mutableStateOf(0) }
     var routePickerResult by remember { mutableStateOf<RoutePickerResult?>(null) }
@@ -58,7 +59,7 @@ fun RequestRideFlowScreen(
     var repeatWeeks by remember { mutableStateOf(4) }
     var seats by remember { mutableStateOf(1) }
     var note by remember { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var submitError by remember { mutableStateOf<RequestSubmitError?>(null) }
 
     // ASAP has no scheduling concept, so the Repeat step (and any days already picked there)
     // never applies to it - drop straight from When to Details.
@@ -96,7 +97,7 @@ fun RequestRideFlowScreen(
             val route = routePickerResult ?: return@RideFlowScaffold
             // The clock keeps moving while the passenger fills in later steps - re-check at submit.
             if (!isAsap && !isBookableDeparture(combineDateAndTime(date, time))) {
-                errorMessage = departureTooSoonMessage() + " Go back to When to change it."
+                submitError = RequestSubmitError(departureTooSoonMessage() + " Go back to When to change it.")
                 return@RideFlowScaffold
             }
             val draft = StandaloneRequestDraft(
@@ -109,15 +110,15 @@ fun RequestRideFlowScreen(
                 repeatDaysOfWeek = repeatDays.map { it.value }.sorted(),
                 repeatWeeks = repeatWeeks.takeIf { repeatDays.isNotEmpty() }
             )
-            onSubmit(draft) { error -> errorMessage = error }
+            onSubmit(draft) { error -> submitError = error }
         },
         onExit = onExit,
         modifier = modifier
     ) {
         // The submit error lives with the Review step it belongs to; hidden while a retry is in flight.
         if (currentLabel == STEP_REVIEW && !isSubmitting) {
-            errorMessage?.let {
-                FormBanner(it, FormBannerKind.Error, Modifier.testTag("ride-error"), title = "Request not sent")
+            submitError?.let {
+                RequestSubmitErrorBanner(it, failureTitle = "Request not sent", onViewRequest = onViewRequest, modifier = Modifier.testTag("ride-error"))
             }
         }
         if (currentLabel != STEP_ROUTE && currentLabel != STEP_REVIEW) routePickerResult?.let { RideRouteRecap(it) }

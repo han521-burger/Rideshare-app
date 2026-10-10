@@ -1,10 +1,14 @@
 package com.example.ds04_monash_rideshare_application.core.navigation
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -28,8 +32,11 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.findViewTreeLifecycleOwner
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RequestStatus
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideStatus
+import com.example.ds04_monash_rideshare_application.Repository.Remote.WarningSubject
 import com.example.ds04_monash_rideshare_application.core.state.AppMode
+import com.example.ds04_monash_rideshare_application.core.state.RequestSubmitError
 import com.example.ds04_monash_rideshare_application.core.state.RideshareViewModel
+import com.example.ds04_monash_rideshare_application.core.state.rideDetailScheduleWarning
 import com.example.ds04_monash_rideshare_application.core.ui.BottomNavScaffold
 import com.example.ds04_monash_rideshare_application.feature.activity.ActivityScreen
 import com.example.ds04_monash_rideshare_application.feature.activity.ActivityTheme
@@ -99,6 +106,13 @@ fun RideshareNavHost(
         viewModel.clearRequestActionError()
         viewModel.selectedRequestId = requestId
         navigate(AppDestination.RequestDetail)
+    }
+
+    // "You've already sent this request" -> leave the form and open the request that already exists.
+    fun viewExistingRequest(requestId: String) {
+        navigateUp()
+        viewModel.loadMyRequests()
+        openRequest(requestId)
     }
 
     BackHandler(enabled = backStack.size > 1) {
@@ -202,6 +216,17 @@ fun RideshareNavHost(
             confirmButton = { TextButton(onClick = viewModel::confirmAcceptConflict) { Text("Drive them instead") } },
             dismissButton = { TextButton(onClick = viewModel::dismissAcceptConflict) { Text("Keep my request") } })
     }
+    // A repeating request: which dates were made and which were not, in plain words.
+    viewModel.submissionSummary?.let { summary ->
+        AlertDialog(onDismissRequest = viewModel::dismissSubmissionSummary,
+            title = { Text(summary.title) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    summary.lines.forEach { Text(it, style = MaterialTheme.typography.bodyMedium) }
+                }
+            },
+            confirmButton = { TextButton(onClick = viewModel::dismissSubmissionSummary) { Text("OK") } })
+    }
     // A few seconds to take back an accidental Accept (e.g. a mis-tap on the banner).
     viewModel.undoableAcceptRequestId?.let { requestId ->
         LaunchedEffect(requestId) {
@@ -284,7 +309,7 @@ fun RideshareNavHost(
                         activeMode = viewModel.activeMode,
                         // Pending requests remain here until the driver accepts, rejects, or the
                         // passenger cancels. Accepted requests move to the Home confirmed list.
-                        myRequests = viewModel.myPendingAndRecentlyExpiredRequests,
+                        myRequests = viewModel.myPendingAndRecentlyEndedRequests,
                         incomingRequests = viewModel.incomingPendingRequests,
                         openRides = viewModel.openRides,
                         myRequestsResource = viewModel.myRequests,
@@ -406,7 +431,15 @@ fun RideshareNavHost(
                 }
             },
             onNavigateBack = ::navigateUp,
-            modifier = modifier
+            modifier = modifier,
+            // The driver is told about their own later ride; a passenger about their own accepted seat on this one.
+            scheduleWarning = rideDetailScheduleWarning(
+                warnings = viewModel.scheduleWarnings.data,
+                rideId = viewModel.selectedRideId,
+                rideDriverId = viewModel.rideDetails.data?.driverId,
+                userId = uiState.userId,
+                myRequestIdForRide = viewModel.myRequests.data.orEmpty().firstOrNull { it.rideId == viewModel.selectedRideId }?.requestId
+            )
         )
 
         AppDestination.RequestDetail -> {
@@ -462,7 +495,9 @@ fun RideshareNavHost(
                     }
                 },
                 onNavigateBack = ::navigateUp,
-                modifier = modifier
+                modifier = modifier,
+                scheduleWarning = request?.takeIf { it.passengerId == uiState.userId }
+                    ?.let { viewModel.warningMessageFor(WarningSubject.REQUEST, it.requestId) }
             )
         }
 
@@ -475,6 +510,7 @@ fun RideshareNavHost(
                 }
             },
             onExit = ::navigateUp,
+            onViewRequest = ::viewExistingRequest,
             modifier = modifier
         )
 
@@ -497,7 +533,7 @@ fun RideshareNavHost(
             onSubmit = { seats, note, applyToRecurringGroup, onDone ->
                 val rideId = viewModel.selectedRideId
                 if (rideId == null) {
-                    onDone("No ride selected")
+                    onDone(RequestSubmitError("No ride selected"))
                 } else {
                     viewModel.requestSeat(rideId, seats, note, applyToRecurringGroup) { success, error ->
                         onDone(error)
@@ -506,6 +542,7 @@ fun RideshareNavHost(
                 }
             },
             onExit = ::navigateUp,
+            onViewRequest = ::viewExistingRequest,
             modifier = modifier
         )
 

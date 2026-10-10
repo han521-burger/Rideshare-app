@@ -1,5 +1,6 @@
 package com.example.ds04_monash_rideshare_application.backend.domain
 
+import com.example.ds04_monash_rideshare_application.backend.testTravelTimes
 import com.example.ds04_monash_rideshare_application.backend.DashboardDto
 import com.example.ds04_monash_rideshare_application.backend.RideDto
 import com.example.ds04_monash_rideshare_application.backend.RideRequestStatus
@@ -25,7 +26,7 @@ class ImpactAggregationTest {
     private fun withApp(test: suspend HttpClient.() -> Unit) {
         val url = tempDatabaseUrl()
         testApplication {
-            application { module(url) }
+            application { module(url, testTravelTimes()) }
             startApplication()
             client.test()
         }

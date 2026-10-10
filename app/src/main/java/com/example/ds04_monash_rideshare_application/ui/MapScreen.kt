@@ -54,6 +54,10 @@ private const val JUMP_ZOOM = 14.5f
 private const val ROUTE_REQUEST_TIMEOUT_MS = 15_000L
 
 //Result of an origin -> Yandex -> destination routing request (proposal Member C: Yandex first implementation).
+// estimatedDurationSeconds is MapKit's own estimate: it is what the app SHOWS next to a route (preview/ETA) and what a
+// driver's posted ride carries. It is presentation. The duration the backend SCHEDULES with is the one it plans
+// itself from its OpenStreetMap/OSRM travel-time matrix (backend TravelTime.kt, docs/TRAVEL_TIMES.md); a difference
+// between the two is expected, and the displayed one never overrides the planned one.
 data class RouteQueryResult(
     val originLat: Double,
     val originLng: Double,

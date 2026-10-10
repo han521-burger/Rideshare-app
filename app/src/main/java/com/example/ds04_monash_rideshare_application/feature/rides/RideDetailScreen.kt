@@ -61,6 +61,7 @@ import com.example.ds04_monash_rideshare_application.Repository.Remote.RideReque
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideStatus
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
 import com.example.ds04_monash_rideshare_application.core.state.Resource
+import com.example.ds04_monash_rideshare_application.core.state.SCHEDULE_WARNING_TITLE
 import com.example.ds04_monash_rideshare_application.core.ui.DetailCard
 import com.example.ds04_monash_rideshare_application.core.ui.FormBanner
 import com.example.ds04_monash_rideshare_application.core.ui.FormBannerKind
@@ -104,7 +105,10 @@ fun RideDetailScreen(
     onOpenChat: () -> Unit,
     onSubmitRating: (ratedUserId: String, stars: Int, comment: String?) -> Unit,
     onNavigateBack: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // The signed-in user's own schedule warning about this ride (as its driver) or about their accepted seat on it (as a
+    // passenger): an earlier ride of theirs finished late. Information only; null when there is none.
+    scheduleWarning: String? = null
 ) {
     val context = LocalContext.current
     var showSosConfirm by remember { mutableStateOf(false) }
@@ -149,10 +153,17 @@ fun RideDetailScreen(
                         item { FormBanner(error, FormBannerKind.Error) }
                     }
 
+                    // Still booked, still on: the ride (or seat) is unchanged, the person is just told they may be late.
+                    val warningStillRelevant = if (isDriver) ride.status in setOf(RideStatus.OPEN, RideStatus.CONFIRMED)
+                        else myRequestForRide?.status == RequestStatus.ACCEPTED
+                    if (scheduleWarning != null && warningStillRelevant) {
+                        item { FormBanner(scheduleWarning, FormBannerKind.Warning, title = SCHEDULE_WARNING_TITLE) }
+                    }
+
                     if (isDriver) {
                         item {
                             CompleteRideAction(ride.rideId, ride.driverId, currentUserId, ride.status,
-                                isActionInFlight, onCompleteRide)
+                                isActionInFlight, departureTime = ride.departureTime, onComplete = onCompleteRide)
                         }
                         item {
                             DriverEnRouteCard(

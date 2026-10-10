@@ -100,10 +100,17 @@ internal fun ActivityTheme(content: @Composable () -> Unit) {
     MaterialTheme(colorScheme = activityColorScheme(), typography = MaterialTheme.typography, content = content)
 }
 
+// One colour per outcome, in the order outcomeDistribution() lists them: Pending, Accepted, Completed, Rejected, Cancelled,
+// Expired, Schedule conflict. The card indexes this by position, so it must never be shorter than the outcome list.
+internal val OUTCOME_COLORS_DARK = listOf(
+    Color(0xFFE5AC50), Color(0xFF98B5D0), Color(0xFF8AC5A2), Color(0xFFF19B95), Color(0xFFB4A397), Color(0xFFB7A6CE), Color(0xFF7FCBD5)
+)
+internal val OUTCOME_COLORS_LIGHT = listOf(
+    Color(0xFFB57924), Color(0xFF4D6D89), Color(0xFF40825E), Color(0xFFBA453A), Color(0xFFAD9987), Color(0xFF806C99), Color(0xFF2F8F9D)
+)
+
 @Composable
-internal fun outcomeColors(): List<Color> = if (isSystemInDarkTheme()) listOf(
-    Color(0xFFE5AC50), Color(0xFF98B5D0), Color(0xFF8AC5A2), Color(0xFFF19B95), Color(0xFFB4A397), Color(0xFFB7A6CE)
-) else listOf(Color(0xFFB57924), Color(0xFF4D6D89), Color(0xFF40825E), Color(0xFFBA453A), Color(0xFFAD9987), Color(0xFF806C99))
+internal fun outcomeColors(): List<Color> = if (isSystemInDarkTheme()) OUTCOME_COLORS_DARK else OUTCOME_COLORS_LIGHT
 
 @Composable
 fun ActivityHeader(name: String, mode: AppMode, onModeChange: (AppMode) -> Unit, driverChecking: Boolean = false) {

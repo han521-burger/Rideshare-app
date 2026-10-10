@@ -33,7 +33,7 @@ tests covering both the valid and invalid paths.
 
 Run everything with `./gradlew :backend:test :app:testDebugUnitTest` (JVM, no emulator) and
 `./gradlew :app:connectedDebugAndroidTest` (needs a running emulator/device). At last run:
-111 backend tests and 114 app unit tests, all passing.
+565 backend tests and 314 app unit tests, all passing (Stage 9.1).
 
 **Backend (`backend/src/test/...`)** — each test boots the real Ktor app on a temporary SQLite
 file. The Gradle test task sets `rideshare.test.trustUserIdTokens`, letting tests call as a
@@ -47,8 +47,12 @@ seeded user by sending its userId as the token; `AuthTest` switches that off to 
 | `RideRequestApprovalTest` | Request stays PENDING, capacity unchanged until the owning driver accepts; other drivers get 403; rejection keeps capacity |
 | `RequestCancellationTest`, `RideCancellationPropagationTest` | Cancelling requests/rides, seat restoration, who may cancel, what cascades |
 | `RideCompletionLifecycleTest` | Completing rides and requests, allowed transitions, ownership |
+| `RequestCompletionAuthorityTest` | The ride owns completion: a seat cannot be completed on a live ride (before departure, under way; passenger or driver) and cannot be used to escape the schedule; completes with its ride using `completedAt`, or the planned arrival after auto-completion; legacy rows (COMPLETED seat on a live ride, ACCEPTED seat on a completed ride) |
+| `ActualCompletionTest`, `CompletionConcurrencyTest`, `CompletionHistoryTimelineTest`, `Stage9RealMatrixDiagnosticsTest` | Server-stamped `completedAt` (retry keeps the first, future ride refused, auto-completion records none); completed-location history for new requests (same-place buffer boundary, directional repositioning, actual vs planned); completion-time PENDING -> CONFLICTED and ACCEPTED -> private warning (driver and passenger); terminal states never resurrected; Stage 8 snapshot untouched; completion vs create / accept / cancel / duplicate-Complete races; the same scenarios against the production OSRM matrix |
 | `LifecycleTest` | Auto-expiry (past scheduled, 30-min-old ASAP, empty past rides), expired requests can't be accepted; "drive them instead" conflict + undo restoring everything; a booked passenger can't drive or book again at the same time |
 | `StandaloneRequestSchedulingTest` | Repeat-weekly asks become one request per day; ASAP never repeats; two drivers racing for the last seat - exactly one wins |
+| `RepeatingRequestBatchTest` | Every date of a repeating request / recurring seat series reports its outcome (created, duplicate, schedule conflict, full, unavailable, own ride); chronological processing; exact idempotent replay (rejected dates not re-evaluated, new key re-evaluates, legacy rows replay); DST through the API; four concurrency races |
+| `RecurrenceExpansionTest` | Recurrence bounds and expansion, 23/25-hour DST days, nonexistent/ambiguous wall times, independence from the server's zone |
 | `VehicleRegistrationTest` | One vehicle per account, field validation, seat caps on offered rides, ownership |
 | `MatchingEngineTest`, `MatchingRouteTest` | Matching gates, scoring and the `GET /rides/match` route |
 | `AnalyticsRoutesTest`, `AnalyticsCorrectnessTest` | Dashboard/analytics numbers |
@@ -131,7 +135,8 @@ Allowed transitions (`RideRequestStatus.transitions` in `Tables.kt`):
 `PENDING → ACCEPTED / REJECTED / CANCELLED`, `ACCEPTED → COMPLETED / CANCELLED`.
 The server also moves `PENDING → EXPIRED` and `ACCEPTED → COMPLETED` on its own (`Lifecycle.kt`),
 and `undo-accept` moves `ACCEPTED → PENDING` within 60 seconds for the accepting driver only.
-`REJECTED`, `CANCELLED`, `COMPLETED` and `EXPIRED` are final.
+`REJECTED`, `CANCELLED`, `COMPLETED`, `EXPIRED` and `CONFLICTED` (a waiting request another accepted trip made
+physically impossible; set only by the server) are final.
 
 | Case | Transition | Expected result               |
 |---|---|-------------------------------|

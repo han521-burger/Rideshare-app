@@ -16,12 +16,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
+import com.example.ds04_monash_rideshare_application.core.state.RequestSubmitError
 import com.example.ds04_monash_rideshare_application.core.state.Resource
 import com.example.ds04_monash_rideshare_application.core.ui.ChoiceChipGroup
 import com.example.ds04_monash_rideshare_application.core.ui.CountStepper
 import com.example.ds04_monash_rideshare_application.core.ui.FieldMessage
-import com.example.ds04_monash_rideshare_application.core.ui.FormBanner
-import com.example.ds04_monash_rideshare_application.core.ui.FormBannerKind
 import com.example.ds04_monash_rideshare_application.core.ui.FormInfoRow
 import com.example.ds04_monash_rideshare_application.core.ui.FormSectionCard
 import com.example.ds04_monash_rideshare_application.core.ui.FormStatusPill
@@ -46,15 +45,17 @@ private val STEP_LABELS = listOf("Ride", "Repeat", "Seats", "Review")
 fun RequestSeatFlowScreen(
     rideDetails: Resource<RideSummary>,
     isSubmitting: Boolean,
-    onSubmit: (seats: Int, note: String?, applyToRecurringGroup: Boolean, onDone: (String?) -> Unit) -> Unit,
+    onSubmit: (seats: Int, note: String?, applyToRecurringGroup: Boolean, onDone: (RequestSubmitError?) -> Unit) -> Unit,
     onExit: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Opens the request the backend says this one duplicates (shown as a "View" action on the banner).
+    onViewRequest: (String) -> Unit = {}
 ) {
     var step by rememberSaveable { mutableStateOf(0) }
     var applyToRecurringGroup by rememberSaveable { mutableStateOf(false) }
     var seats by rememberSaveable { mutableStateOf(1) }
     var note by rememberSaveable { mutableStateOf("") }
-    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var submitError by remember { mutableStateOf<RequestSubmitError?>(null) }
 
     val ride = rideDetails.data
 
@@ -73,7 +74,7 @@ fun RequestSeatFlowScreen(
                 step++
             } else if (ride != null) {
                 onSubmit(seats, note.trim().takeIf { it.isNotBlank() }, applyToRecurringGroup) { error ->
-                    errorMessage = error
+                    submitError = error
                 }
             }
         },
@@ -90,7 +91,7 @@ fun RequestSeatFlowScreen(
                 else -> ReviewStep(ride, seats, note, applyToRecurringGroup)
             }
         }
-        errorMessage?.let { FormBanner(it, FormBannerKind.Error, title = "Couldn’t send your request") }
+        submitError?.let { RequestSubmitErrorBanner(it, failureTitle = "Couldn’t send your request", onViewRequest = onViewRequest) }
     }
 }
 

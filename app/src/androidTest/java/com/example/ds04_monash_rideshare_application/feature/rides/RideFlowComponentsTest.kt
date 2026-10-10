@@ -42,6 +42,7 @@ import androidx.compose.ui.unit.dp
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateRideDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.StandaloneRequestDraft
+import com.example.ds04_monash_rideshare_application.core.state.RequestSubmitError
 import com.example.ds04_monash_rideshare_application.core.state.Resource
 import com.example.ds04_monash_rideshare_application.core.ui.AsapToggleRow
 import com.example.ds04_monash_rideshare_application.core.ui.CountStepper
@@ -519,7 +520,7 @@ class RideFlowComponentsTest {
 
     @Test fun submitFailureKeepsTheReviewAndShowsTheServerMessage() {
         compose.setContent {
-            RequestRideFlowScreen(false, { _, done -> done("Couldn’t send that request. Please try again.") }, {}, routeStep = fakeRouteStep())
+            RequestRideFlowScreen(false, { _, done -> done(RequestSubmitError("Couldn’t send that request. Please try again.")) }, {}, routeStep = fakeRouteStep())
         }
         repeat(3) { compose.onNodeWithText("Next").performClick() }
         compose.onNodeWithContentDescription("Step 4 of 4: Review").assertExists()
@@ -783,18 +784,21 @@ class RideFlowComponentsTest {
         compose.onNodeWithText("21.4 km").assertExists()
     }
 
-    @Test fun legacyRequestSeatKeepsItsOwnWizardShell() {
+    // Stage 10.1: this test used to assert the pre-redesign request-seat wizard ("Step 1 of 4: Ride" as visible text, final step
+    // "Confirm", and NO combined accessibility description). The screen has since been migrated, deliberately, to the shared
+    // RideFlowScaffold / WizardProgress shell (commits "Redesign Request Ride and Offer Ride flows" and "Restyle remaining
+    // screens"), which exposes ONE combined TalkBack node ("Step 1 of 4: Ride", its children cleared), and a final
+    // "Review" step with a "Send request" button. It asserts that shell with the same strictness.
+    @Test fun requestSeatUsesTheSharedWizardShell() {
         compose.setContent {
             MaterialTheme { RequestSeatFlowScreen(Resource(data = summary), false, { _, _, _, _ -> }, {}) }
         }
-        compose.onNodeWithText("Step 1 of 4: Ride").assertExists()
+        compose.onNodeWithContentDescription("Step 1 of 4: Ride").assertExists()
         compose.onNodeWithText("Cancel").assertExists()
         compose.onNodeWithText("Next").assertIsEnabled()
-        // None of the new shell's semantics leak into the legacy flow.
-        compose.onNodeWithContentDescription("Step 1 of 4: Ride").assertDoesNotExist()
         repeat(3) { compose.onNodeWithText("Next").performClick() }
-        compose.onNodeWithText("Step 4 of 4: Confirm").assertExists()
-        compose.onNodeWithText("Confirm").assertExists()
+        compose.onNodeWithContentDescription("Step 4 of 4: Review").assertExists()
+        compose.onNodeWithText("Send request").assertExists()
     }
 
     @Test fun darkSchemeKeepsLaterStepsReadable() {

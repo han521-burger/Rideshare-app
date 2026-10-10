@@ -1,5 +1,8 @@
 package com.example.ds04_monash_rideshare_application.backend.routes
 
+import com.example.ds04_monash_rideshare_application.backend.readTransaction
+import com.example.ds04_monash_rideshare_application.backend.schedulingTransaction
+import com.example.ds04_monash_rideshare_application.backend.schedulingTransactionFor
 import com.example.ds04_monash_rideshare_application.backend.ConflictException
 import com.example.ds04_monash_rideshare_application.backend.CreateRideRequest
 import com.example.ds04_monash_rideshare_application.backend.CreateStopInput
@@ -7,7 +10,12 @@ import com.example.ds04_monash_rideshare_application.backend.ForbiddenException
 import com.example.ds04_monash_rideshare_application.backend.MatchSearchResponse
 import com.example.ds04_monash_rideshare_application.backend.NotFoundException
 import com.example.ds04_monash_rideshare_application.backend.Ratings
-import com.example.ds04_monash_rideshare_application.backend.requireMonashEndpoint
+import com.example.ds04_monash_rideshare_application.backend.SchedulingConfig
+import com.example.ds04_monash_rideshare_application.backend.ServerClock
+import com.example.ds04_monash_rideshare_application.backend.CODE_RIDE_NOT_STARTED
+import com.example.ds04_monash_rideshare_application.backend.MESSAGE_RIDE_NOT_STARTED
+import com.example.ds04_monash_rideshare_application.backend.revalidateSchedulesAfterCompletion
+import com.example.ds04_monash_rideshare_application.backend.requireApprovedRoute
 import com.example.ds04_monash_rideshare_application.backend.RideDto
 import com.example.ds04_monash_rideshare_application.backend.RideRequestStatus
 import com.example.ds04_monash_rideshare_application.backend.RideRequests
@@ -18,7 +26,13 @@ import com.example.ds04_monash_rideshare_application.backend.UpdateRideRequest
 import com.example.ds04_monash_rideshare_application.backend.Users
 import com.example.ds04_monash_rideshare_application.backend.ValidationException
 import com.example.ds04_monash_rideshare_application.backend.requireBookableDeparture
-import com.example.ds04_monash_rideshare_application.backend.findTripConflicts
+import com.example.ds04_monash_rideshare_application.backend.ApprovedRoute
+import com.example.ds04_monash_rideshare_application.backend.CODE_TRAVEL_TIME_UNAVAILABLE
+import com.example.ds04_monash_rideshare_application.backend.ServiceUnavailableException
+import com.example.ds04_monash_rideshare_application.backend.TravelTimeProvider
+import com.example.ds04_monash_rideshare_application.backend.drivingJourney
+import com.example.ds04_monash_rideshare_application.backend.scheduleConflictFor
+import com.example.ds04_monash_rideshare_application.backend.scheduleInfeasibleError
 import com.example.ds04_monash_rideshare_application.backend.formatTripTime
 import com.example.ds04_monash_rideshare_application.backend.tripWindow
 import com.example.ds04_monash_rideshare_application.backend.Vehicles
@@ -45,13 +59,13 @@ import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
 import java.time.ZoneId
 import java.util.UUID
 
-fun Route.rideRoutes() {
+fun Route.rideRoutes(travelTimes: TravelTimeProvider) {
     // GET /rides?date=&originLat=&originLng=&destinationLat=&destinationLng=&availableOnly=
     // Plain filtered browse - no ranking. Use /rides/match for a ranked passenger search.
     get("/rides") {
@@ -64,7 +78,7 @@ fun Route.rideRoutes() {
         val destinationLng = call.request.queryParameters["destinationLng"]?.toDoubleOrNull()
         val radiusMeters = call.request.queryParameters["radiusMeters"]?.toDoubleOrNull() ?: 5_000.0
 
-        val (rides, alreadyRequestedRideIds) = transaction {
+        val (rides, alreadyRequestedRideIds) = readTransaction {
             // CONFIRMED rides remain discoverable while seats are available: approval of one
             // passenger should not hide the remaining seats from other passengers.
             val rows = Rides.selectAll().where { Rides.status inList listOf(RideStatus.OPEN, RideStatus.CONFIRMED) }.toList()
@@ -109,7 +123,7 @@ fun Route.rideRoutes() {
 
         val criteria = SearchCriteria(originLat, originLng, destinationLat, destinationLng, departureTime, seatsNeeded)
 
-        val (candidates, ridesByRideId) = transaction {
+        val (candidates, ridesByRideId) = readTransaction {
             val alreadyRequestedRideIds = callerActiveRequestedRideIds(callerId)
             val rows = Rides.selectAll().where { Rides.status inList listOf(RideStatus.OPEN, RideStatus.CONFIRMED) }
                 .filter { it[Rides.driverId] != callerId && it[Rides.rideId] !in alreadyRequestedRideIds }
@@ -145,31 +159,37 @@ fun Route.rideRoutes() {
         val body = call.receive<CreateRideRequest>()
         if (body.seatsTotal <= 0) throw ValidationException("seatsTotal must be positive")
         requireBookableDeparture(body.departureTime)
-        requireMonashEndpoint(body.originLat, body.originLng, body.destinationLat, body.destinationLng)
+        // Same endpoint rule as a ride request: approved points only, a campus at one end, two different places.
+        val route = requireApprovedRoute(body.originLat, body.originLng, body.destinationLat, body.destinationLng)
 
         val rideId = "ride-${UUID.randomUUID()}"
         val now = System.currentTimeMillis()
         val groupId = if (body.repeatDaysOfWeek.isNotEmpty()) "recur-${UUID.randomUUID()}" else null
 
-        transaction {
+        // Reads the driver's schedule, then adds rides to it: one step under the driver's lock.
+        schedulingTransaction(listOf(driverId)) {
             val vehicleId = requireDriverVehicle(driverId, body.seatsTotal)[Vehicles.vehicleId]
-            // A driver can't be in two trips at once (Lifecycle.kt). Their own waiting ride
-            // requests block too - otherwise one could be accepted for the same time.
-            fun conflictAt(departure: Long): String? {
-                val conflicts = findTripConflicts(driverId, tripWindow(departure, body.estimatedDurationSeconds))
-                return conflicts.blocking ?: conflicts.pendingRequestIds.firstOrNull()?.let {
-                    "you have your own ride request around ${formatTripTime(departure)} - cancel it first"
-                }
-            }
-            conflictAt(body.departureTime)?.let { throw ConflictException("You can't offer this ride - $it.") }
-            insertRide(rideId, driverId, vehicleId, body, groupId, now)
+            // How long this ride takes for SCHEDULING comes from the backend's travel-time matrix, decided once here and
+            // stored. body.estimatedDurationSeconds is MapKit's figure for the route preview: it is kept for display and
+            // never used to decide whether anything fits. No matrix entry means the ride is refused (recoverably);
+            // nothing falls back to MapKit, distance or a fixed speed.
+            val plannedSeconds = travelTimes.travelSeconds(route.origin.id, route.destination.id)
+                ?: throw ServiceUnavailableException(
+                    "We couldn't work out the travel time for this trip right now, so it can't be offered yet. Please try again later.",
+                    CODE_TRAVEL_TIME_UNAVAILABLE
+                )
+            // A person can't be in two places at once: the new ride has to fit the driver's whole timeline (rides they
+            // drive and journeys they have asked for), with room before and after (ScheduleFeasibility.kt).
+            fun conflictAt(departure: Long) = scheduleConflictFor(driverId, drivingJourney(departure, plannedSeconds, route), travelTimes)
+            conflictAt(body.departureTime)?.let { throw scheduleInfeasibleError(it) }
+            insertRide(rideId, driverId, vehicleId, body, route, plannedSeconds, groupId, now)
             insertStops(rideId, body.stops)
 
             // "Repeat this route every Mon/Wed" - generate concrete sibling rides for the next
             // repeatWeeks weeks. No scheduler in this trial, so this is a bounded, one-time
             // generation rather than an ongoing rule (see docs/RTM.md).
             if (groupId != null) {
-                val zone = ZoneId.systemDefault()
+                val zone = SchedulingConfig.SERVICE_ZONE
                 val startInstant = Instant.ofEpochMilli(body.departureTime).atZone(zone)
                 val startDate = startInstant.toLocalDate()
                 val timeOfDay = startInstant.toLocalTime()
@@ -183,7 +203,7 @@ fun Route.rideRoutes() {
                         // Days you already have a trip are skipped rather than failing the lot.
                         if (siblingDeparture > System.currentTimeMillis() && conflictAt(siblingDeparture) == null) {
                             val siblingId = "ride-${UUID.randomUUID()}"
-                            insertRide(siblingId, driverId, vehicleId, body, groupId, now, departureOverride = siblingDeparture)
+                            insertRide(siblingId, driverId, vehicleId, body, route, plannedSeconds, groupId, now, departureOverride = siblingDeparture)
                             insertStops(siblingId, body.stops)
                         }
                     }
@@ -191,7 +211,7 @@ fun Route.rideRoutes() {
                 }
             }
         }
-        val dto = transaction {
+        val dto = readTransaction {
             enrichRideDtos(Rides.selectAll().where { Rides.rideId eq rideId }.toList()).first()
         }
         call.respond(dto)
@@ -200,7 +220,7 @@ fun Route.rideRoutes() {
     get("/rides/{id}") {
         call.requireUserId()
         val rideId = call.parameters["id"] ?: throw NotFoundException()
-        val dto = transaction {
+        val dto = readTransaction {
             enrichRideDtos(Rides.selectAll().where { Rides.rideId eq rideId }.toList()).firstOrNull()
         } ?: throw NotFoundException("Ride not found")
         call.respond(dto)
@@ -211,7 +231,14 @@ fun Route.rideRoutes() {
         val rideId = call.parameters["id"] ?: throw NotFoundException()
         val body = call.receive<UpdateRideRequest>()
 
-        transaction {
+        // Cancelling or completing changes the requests of everyone on the ride, so the driver, those
+        // passengers (users, ascending) and then the ride are locked before anything is read for a
+        // decision (Concurrency.kt). Who the passengers are is found first, then confirmed under the lock.
+        schedulingTransactionFor(
+            usersOf = { people: Set<String> -> people },
+            ridesOf = { listOf(rideId) },
+            discover = { rideParticipantIds(rideId) }
+        ) {
             val ride = Rides.selectAll().where { Rides.rideId eq rideId }.firstOrNull()
                 ?: throw NotFoundException("Ride not found")
             if (ride[Rides.driverId] != userId) throw ForbiddenException("You don't own this ride")
@@ -223,7 +250,7 @@ fun Route.rideRoutes() {
             }
             if (currentStatus in setOf(RideStatus.CANCELLED, RideStatus.COMPLETED, RideStatus.EXPIRED)) {
                 // Preserve HTTP 200 for terminal retries, but ignore all supplied edits.
-                if (body.status == currentStatus) return@transaction
+                if (body.status == currentStatus) return@schedulingTransactionFor
                 throw ConflictException("A $currentStatus ride cannot be changed")
             }
             val allowed = when (currentStatus) {
@@ -235,8 +262,30 @@ fun Route.rideRoutes() {
                 throw ConflictException("Can't move a ride from $currentStatus to $targetStatus")
             }
 
+            // An EXPLICIT completion. The terminal-retry branch above already returned for a ride that is COMPLETED, so
+            // this runs once per ride and Rides.completedAt - the server's clock, never a client's value - is written
+            // exactly once and in this same transaction as the status (and so is never written for a completion that
+            // rolls back). A ride cannot be completed before it has started, or a client could invent a history that
+            // never happened; the check uses the later of the stored departure and any departure sent in this same call,
+            // so the call cannot move the ride into the past in order to finish it.
+            val completing = body.status == RideStatus.COMPLETED
+            val completedNow = ServerClock.now()
+            if (completing && completedNow < maxOf(ride[Rides.departureTime], body.departureTime ?: Long.MIN_VALUE)) {
+                throw ConflictException(MESSAGE_RIDE_NOT_STARTED, CODE_RIDE_NOT_STARTED)
+            }
+            // Everyone who carried a journey on this ride: the ACCEPTED seats (completed below) and - for a row from before the
+            // ride owned completion - a seat already marked COMPLETED early. Both have now ridden to the end, so both are
+            // revalidated. Cancelled, rejected and expired seats never took the ride and are not.
+            val acceptedPassengerIds = if (!completing) emptyList() else RideRequests.selectAll()
+                .where { (RideRequests.rideId eq rideId) and (RideRequests.status inList listOf(RideRequestStatus.ACCEPTED, RideRequestStatus.COMPLETED)) }
+                .map { it[RideRequests.passengerId] }
+
             Rides.update({ Rides.rideId eq rideId }) { stmt ->
-                body.departureTime?.let { stmt[departureTime] = it }
+                body.departureTime?.let { newDeparture ->
+                    stmt[departureTime] = newDeparture
+                    // The planned arrival moves with the departure (same planned duration).
+                    ride[Rides.plannedDurationSeconds]?.let { stmt[plannedArrivalTime] = newDeparture + it * 1000 }
+                }
                 body.seatsTotal?.let { newTotal ->
                     requireDriverVehicle(userId, newTotal)
                     if (newTotal < ride[Rides.seatsTotal] - ride[Rides.seatsAvailable]) {
@@ -248,6 +297,7 @@ fun Route.rideRoutes() {
                 }
                 body.notes?.let { stmt[notes] = it }
                 body.status?.let { stmt[status] = it }
+                if (completing) stmt[completedAt] = completedNow
                 // "I'm coming" (item: driver home / ride detail) - just a status flag in this
                 // trial, no live position behind it. See Tables.kt's comment on this column.
                 body.driverEnRoute?.let { stmt[driverEnRoute] = it }
@@ -266,22 +316,24 @@ fun Route.rideRoutes() {
             } else if (body.status == RideStatus.COMPLETED) {
                 // Accepted passengers finish their trip; outstanding asks can no longer be
                 // fulfilled. Preserve terminal request history and the ride's seat counts.
-                val completedAt = System.currentTimeMillis()
                 RideRequests.update({
                     (RideRequests.rideId eq rideId) and (RideRequests.status eq RideRequestStatus.ACCEPTED)
                 }) {
                     it[status] = RideRequestStatus.COMPLETED
-                    it[respondedAt] = completedAt
+                    it[respondedAt] = completedNow
                 }
                 RideRequests.update({
                     (RideRequests.rideId eq rideId) and (RideRequests.status eq RideRequestStatus.PENDING)
                 }) {
                     it[status] = RideRequestStatus.CANCELLED
-                    it[respondedAt] = completedAt
+                    it[respondedAt] = completedNow
                 }
+                // The ride really ended at completedNow: every person on it is now somewhere, as of that moment. Their
+                // other journeys are re-judged against that (CompletionRevalidation.kt), still inside this transaction.
+                revalidateSchedulesAfterCompletion(rideId, acceptedPassengerIds + userId, travelTimes, completedNow)
             }
         }
-        val dto = transaction {
+        val dto = readTransaction {
             enrichRideDtos(Rides.selectAll().where { Rides.rideId eq rideId }.toList()).first()
         }
         call.respond(dto)
@@ -294,7 +346,12 @@ fun Route.rideRoutes() {
         val userId = call.requireUserId()
         val rideId = call.parameters["id"] ?: throw NotFoundException()
 
-        transaction {
+        // Deleting also removes the ride's waiting requests, so lock the same people as cancelling does.
+        schedulingTransactionFor(
+            usersOf = { people: Set<String> -> people },
+            ridesOf = { listOf(rideId) },
+            discover = { rideParticipantIds(rideId) }
+        ) {
             val ride = Rides.selectAll().where { Rides.rideId eq rideId }.firstOrNull()
                 ?: throw NotFoundException("Ride not found")
             if (ride[Rides.driverId] != userId) throw ForbiddenException("You don't own this ride")
@@ -312,6 +369,15 @@ fun Route.rideRoutes() {
         }
         call.respond(mapOf("deleted" to true))
     }
+}
+
+// The driver and everyone with a request on this ride: the people whose schedules a change to the
+// ride (cancel, complete, delete) can touch. Read-only.
+private fun Transaction.rideParticipantIds(rideId: String): Set<String> {
+    val ride = Rides.selectAll().where { Rides.rideId eq rideId }.firstOrNull()
+        ?: throw NotFoundException("Ride not found")
+    return setOf(ride[Rides.driverId]) +
+        RideRequests.selectAll().where { RideRequests.rideId eq rideId }.map { it[RideRequests.passengerId] }
 }
 
 // Ride IDs the caller already has a live (non-rejected/cancelled) request against - used to keep
@@ -367,21 +433,31 @@ private fun insertRide(
     driverId: String,
     vehicleId: String,
     body: CreateRideRequest,
+    route: ApprovedRoute,
+    plannedDurationSeconds: Long,
     groupId: String?,
     createdAt: Long,
     departureOverride: Long? = null
 ) {
+    val departure = departureOverride ?: body.departureTime
     Rides.insert {
         it[Rides.rideId] = rideId
         it[Rides.driverId] = driverId
         it[Rides.vehicleId] = vehicleId
-        it[originLat] = body.originLat
-        it[originLng] = body.originLng
-        it[destinationLat] = body.destinationLat
-        it[destinationLng] = body.destinationLng
+        // The approved points' own coordinates, exactly as an open request stores them.
+        it[originLat] = route.origin.lat
+        it[originLng] = route.origin.lng
+        it[destinationLat] = route.destination.lat
+        it[destinationLng] = route.destination.lng
         it[distanceMeters] = body.distanceMeters
+        // DISPLAY duration, from the driver's app (MapKit). Not used for scheduling.
         it[estimatedDurationSeconds] = body.estimatedDurationSeconds
-        it[departureTime] = departureOverride ?: body.departureTime
+        // BACKEND planning interval - what scheduling uses.
+        it[originPointId] = route.origin.id
+        it[destinationPointId] = route.destination.id
+        it[Rides.plannedDurationSeconds] = plannedDurationSeconds
+        it[plannedArrivalTime] = departure + plannedDurationSeconds * 1000
+        it[departureTime] = departure
         it[seatsTotal] = body.seatsTotal
         it[seatsAvailable] = body.seatsTotal
         it[notes] = body.notes

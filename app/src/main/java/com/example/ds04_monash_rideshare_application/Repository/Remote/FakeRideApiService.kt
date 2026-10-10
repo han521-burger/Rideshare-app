@@ -83,12 +83,14 @@ class FakeRideApiService : RideApiService {
         seats: Int,
         note: String?,
         applyToRecurringGroup: Boolean,
-        callback: RideApiService.Callback<List<RideRequestSummary>>
+        clientRequestId: String?,
+        journeyIntentId: String?,
+        callback: RideApiService.Callback<RequestSubmissionResult>
     ) {
         callback.onFailure(unavailable)
     }
 
-    override fun createStandaloneRequest(draft: StandaloneRequestDraft, callback: RideApiService.Callback<RideRequestSummary>) {
+    override fun createStandaloneRequest(draft: StandaloneRequestDraft, callback: RideApiService.Callback<RequestSubmissionResult>) {
         callback.onFailure(unavailable)
     }
 

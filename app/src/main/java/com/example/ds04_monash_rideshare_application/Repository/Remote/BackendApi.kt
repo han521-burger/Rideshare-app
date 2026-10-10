@@ -71,10 +71,10 @@ interface BackendApi {
     fun getTripHistory(): Call<List<RideDto>>
 
     @POST("rides/{rideId}/requests")
-    fun requestSeat(@Path("rideId") rideId: String, @Body body: CreateSeatRequestBody): Call<List<RideRequestDto>>
+    fun requestSeat(@Path("rideId") rideId: String, @Body body: CreateSeatRequestBody): Call<CreateRequestsResultDto>
 
     @POST("requests")
-    fun createStandaloneRequest(@Body body: CreateStandaloneRequestBody): Call<RideRequestDto>
+    fun createStandaloneRequest(@Body body: CreateStandaloneRequestBody): Call<CreateRequestsResultDto>
 
     @GET("requests")
     fun getRequestsForMyRides(): Call<List<RideRequestDto>>
@@ -87,6 +87,10 @@ interface BackendApi {
 
     @POST("requests/{requestId}/undo-accept")
     fun undoAccept(@Path("requestId") requestId: String): Call<RideRequestDto>
+
+    // The signed-in user's own schedule warnings - private to them (backend ScheduleWarningRoutes.kt).
+    @GET("schedule-warnings")
+    fun getScheduleWarnings(): Call<List<ScheduleWarningDto>>
 
     @GET("rides/{rideId}/messages")
     fun getMessages(@Path("rideId") rideId: String): Call<List<MessageDto>>

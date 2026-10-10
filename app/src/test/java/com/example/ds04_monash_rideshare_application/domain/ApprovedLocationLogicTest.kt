@@ -52,19 +52,17 @@ class ApprovedLocationLogicTest {
     }
 
     // The two lists are "kept in sync by hand" with the backend (which validates every trip), so
-    // a drifting copy would let the app offer a place the server can't name. Parse the backend
-    // source and compare. Gradle runs unit tests with the module (app/) as working directory.
+    // a drifting copy would let the app offer a place the server can't name. The backend's single list of
+    // approved points (ApprovedPoints.kt, which NamedPoints.kt and MonashCampuses.kt are now views of) is
+    // parsed and compared. Gradle runs unit tests with the module (app/) as working directory.
+    // (ApprovedPointsParityTest checks the same list for ids, campus flags and set equality.)
     @Test fun appHubsAndCampusesMatchTheBackendDataset() {
-        val backend = File("../backend/src/main/kotlin/com/example/ds04_monash_rideshare_application/backend")
-        val points = Regex("""(?:NamedPoint|CampusPoint)\("([^"]+)",\s*(-?[0-9.]+),\s*(-?[0-9.]+)\)""")
-        fun read(name: String): List<Triple<String, Double, Double>> {
-            val file = File(backend, name)
-            assertTrue("backend source not found at ${file.absolutePath}", file.exists())
-            return points.findAll(file.readText()).map { Triple(it.groupValues[1], it.groupValues[2].toDouble(), it.groupValues[3].toDouble()) }.toList()
-        }
-        // NamedPoints.kt also lists retired points after the 25 current ones; only the current ones count.
-        val backendHubs = read("NamedPoints.kt").take(FIXED_POINTS.size)
-        val backendCampuses = read("MonashCampuses.kt")
+        val file = File("../backend/src/main/kotlin/com/example/ds04_monash_rideshare_application/backend/ApprovedPoints.kt")
+        assertTrue("backend source not found at ${file.absolutePath}", file.exists())
+        val point = Regex("""ApprovedPoint\("[^"]+", "([^"]+)", (-?[0-9.]+), (-?[0-9.]+), isCampus = (true|false)\)""")
+        val all = point.findAll(file.readText()).map { Pair(Triple(it.groupValues[1], it.groupValues[2].toDouble(), it.groupValues[3].toDouble()), it.groupValues[4].toBoolean()) }.toList()
+        val backendHubs = all.filter { !it.second }.map { it.first }
+        val backendCampuses = all.filter { it.second }.map { it.first }
         assertEquals(FIXED_POINTS.map { Triple(it.name, it.lat(), it.lng()) }, backendHubs)
         assertEquals(MONASH_CAMPUSES.map { Triple(it.name, it.lat(), it.lng()) }, backendCampuses)
     }

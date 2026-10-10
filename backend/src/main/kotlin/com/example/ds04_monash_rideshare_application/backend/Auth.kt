@@ -5,7 +5,6 @@ import io.ktor.server.application.ApplicationCall
 import io.ktor.server.request.header
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
 
 // The app signs in with a Monash email + password (routes/AuthRoutes.kt) and gets back a random
 // session token, sent on every call as "Authorization: Bearer <token>". Every protected route
@@ -16,7 +15,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 fun ApplicationCall.requireUserId(): String {
     val token = bearerToken() ?: throw UnauthorizedException()
     val now = System.currentTimeMillis()
-    val sessionUser = transaction {
+    val sessionUser = readTransaction {
         Sessions.selectAll().where { Sessions.token eq token }.firstOrNull()
             ?.takeIf { it[Sessions.expiresAt] > now }
             ?.get(Sessions.userId)
@@ -26,7 +25,7 @@ fun ApplicationCall.requireUserId(): String {
     // Backend tests only (set in backend/build.gradle's test task): let a test call as a seeded
     // user by sending its userId as the token, without signing in first. Never set in a real run.
     if (System.getProperty(TRUST_USER_ID_TOKENS_PROPERTY) == "true") {
-        val exists = transaction { Users.selectAll().where { Users.userId eq token }.count() > 0 }
+        val exists = readTransaction { Users.selectAll().where { Users.userId eq token }.count() > 0 }
         if (exists) return token
     }
     throw UnauthorizedException("Please sign in again")

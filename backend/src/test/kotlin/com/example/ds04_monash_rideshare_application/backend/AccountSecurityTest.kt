@@ -40,7 +40,7 @@ class AccountSecurityTest {
         LoginThrottle.resetForTests()
         try {
             testApplication {
-                application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}") }
+                application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}", testTravelTimes()) }
                 startApplication()
                 client.test()
             }
@@ -80,7 +80,7 @@ class AccountSecurityTest {
         val ben = token("ben.nguyen@student.monash.edu")
         val created = postJson("/rides/ride-open-2/requests", """{"seatsRequested":1,"applyToRecurringGroup":false}""", priya)
         assertEquals(HttpStatusCode.OK, created.status, created.bodyAsText())
-        val requestId = json.decodeFromString<List<RideRequestDto>>(created.bodyAsText()).single().requestId
+        val requestId = createdRequests(created.bodyAsText()).single().requestId
         val accepted = put("/requests/$requestId") {
             header(HttpHeaders.Authorization, "Bearer $ben")
             contentType(ContentType.Application.Json)

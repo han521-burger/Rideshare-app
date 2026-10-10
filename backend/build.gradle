@@ -69,6 +69,29 @@ tasks.register('seedDemoHistory', JavaExec) {
     workingDir = projectDir
 }
 
+// PRODUCTION travel-time matrix: one request to a local OSRM server (OpenStreetMap data) for the whole
+// 30 x 30 table, through the same strict importer. tools/osrm/generate-travel-times.ps1 runs the full
+// procedure including OSRM itself; see docs/TRAVEL_TIMES.md:
+//   ./gradlew :backend:generateTravelTimes --args="--osrm http://localhost:5000 --provenance path/provenance.json"
+tasks.register('generateTravelTimes', JavaExec) {
+    group = 'application'
+    description = 'Generates backend/src/main/resources/travel-times.json from a local OSRM Table request.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.example.ds04_monash_rideshare_application.backend.GenerateTravelTimesToolKt'
+    workingDir = projectDir
+}
+
+// Builds src/main/resources/travel-times.json from the Android generator's raw export (see
+// docs/TRAVEL_TIMES.md). Refuses partial / failed / incomplete exports and writes nothing in that case:
+//   ./gradlew :backend:importTravelTimes --args="C:/path/to/travel-times-raw.json"
+tasks.register('importTravelTimes', JavaExec) {
+    group = 'application'
+    description = 'Converts the Android travel-time export into backend/src/main/resources/travel-times.json.'
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'com.example.ds04_monash_rideshare_application.backend.ImportTravelTimesToolKt'
+    workingDir = projectDir
+}
+
 test {
     useJUnitPlatform()
     // Lets tests call as a seeded user by sending its userId as the bearer token (see Auth.kt).

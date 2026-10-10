@@ -1,18 +1,65 @@
 package com.example.ds04_monash_rideshare_application.backend
 
 import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.DatabaseConfig
 import org.jetbrains.exposed.sql.SchemaUtils
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.selectAll
+import org.jetbrains.exposed.sql.transactions.TransactionManager
 import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
+import org.sqlite.SQLiteConfig
+import org.sqlite.SQLiteDataSource
 
 // SQLite file DB for local trial/dev use - see build.gradle header for why, and swap this for a
 // hosted Postgres connection once the team picks real hosting (RTM FR-08).
+//
+// TWO KINDS OF TRANSACTION (full model in Concurrency.kt):
+//  * Write transactions - the default `transaction { }`, `schedulingTransaction`, anything that changes
+//    data or decides based on data it is about to change. On SQLite these start with BEGIN IMMEDIATE, so
+//    the writer takes the database's single write lock up front and any other writer WAITS (up to the
+//    busy timeout) instead of racing it. The default deferred mode lets two transactions both read, then
+//    fail with SQLITE_BUSY when they try to write - something Exposed used to hide by silently re-running
+//    the failed transaction. That retry is switched off, so correctness cannot depend on it.
+//  * Read transactions - `readTransaction { }`, for handlers that only read. A second, ordinary
+//    (deferred) connection to the same file with PRAGMA query_only on: it never takes the write lock, so
+//    reads are not queued behind writers, and an accidental write fails loudly instead of racing.
+// Only this file knows about SQLite's transaction modes; on PostgreSQL both kinds are the one ordinary
+// connection and the scheduling lock becomes SELECT ... FOR UPDATE (see Concurrency.kt).
+object Databases {
+    // The database a plain `transaction { }` (and every write) runs on.
+    lateinit var write: Database
+        private set
+    // Used by readTransaction. Same file; deferred, read-only. (Same object as `write` on PostgreSQL.)
+    lateinit var read: Database
+        private set
+
+    internal fun connectSqlite(jdbcUrl: String) {
+        fun connection(mode: SQLiteConfig.TransactionMode, readOnly: Boolean): Database {
+            val config = SQLiteConfig().apply {
+                setBusyTimeout(SchedulingConfig.DB_BUSY_TIMEOUT_MILLIS)
+                setTransactionMode(mode)
+            }
+            val dataSource = SQLiteDataSource(config).apply { url = jdbcUrl }
+            return Database.connect(
+                dataSource,
+                setupConnection = { connection ->
+                    if (readOnly) connection.createStatement().use { it.execute("PRAGMA query_only = ON") }
+                },
+                databaseConfig = DatabaseConfig { defaultRepetitionAttempts = 0 }
+            )
+        }
+        read = connection(SQLiteConfig.TransactionMode.DEFERRED, readOnly = true)
+        write = connection(SQLiteConfig.TransactionMode.IMMEDIATE, readOnly = false)
+        // Plain `transaction { }` (including in tests and tools) must be a write transaction.
+        TransactionManager.defaultDatabase = write
+    }
+}
+
 fun initDatabase(jdbcUrl: String = "jdbc:sqlite:./rideshare-backend.db") {
-    val database = Database.connect(jdbcUrl, driver = "org.sqlite.JDBC")
-    transaction(database) {
+    Databases.connectSqlite(jdbcUrl)
+    transaction(Databases.write) {
         // Refuse an ambiguous legacy migration rather than deleting or merging vehicles.
         val hasVehicles = exec("SELECT name FROM sqlite_master WHERE type='table' AND name='vehicles'") { it.next() } == true
         if (hasVehicles) {
@@ -22,7 +69,19 @@ fun initDatabase(jdbcUrl: String = "jdbc:sqlite:./rideshare-backend.db") {
         // createMissingTablesAndColumns (not create) so a local dev DB from before a schema
         // change - a new nullable/defaulted column, a new table - gets migrated in place via
         // ALTER TABLE instead of silently keeping the old shape and erroring at query time.
-        SchemaUtils.createMissingTablesAndColumns(Users, Sessions, Vehicles, Rides, RideStops, RideRequests, DeclinedRequests, Messages, Ratings, FavoriteDrivers)
+        SchemaUtils.createMissingTablesAndColumns(
+            Users, Sessions, Vehicles, Rides, RideStops, RideRequests, RequestSubmissions,
+            DeclinedRequests, Messages, Ratings, FavoriteDrivers, ScheduleWarnings
+        )
+        // Backstop against an exact duplicate: one live (PENDING/ACCEPTED) request per passenger per
+        // journey key. Partial, so cancelled/rejected/expired/completed rows never block a new
+        // request, and rows from before journey_key existed (NULL) are exempt. Plain SQL, valid
+        // unchanged on SQLite and PostgreSQL. The ±1-minute rule itself is DuplicateRules.kt.
+        exec(
+            "CREATE UNIQUE INDEX IF NOT EXISTS ride_requests_live_journey_unique " +
+                "ON ride_requests (passenger_id, journey_key) " +
+                "WHERE journey_key IS NOT NULL AND status IN ('PENDING', 'ACCEPTED')"
+        )
         seedDemoDataIfEmpty()
         setDemoPasswords()
     }

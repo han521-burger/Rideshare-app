@@ -3,9 +3,9 @@ package com.example.ds04_monash_rideshare_application.backend.domain
 import com.example.ds04_monash_rideshare_application.backend.MONASH_CAMPUSES
 import com.example.ds04_monash_rideshare_application.backend.NAMED_FIXED_POINTS
 import com.example.ds04_monash_rideshare_application.backend.ValidationException
-import com.example.ds04_monash_rideshare_application.backend.isNearMonashCampus
+import com.example.ds04_monash_rideshare_application.backend.resolveApprovedPoint
 import com.example.ds04_monash_rideshare_application.backend.nearestNamedPointLabel
-import com.example.ds04_monash_rideshare_application.backend.requireMonashEndpoint
+import com.example.ds04_monash_rideshare_application.backend.requireApprovedRoute
 import com.example.ds04_monash_rideshare_application.backend.routes.haversine
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -35,13 +35,15 @@ class HubDatasetTest {
         }
     }
 
-    @Test fun `every campus counts as a campus and only Caulfield Station overlaps a campus radius`() {
-        MONASH_CAMPUSES.forEach { assertTrue(isNearMonashCampus(it.lat, it.lng), "${it.name} must count as a campus") }
-        // Characterisation of the current data: Caulfield Station sits ~210 m from Monash Caulfield,
-        // inside the 300 m campus radius, so the endpoint rule treats it as campus-adjacent. Every
-        // other hub is clear of every campus. If this list changes, review MonashCampuses.kt.
-        val overlapping = NAMED_FIXED_POINTS.filter { isNearMonashCampus(it.lat, it.lng) }.map { it.name }
-        assertEquals(listOf("Caulfield Station"), overlapping)
+    @Test fun `every campus resolves to a campus and no hub does, even Caulfield Station next to Monash Caulfield`() {
+        MONASH_CAMPUSES.forEach { assertTrue(resolveApprovedPoint(it.lat, it.lng)?.isCampus == true, "${it.name} must count as a campus") }
+        NAMED_FIXED_POINTS.forEach { assertFalse(resolveApprovedPoint(it.lat, it.lng)?.isCampus == true, "${it.name} must not count as a campus") }
+        // Caulfield Station is ~210 m from Monash Caulfield. The old "within 300 m of a campus" rule counted it
+        // as campus-adjacent; identity-based approved points do not.
+        val station = NAMED_FIXED_POINTS.single { it.name == "Caulfield Station" }
+        val campus = MONASH_CAMPUSES.single { it.name == "Monash Caulfield" }
+        assertTrue(haversine(station.lat, station.lng, campus.lat, campus.lng) < 300.0)
+        assertEquals("caulfield-station", resolveApprovedPoint(station.lat, station.lng)?.id)
     }
 
     @Test fun `every hub and campus resolves back to its own name`() {
@@ -70,10 +72,10 @@ class HubDatasetTest {
         val campus = MONASH_CAMPUSES.first()
         val hub = NAMED_FIXED_POINTS.first()
         val otherHub = NAMED_FIXED_POINTS.last()
-        requireMonashEndpoint(campus.lat, campus.lng, hub.lat, hub.lng)
-        requireMonashEndpoint(hub.lat, hub.lng, campus.lat, campus.lng)
-        requireMonashEndpoint(campus.lat, campus.lng, MONASH_CAMPUSES.last().lat, MONASH_CAMPUSES.last().lng)
-        val failure = assertFailsWith<ValidationException> { requireMonashEndpoint(hub.lat, hub.lng, otherHub.lat, otherHub.lng) }
+        requireApprovedRoute(campus.lat, campus.lng, hub.lat, hub.lng)
+        requireApprovedRoute(hub.lat, hub.lng, campus.lat, campus.lng)
+        requireApprovedRoute(campus.lat, campus.lng, MONASH_CAMPUSES.last().lat, MONASH_CAMPUSES.last().lng)
+        val failure = assertFailsWith<ValidationException> { requireApprovedRoute(hub.lat, hub.lng, otherHub.lat, otherHub.lng) }
         assertNotNull(failure.message)
     }
 }

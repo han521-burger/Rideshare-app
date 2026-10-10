@@ -2,46 +2,93 @@ package com.example.ds04_monash_rideshare_application.backend
 
 import com.example.ds04_monash_rideshare_application.backend.routes.haversine
 import org.jetbrains.exposed.sql.ResultRow
+import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-// How long an ASAP ask waits for a driver before it expires.
-const val ASAP_REQUEST_LIFETIME_MILLIS = 30L * 60_000L
+// How long an ASAP ask waits for a driver before it expires (value lives in SchedulingConfig).
+const val ASAP_REQUEST_LIFETIME_MILLIS = SchedulingConfig.ASAP_REQUEST_LIFETIME_MILLIS
 // A ride with passengers is auto-completed this long after its estimated arrival.
 private const val COMPLETION_GRACE_MILLIS = 30L * 60_000L
-// Two trips closer together than this (either side) count as overlapping for one person.
+// LEGACY time-only overlap margin: two trips closer together than this (either side) count as overlapping. It is NOT
+// how anything is judged any more - creating OR accepting a request or ride uses location + travel time + a 10-minute
+// buffer (ScheduleFeasibility.kt). It remains for exactly one thing: comparing a journey with a legacy record that
+// cannot be placed on the map (an endpoint that is not an approved point), where time is all there is to go on.
 const val TRIP_CONFLICT_BUFFER_MILLIS = 30L * 60_000L
-// Standalone requests never had a real route computed - same 40 km/h estimate as accept uses.
+// LEGACY: the straight-line speed behind estimatedTripWindow, for records that never had a planned duration.
 private const val ESTIMATED_SPEED_METERS_PER_SECOND = 40_000.0 / 3600.0
 
 const val CONFLICT_OWN_PENDING_REQUEST = "OWN_PENDING_REQUEST"
+// The passenger already has a live (PENDING/ACCEPTED) request for this same journey. The error body
+// carries existingRequestId so the app can take them to it.
+const val CONFLICT_DUPLICATE_OPEN_REQUEST = "DUPLICATE_OPEN_REQUEST"
+// A clientRequestId was reused for a different request than the one it first identified.
+const val CONFLICT_IDEMPOTENCY_KEY_REUSED = "IDEMPOTENCY_KEY_REUSED"
+// No routing data exists for this pair of approved points, so the trip's own duration cannot be planned.
+// Returned as HTTP 503: nothing is wrong with the request, and it succeeds once the data exists.
+const val CODE_TRAVEL_TIME_UNAVAILABLE = "TRAVEL_TIME_UNAVAILABLE"
 
 // How far a driver's posted ride may leave from an open ask's requested time and still take it
 // (same window as ride matching).
 const val ATTACH_TIME_WINDOW_MILLIS = 45L * 60_000L
 
-// There's no scheduler in this trial backend, so stale records are tidied lazily: this runs before
-// every API call (Application.kt) and is cheap at trial scale.
+// Tidies stale records (runs before API calls - see Application.kt). Two steps, so that ordinary calls
+// never take the write lock just because this ran:
+//  1. DETECT, read-only (a plain deferred read): work out what, if anything, is stale right now.
+//     Nothing stale (the usual case) -> return without a write transaction.
+//  2. APPLY, only when something is stale: through the scheduling lock path
+//     (schedulingTransactionFor in Concurrency.kt), which locks every passenger and driver involved in
+//     id order, re-detects under the lock (another call may have tidied some of it already) and then
+//     writes. So expiry races with create / accept / cancel / complete the same way they race each other.
+// The rules themselves are unchanged:
 // - PENDING requests whose departure has passed (ASAP: 30 min after asking) become EXPIRED.
 // - Rides past departure with nobody accepted become EXPIRED.
 // - Rides with accepted passengers become COMPLETED (with those requests) once the trip is over.
-fun expireStaleRecords(now: Long = System.currentTimeMillis()) = transaction {
-    val ridesById = Rides.selectAll().toList().associateBy { it[Rides.rideId] }
+fun expireStaleRecords(now: Long = System.currentTimeMillis()) {
+    if (readTransaction { planExpiry(now) }.isEmpty) return
+    schedulingTransactionFor(
+        usersOf = { plan: ExpiryPlan -> plan.userIds },
+        ridesOf = { plan -> plan.rideIds },
+        discover = { planExpiry(now) },
+        block = { plan -> applyExpiry(plan, now) }
+    )
+}
 
+// What is stale at one moment, and whose records it touches (so they can be locked first).
+class ExpiryPlan(
+    val expireRequestIds: List<String>,
+    val expireRideIds: List<String>,
+    val completeRides: List<CompletedRide>,
+    val userIds: Set<String>
+) {
+    val rideIds: Set<String> get() = (expireRideIds + completeRides.map { it.rideId }).toSet()
+    val isEmpty: Boolean get() = expireRequestIds.isEmpty() && expireRideIds.isEmpty() && completeRides.isEmpty()
+}
+
+class CompletedRide(val rideId: String, val acceptedRequestIds: List<String>)
+
+// Read-only: safe on a read transaction.
+internal fun Transaction.planExpiry(now: Long): ExpiryPlan {
+    val ridesById = Rides.selectAll().toList().associateBy { it[Rides.rideId] }
+    val users = mutableSetOf<String>()
+
+    val expireRequests = mutableListOf<String>()
     RideRequests.selectAll().where { RideRequests.status eq RideRequestStatus.PENDING }.forEach { request ->
-        val deadline = request[RideRequests.rideId]?.let { ridesById[it]?.get(Rides.departureTime) }
-            ?: if (request[RideRequests.isAsap]) request[RideRequests.createdAt] + ASAP_REQUEST_LIFETIME_MILLIS
-            else request[RideRequests.desiredDepartureTime] ?: (request[RideRequests.createdAt] + ASAP_REQUEST_LIFETIME_MILLIS)
-        if (now > deadline) markRequest(request[RideRequests.requestId], RideRequestStatus.EXPIRED, now)
+        val deadline = requestDeadline(request, request[RideRequests.rideId]?.let { ridesById[it]?.get(Rides.departureTime) })
+        if (now > deadline) {
+            expireRequests += request[RideRequests.requestId]
+            users += request[RideRequests.passengerId]
+        }
     }
 
+    val expireRides = mutableListOf<String>()
+    val completeRides = mutableListOf<CompletedRide>()
     ridesById.values
         .filter { it[Rides.status] in setOf(RideStatus.OPEN, RideStatus.CONFIRMED) && it[Rides.departureTime] < now }
         .forEach { ride ->
@@ -50,12 +97,43 @@ fun expireStaleRecords(now: Long = System.currentTimeMillis()) = transaction {
                 (RideRequests.rideId eq rideId) and (RideRequests.status eq RideRequestStatus.ACCEPTED)
             }.toList()
             if (accepted.isEmpty()) {
-                Rides.update({ Rides.rideId eq rideId }) { it[status] = RideStatus.EXPIRED }
+                expireRides += rideId
+                users += ride[Rides.driverId]
             } else if (now >= rideWindow(ride).end + COMPLETION_GRACE_MILLIS) {
-                Rides.update({ Rides.rideId eq rideId }) { it[status] = RideStatus.COMPLETED }
-                accepted.forEach { markRequest(it[RideRequests.requestId], RideRequestStatus.COMPLETED, now) }
+                completeRides += CompletedRide(rideId, accepted.map { it[RideRequests.requestId] })
+                users += ride[Rides.driverId]
+                accepted.forEach { users += it[RideRequests.passengerId] }
             }
         }
+    return ExpiryPlan(expireRequests, expireRides, completeRides, users)
+}
+
+// Must run inside a scheduling transaction that holds the plan's locks.
+internal fun Transaction.applyExpiry(plan: ExpiryPlan, now: Long) {
+    plan.expireRequestIds.forEach { markRequest(it, RideRequestStatus.EXPIRED, now) }
+    plan.expireRideIds.forEach { rideId ->
+        Rides.update({ Rides.rideId eq rideId }) { it[status] = RideStatus.EXPIRED }
+    }
+    plan.completeRides.forEach { completed ->
+        Rides.update({ Rides.rideId eq completed.rideId }) { it[status] = RideStatus.COMPLETED }
+        completed.acceptedRequestIds.forEach { markRequest(it, RideRequestStatus.COMPLETED, now) }
+    }
+}
+
+// When a PENDING request stops being something anyone can accept: the departure of the ride it is aimed at, else (an
+// open ask) the time it asked for, or 30 minutes after an ASAP ask was made.
+fun requestDeadline(request: ResultRow, attachedRideDeparture: Long?): Long = attachedRideDeparture
+    ?: if (request[RideRequests.isAsap]) request[RideRequests.createdAt] + ASAP_REQUEST_LIFETIME_MILLIS
+    else request[RideRequests.desiredDepartureTime] ?: (request[RideRequests.createdAt] + ASAP_REQUEST_LIFETIME_MILLIS)
+
+// A PENDING request that another, stronger commitment has made physically impossible (RideRequestStatus.CONFLICTED):
+// terminal, and it keeps the structured reason (ScheduleConflictDetails as JSON) so the passenger can be told why.
+fun markConflicted(requestId: String, conflictDetailsJson: String, at: Long) {
+    RideRequests.update({ (RideRequests.requestId eq requestId) and (RideRequests.status eq RideRequestStatus.PENDING) }) {
+        it[status] = RideRequestStatus.CONFLICTED
+        it[respondedAt] = at
+        it[conflictDetails] = conflictDetailsJson
+    }
 }
 
 private fun markRequest(requestId: String, newStatus: String, at: Long) {
@@ -70,70 +148,25 @@ data class TripWindow(val start: Long, val end: Long) {
         start < other.end + TRIP_CONFLICT_BUFFER_MILLIS && other.start < end + TRIP_CONFLICT_BUFFER_MILLIS
 }
 
+// A ride's end for COMPLETION purposes (expiry/auto-complete below) - not for deciding whether anything fits. Its
+// interval is its backend PLANNED arrival (travel-time matrix). Only a ride from before planning existed falls back
+// to its stored estimatedDurationSeconds - MapKit's display figure - and that use is counted (LegacyScheduling).
 fun rideWindow(ride: ResultRow): TripWindow {
     val start = ride[Rides.departureTime]
+    ride[Rides.plannedArrivalTime]?.let { return TripWindow(start, it) }
+    LegacyScheduling.noteLegacyEstimate()
     return TripWindow(start, start + ride[Rides.estimatedDurationSeconds] * 1000)
 }
 
 fun tripWindow(departureTime: Long, estimatedDurationSeconds: Long) =
     TripWindow(departureTime, departureTime + estimatedDurationSeconds * 1000)
 
-// Must be called inside a transaction.
-fun requestWindow(request: ResultRow): TripWindow? {
-    request[RideRequests.rideId]?.let { rideId ->
-        return Rides.selectAll().where { Rides.rideId eq rideId }.firstOrNull()?.let(::rideWindow)
-    }
-    val start = if (request[RideRequests.isAsap]) request[RideRequests.createdAt]
-    else request[RideRequests.desiredDepartureTime] ?: return null
-    return estimatedTripWindow(
-        start,
-        request[RideRequests.originLat] ?: return null,
-        request[RideRequests.originLng] ?: return null,
-        request[RideRequests.destinationLat] ?: return null,
-        request[RideRequests.destinationLng] ?: return null
-    )
-}
-
+// LEGACY ONLY: straight-line distance at 40 km/h, for records that never had a planned duration. Nothing that
+// creates or checks a NEW journey may call this (LegacyScheduling counts calls; a test guards it).
 fun estimatedTripWindow(start: Long, originLat: Double, originLng: Double, destinationLat: Double, destinationLng: Double): TripWindow {
+    LegacyScheduling.noteLegacyEstimate()
     val seconds = (haversine(originLat, originLng, destinationLat, destinationLng) / ESTIMATED_SPEED_METERS_PER_SECOND).toLong()
     return TripWindow(start, start + seconds * 1000)
-}
-
-// What a user already has around a given time. "blocking" can't be overridden (you can't drive
-// and ride, or drive two cars, at once); "pendingRequestIds" are the user's own still-waiting
-// asks, which can be cancelled to make room. Must be called inside a transaction.
-class TripConflicts(val blocking: String?, val pendingRequestIds: List<String>)
-
-fun findTripConflicts(
-    userId: String,
-    window: TripWindow,
-    ignoreRideId: String? = null,
-    ignoreRequestId: String? = null
-): TripConflicts {
-    val drivingClash = Rides.selectAll()
-        .where { Rides.driverId eq userId }
-        .filter { it[Rides.status] in setOf(RideStatus.OPEN, RideStatus.CONFIRMED) && it[Rides.rideId] != ignoreRideId }
-        .firstOrNull { rideWindow(it).overlaps(window) }
-    if (drivingClash != null) {
-        return TripConflicts("you're already driving a ride at ${formatTripTime(drivingClash[Rides.departureTime])}", emptyList())
-    }
-
-    val ownRequests = RideRequests.selectAll()
-        .where { RideRequests.passengerId eq userId }
-        .filter { it[RideRequests.requestId] != ignoreRequestId }
-    val ridingClash = ownRequests
-        .filter { it[RideRequests.status] == RideRequestStatus.ACCEPTED && it[RideRequests.rideId] != ignoreRideId }
-        .firstOrNull { requestWindow(it)?.overlaps(window) == true }
-    if (ridingClash != null) {
-        val start = requestWindow(ridingClash)!!.start
-        return TripConflicts("you're already booked as a passenger at ${formatTripTime(start)}", emptyList())
-    }
-
-    val pending = ownRequests
-        .filter { it[RideRequests.status] == RideRequestStatus.PENDING }
-        .filter { requestWindow(it)?.overlaps(window) == true }
-        .map { it[RideRequests.requestId] }
-    return TripConflicts(null, pending)
 }
 
 // Cancels one PENDING or ACCEPTED request (must be called inside a transaction). An accepted seat

@@ -38,7 +38,7 @@ class RequestCancellationTest {
             deleteOnExit()
         }
         testApplication {
-            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}") }
+            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}", testTravelTimes()) }
             startApplication()
             // Adjust only this isolated fixture before any lifecycle operations.
             transaction {
@@ -58,7 +58,7 @@ class RequestCancellationTest {
             setBody("""{"seatsRequested":$seats,"applyToRecurringGroup":false}""")
         }
         assertEquals(HttpStatusCode.OK, response.status)
-        return json.decodeFromString<List<RideRequestDto>>(response.bodyAsText()).single().also {
+        return createdRequests(response.bodyAsText()).single().also {
             assertEquals(RideRequestStatus.PENDING, it.status)
             assertEquals(seats, it.seatsRequested)
             assertEquals(rideId, it.rideId)
@@ -178,9 +178,17 @@ class RequestCancellationTest {
         val request = create()
         transition(request, RideRequestStatus.ACCEPTED, driver)
         capacity(1)
-        val completed = transition(request, RideRequestStatus.COMPLETED, driver)
+        // Stage 9.1: a seat is completed by its RIDE completing (a request cannot complete itself while the ride is live).
+        val ride = serverClockAfterDeparture(rideId).use {
+            put("/rides/$rideId") {
+                header(HttpHeaders.Authorization, "Bearer $driver"); contentType(ContentType.Application.Json); setBody("""{"status":"COMPLETED"}""")
+            }
+        }
+        assertEquals(HttpStatusCode.OK, ride.status)
+        val completed = persisted(request)
+        assertEquals(RideRequestStatus.COMPLETED, completed.status)
         transition(request, RideRequestStatus.CANCELLED, expected = HttpStatusCode.Conflict)
-        capacity(1)
+        capacity(1, RideStatus.COMPLETED)
         assertEquals(completed, persisted(request))
     }
 
@@ -267,7 +275,11 @@ class RequestCancellationTest {
         val cancelledState = transition(cancelled, RideRequestStatus.CANCELLED, secondPassenger)
         val completed = create(caller = secondPassenger)
         transition(completed, RideRequestStatus.ACCEPTED, driver)
-        val completedState = transition(completed, RideRequestStatus.COMPLETED, secondPassenger)
+        // Stage 9.1: one seat can no longer be completed through the API while the ride is live (RIDE_NOT_COMPLETED), and
+        // completing the ride would complete `active` too. This test is about how a COMPLETED row is counted for capacity,
+        // so the row is written directly.
+        setStatus(completed.requestId, RideRequestStatus.COMPLETED)
+        val completedState = persisted(completed, secondPassenger)
         capacity(2, RideStatus.CONFIRMED)
         transition(active, RideRequestStatus.CANCELLED)
         // Completed bookings keep their consumed seats; only the cancelled seat is restored.
@@ -312,10 +324,12 @@ class RequestCancellationTest {
             }
             val request = create()
             transition(request, RideRequestStatus.ACCEPTED, driver)
-            val response = put("/rides/$rideId") {
-                header(HttpHeaders.Authorization, "Bearer $driver")
-                contentType(ContentType.Application.Json)
-                setBody("""{"status":"$terminal"}""")
+            val response = serverClockAfterDeparture(rideId).use {
+                put("/rides/$rideId") {
+                    header(HttpHeaders.Authorization, "Bearer $driver")
+                    contentType(ContentType.Application.Json)
+                    setBody("""{"status":"$terminal"}""")
+                }
             }
             assertEquals(HttpStatusCode.OK, response.status)
             val before = persisted(request)

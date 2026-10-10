@@ -7,6 +7,9 @@ import androidx.lifecycle.ViewModel
 import com.example.ds04_monash_rideshare_application.Auth.AuthSession
 import com.example.ds04_monash_rideshare_application.Repository.Remote.BackendException
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CONFLICT_OWN_PENDING_REQUEST
+import com.example.ds04_monash_rideshare_application.Repository.Remote.REQUEST_ALREADY_ACCEPTED
+import com.example.ds04_monash_rideshare_application.Repository.Remote.RequestSubmissionResult
+import com.example.ds04_monash_rideshare_application.Repository.Remote.REQUEST_UNAVAILABLE
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateRideDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.CreateVehicleDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.AnalyticsSummary
@@ -23,6 +26,7 @@ import com.example.ds04_monash_rideshare_application.Repository.Remote.RideReque
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSearchCriteria
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideStatus
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
+import com.example.ds04_monash_rideshare_application.Repository.Remote.ScheduleWarning
 import com.example.ds04_monash_rideshare_application.Repository.Remote.StandaloneRequestDraft
 import com.example.ds04_monash_rideshare_application.Repository.Remote.UserAccountSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.VehicleSummary
@@ -82,11 +86,19 @@ class RideshareViewModel(
         private set
     var incomingRequests by mutableStateOf(Resource<List<RideRequestSummary>>())
         private set
+    // The signed-in user's own schedule warnings (an earlier ride finished late; a later ACCEPTED/driven journey may now be
+    // out of reach). Information only - it never changes a request or ride - and refreshed whenever requests or rides are.
+    var scheduleWarnings by mutableStateOf(Resource<List<ScheduleWarning>>())
+        private set
+    private var scheduleWarningsVersion = 0
     var openRides by mutableStateOf(Resource<List<RideSummary>>())
         private set
     var searchResults by mutableStateOf(Resource<List<RideSummary>>())
         private set
     var lastSearchCriteria by mutableStateOf<RideSearchCriteria?>(null)
+        private set
+    // What a repeating request (or a seat request across a recurring group) came to, shown once after it is sent.
+    var submissionSummary by mutableStateOf<SubmissionSummary?>(null)
         private set
     var rideDetails by mutableStateOf(Resource<RideSummary>())
         private set
@@ -139,14 +151,15 @@ class RideshareViewModel(
             return (driving + riding).distinctBy { it.rideId }.sortedBy { it.departureTime }
         }
 
-    // Passenger's Pending tab: still-waiting asks plus ones that expired in the last day, so they
-    // can see what happened and ask again instead of the request silently disappearing.
-    val myPendingAndRecentlyExpiredRequests: List<RideRequestSummary>
+    // Passenger's Pending tab: still-waiting asks plus ones that ended without a ride in the last day - expired, or
+    // made impossible by another trip (CONFLICTED) - so they can see what happened and ask again instead of the
+    // request silently disappearing.
+    val myPendingAndRecentlyEndedRequests: List<RideRequestSummary>
         get() {
             val cutoff = System.currentTimeMillis() - 24 * 60 * 60 * 1000L
             return myRequests.data.orEmpty().filter {
                 it.status == RequestStatus.PENDING ||
-                    (it.status == RequestStatus.EXPIRED && (it.respondedAt ?: 0L) >= cutoff)
+                    ((it.status == RequestStatus.EXPIRED || it.status == RequestStatus.CONFLICTED) && (it.respondedAt ?: 0L) >= cutoff)
             }
         }
 
@@ -290,14 +303,16 @@ class RideshareViewModel(
         vehicleSaving = false
         profileDetails = Resource(); myDriverRides = Resource(); myRequests = Resource()
         incomingRequests = Resource(); openRides = Resource(); searchResults = Resource()
-        lastSearchCriteria = null
+        lastSearchCriteria = null; journeyIntents.clear(); submissionSummary = null
         rideDetails = Resource(); messages = Resource(); tripHistory = Resource()
         dashboard = Resource(); analytics = Resource(); leaderboard = Resource(); ratings = Resource(); favorites = Resource()
         vehicles = Resource()
         selectedRideId = null; selectedRequestId = null; requestActionError = null
         acceptConflict = null; undoableAcceptRequestId = null; dismissedBannerRequestIds = emptySet()
         actionInFlight = false; incomingRequestRefresh = RequestRefreshGate(); lastCreatedRide = null
+        standaloneSubmissionKeys.reset(); seatSubmissionKeys.reset()
         rideDetailsVersion++; myRequestsVersion++; driverRidesVersion++
+        scheduleWarningsVersion++; scheduleWarnings = Resource()
     }
 
     // Signs out on this device straight away; the server-side session is ended in the
@@ -392,6 +407,7 @@ class RideshareViewModel(
     }
 
     fun searchRides(criteria: RideSearchCriteria) {
+        journeyIntents.forSearch(criteria)
         lastSearchCriteria = criteria
         searchResults = Resource(isLoading = true)
         apiService.searchRides(criteria, object : RideApiService.Callback<List<RideSummary>> {
@@ -496,6 +512,7 @@ class RideshareViewModel(
     }
 
     fun loadMyDriverRides() {
+        loadScheduleWarnings()
         val version = ++driverRidesVersion
         myDriverRides = Resource(isLoading = true, data = myDriverRides.data)
         apiService.fetchMyDriverRides(object : RideApiService.Callback<List<RideSummary>> {
@@ -516,39 +533,99 @@ class RideshareViewModel(
         })
     }
 
-    fun requestSeat(rideId: String, seats: Int, note: String?, applyToRecurringGroup: Boolean, onDone: (Boolean, String?) -> Unit) {
+    // What a seat request is, for deciding whether a tap is a retry of the same submission. The journey intent is
+    // part of it: the same ride asked for under a different search is a different request, so it gets a new id.
+    private data class SeatSubmission(
+        val rideId: String, val seats: Int, val note: String?, val applyToRecurringGroup: Boolean, val journeyIntentId: String?
+    )
+
+    // One id per ride search; every seat request made from that search carries it (see JourneyIntents).
+    private val journeyIntents = JourneyIntents()
+
+    // A seat request declares the search's intent only when the ride really came from that search's results. A ride
+    // reached any other way (the browse list, a link) is not an option the passenger was weighing for that journey,
+    // so it declares none and stands alone.
+    private fun journeyIntentFor(rideId: String): String? =
+        if (searchResults.data?.any { it.rideId == rideId } == true) journeyIntents.current() else null
+
+    // One idempotency id per logical submission, kept here (not in a screen) so it survives the screen
+    // being rebuilt: a retry after a timeout reuses it and the backend returns the original request.
+    private val standaloneSubmissionKeys = SubmissionKeys<StandaloneRequestDraft>()
+    private val seatSubmissionKeys = SubmissionKeys<SeatSubmission>()
+
+    fun requestSeat(rideId: String, seats: Int, note: String?, applyToRecurringGroup: Boolean, onDone: (Boolean, RequestSubmitError?) -> Unit) {
         actionInFlight = true
-        apiService.requestSeat(rideId, seats, note, applyToRecurringGroup, object : RideApiService.Callback<List<RideRequestSummary>> {
-            override fun onSuccess(result: List<RideRequestSummary>) {
+        val intent = journeyIntentFor(rideId)
+        val key = seatSubmissionKeys.keyFor(SeatSubmission(rideId, seats, note, applyToRecurringGroup, intent))
+        apiService.requestSeat(rideId, seats, note, applyToRecurringGroup, key, intent, object : RideApiService.Callback<RequestSubmissionResult> {
+            override fun onSuccess(result: RequestSubmissionResult) {
                 actionInFlight = false
+                // The call was processed (whatever each date came to): it is finished, so the next tap is a new submission.
+                seatSubmissionKeys.reset()
                 loadMyRequests()
-                onDone(true, null)
+                finishSubmission(result, onDone)
             }
 
             override fun onFailure(error: Exception) {
                 actionInFlight = false
-                onDone(false, error.message ?: "Couldn't request that seat. Please try again.")
+                val failure = error.toRequestSubmitError("Couldn't request that seat. Please try again.")
+                // Already requested: make sure the request the backend named is on screen.
+                if (failure.isDuplicate) loadMyRequests()
+                onDone(false, failure)
             }
         })
     }
 
-    fun createStandaloneRequest(draft: StandaloneRequestDraft, onDone: (Boolean, String?) -> Unit) {
+    fun createStandaloneRequest(draft: StandaloneRequestDraft, onDone: (Boolean, RequestSubmitError?) -> Unit) {
         actionInFlight = true
-        apiService.createStandaloneRequest(draft, object : RideApiService.Callback<RideRequestSummary> {
-            override fun onSuccess(result: RideRequestSummary) {
+        val submission = draft.copy(clientRequestId = null)
+        val keyed = submission.copy(clientRequestId = standaloneSubmissionKeys.keyFor(submission))
+        apiService.createStandaloneRequest(keyed, object : RideApiService.Callback<RequestSubmissionResult> {
+            override fun onSuccess(result: RequestSubmissionResult) {
                 actionInFlight = false
+                standaloneSubmissionKeys.reset()
                 loadMyRequests()
-                onDone(true, null)
+                finishSubmission(result, onDone)
             }
 
             override fun onFailure(error: Exception) {
                 actionInFlight = false
-                onDone(false, error.message ?: "Couldn't send that request. Please try again.")
+                val failure = error.toRequestSubmitError("Couldn't send that request. Please try again.")
+                // Already requested: make sure the request the backend named is on screen.
+                if (failure.isDuplicate) loadMyRequests()
+                onDone(false, failure)
             }
         })
     }
+
+    // A one-off request is just a success, as ever. A repeating one gets a short summary of every date; if not a single date
+    // could be made the passenger stays on the form (nothing was created) with that summary in front of them.
+    private fun finishSubmission(result: RequestSubmissionResult, onDone: (Boolean, RequestSubmitError?) -> Unit) {
+        if (result.isBatch) submissionSummary = summariseSubmission(result)
+        onDone(result.created > 0, null)
+    }
+
+    fun dismissSubmissionSummary() { submissionSummary = null }
+
+    // A failed refresh keeps the last warnings (a banner should not vanish because the network blinked).
+    fun loadScheduleWarnings() {
+        val version = ++scheduleWarningsVersion
+        apiService.fetchScheduleWarnings(object : RideApiService.Callback<List<ScheduleWarning>> {
+            override fun onSuccess(result: List<ScheduleWarning>) {
+                if (version == scheduleWarningsVersion) scheduleWarnings = Resource(data = result)
+            }
+            override fun onFailure(error: Exception) {
+                if (version == scheduleWarningsVersion) scheduleWarnings = Resource(data = scheduleWarnings.data, errorMessage = error.message)
+            }
+        })
+    }
+
+    /** The warning text for one of the signed-in user's requests or rides, or null when there is none. */
+    fun warningMessageFor(subjectKind: String, subjectId: String?): String? =
+        com.example.ds04_monash_rideshare_application.core.state.scheduleWarningFor(scheduleWarnings.data, subjectKind, subjectId)
 
     fun loadMyRequests() {
+        loadScheduleWarnings()
         val version = ++myRequestsVersion
         myRequests = Resource(isLoading = true, data = myRequests.data)
         apiService.fetchMyRequests(object : RideApiService.Callback<List<RideRequestSummary>> {
@@ -654,6 +731,11 @@ class RideshareViewModel(
                 }
                 val message = error.message ?: "Couldn't update that request. Please try again."
                 requestActionError = message
+                // The request is gone (another driver took it, or it ended): show the answer AND drop it from the inbox
+                // now, rather than leaving it there until the next background refresh.
+                if (newStatus == RequestStatus.ACCEPTED && (error as? BackendException)?.code in setOf(REQUEST_ALREADY_ACCEPTED, REQUEST_UNAVAILABLE)) {
+                    loadIncomingRequests(showLoading = false)
+                }
                 onDone(false, message)
             }
         })

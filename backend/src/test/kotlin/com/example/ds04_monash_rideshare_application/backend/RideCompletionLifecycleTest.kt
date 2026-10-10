@@ -37,7 +37,7 @@ class RideCompletionLifecycleTest {
     ) {
         val file = Files.createTempFile("rideshare-completion-", ".db").toFile().apply { deleteOnExit() }
         testApplication {
-            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}") }
+            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}", testTravelTimes()) }
             startApplication()
             transaction {
                 Rides.update({ Rides.rideId eq rideId }) {
@@ -69,7 +69,9 @@ class RideCompletionLifecycleTest {
                     }
                 }
             }
-            client.test()
+            // Completing needs the ride to have started (RIDE_NOT_STARTED, Stage 9). The fixture ride leaves tomorrow, and its
+            // pending requests must not be expired by the real clock, so the SERVER clock is pinned to just after departure.
+            serverClockAfterDeparture(rideId).use { client.test() }
         }
     }
 
@@ -97,14 +99,15 @@ class RideCompletionLifecycleTest {
     private suspend fun HttpClient.complete() {
         val beforeRide = ride()
         val before = requests()
-        val earliest = System.currentTimeMillis()
+        // Stage 9: the server clock is pinned (withRide), so the completion time is exact: the ride records it as completedAt
+        // and the requests it completes or cancels carry it as respondedAt.
+        val completionTime = ServerClock.now()
         val response = updateRide()
         assertEquals(HttpStatusCode.OK, response.status)
         assertEquals(RideStatus.COMPLETED, json.decodeFromString<RideDto>(response.bodyAsText()).status)
-        assertEquals(beforeRide.copy(status = RideStatus.COMPLETED), ride())
+        assertEquals(beforeRide.copy(status = RideStatus.COMPLETED, completedAt = completionTime), ride())
         val after = requests()
         assertEquals(before.keys, after.keys)
-        val latest = System.currentTimeMillis()
         before.forEach { (id, request) ->
             val target = if (request.rideId != rideId) request.status else when (request.status) {
                 RideRequestStatus.PENDING -> RideRequestStatus.CANCELLED
@@ -114,7 +117,7 @@ class RideCompletionLifecycleTest {
             val actual = after.getValue(id)
             if (target != request.status) {
                 val responded = assertNotNull(actual.respondedAt)
-                assertTrue(responded in earliest..latest)
+                assertEquals(completionTime, responded)
                 assertEquals(request.copy(status = target, respondedAt = responded), actual)
             } else assertEquals(request, actual)
         }
@@ -288,7 +291,9 @@ class RideCompletionLifecycleTest {
                 val expected = if (allowed) HttpStatusCode.OK else HttpStatusCode.Conflict
                 val actual = updateRide("""{"status":"$to"}""").status
                 if (actual != expected) failures += "$from -> $to: expected $expected, got $actual"
-                if (actual == expected) assertEquals(beforeRide.copy(status = if (allowed) to else from), ride())
+                // Only a real transition INTO COMPLETED is stamped (completedAt); COMPLETED -> COMPLETED is the no-write retry.
+                val stamped = if (allowed && to == RideStatus.COMPLETED && from != RideStatus.COMPLETED) ServerClock.now() else null
+                if (actual == expected) assertEquals(beforeRide.copy(status = if (allowed) to else from, completedAt = stamped), ride())
             }
         }
         assertEquals(emptyList(), failures)

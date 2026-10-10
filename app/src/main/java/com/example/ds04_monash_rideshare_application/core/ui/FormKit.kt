@@ -28,6 +28,7 @@ import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Remove
+import androidx.compose.material.icons.rounded.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -275,7 +276,9 @@ fun SeatStepper(
     }
 }
 
-enum class FormBannerKind { Error, Success }
+// Warning is information about something that is still fine to act on (for example, a booking that may now be hard to make):
+// amber, polite to screen readers, and visibly not an error.
+enum class FormBannerKind { Error, Success, Warning }
 
 private data class Tone(val container: Color, val content: Color)
 
@@ -284,6 +287,11 @@ private data class Tone(val container: Color, val content: Color)
 private fun successTone(): Tone =
     if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Tone(Color(0xFF1E4632), Color(0xFFC7F0D5))
     else Tone(Color(0xFFCFEDD9), Color(0xFF0E2E1C))
+
+@Composable
+private fun warningTone(): Tone =
+    if (MaterialTheme.colorScheme.background.luminance() < 0.5f) Tone(Color(0xFF4A3A12), Color(0xFFFFE9B0))
+    else Tone(Color(0xFFFFF0C9), Color(0xFF3B2A00))
 
 /** Compact status pill, e.g. "Ready to offer rides". */
 @Composable
@@ -308,8 +316,12 @@ fun FormBanner(
     trailing: (@Composable () -> Unit)? = null
 ) {
     val colors = MaterialTheme.colorScheme
-    val tone = if (kind == FormBannerKind.Success) successTone() else Tone(colors.error.copy(alpha = .12f), colors.onSurface)
-    val iconTint = if (kind == FormBannerKind.Success) tone.content else colors.error
+    val tone = when (kind) {
+        FormBannerKind.Success -> successTone()
+        FormBannerKind.Warning -> warningTone()
+        FormBannerKind.Error -> Tone(colors.error.copy(alpha = .12f), colors.onSurface)
+    }
+    val iconTint = if (kind == FormBannerKind.Error) colors.error else tone.content
     val shape = RoundedCornerShape(16.dp)
     Row(
         modifier.fillMaxWidth().clip(shape).background(tone.container)
@@ -320,7 +332,11 @@ fun FormBanner(
         horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.Top
     ) {
         Icon(
-            if (kind == FormBannerKind.Success) Icons.Rounded.Check else Icons.Rounded.ErrorOutline, null,
+            when (kind) {
+                FormBannerKind.Success -> Icons.Rounded.Check
+                FormBannerKind.Warning -> Icons.Rounded.Warning
+                FormBannerKind.Error -> Icons.Rounded.ErrorOutline
+            }, null,
             Modifier.size(20.dp), tint = iconTint
         )
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {

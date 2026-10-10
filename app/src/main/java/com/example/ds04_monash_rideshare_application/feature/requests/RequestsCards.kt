@@ -79,6 +79,7 @@ private fun CardAffordance(text: String) {
 internal fun RequestCard(request: RideRequestSummary, incoming: Boolean, onClick: () -> Unit,
     distanceLabel: String? = null, onRequestAgain: (() -> Unit)? = null) {
     val expired = request.status == RequestStatus.EXPIRED
+    val conflict = conflictSupport(request)
     RequestsCard("request-${request.requestId}", onClick) {
         if (incoming) request.passenger?.let { Text(it.displayName, fontWeight = FontWeight.SemiBold) }
         FlowRow(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -87,6 +88,8 @@ internal fun RequestCard(request: RideRequestSummary, incoming: Boolean, onClick
         }
         requestPlaces(request)?.let { CompactRoute(it) }
         if (expired) Text(EXPIRED_SUPPORT, style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant)
+        else if (conflict != null) Text(conflict, style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant)
         else if (incoming) Text(if (request.ride != null) "Attached to your ride" else "Standalone request",
             style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -108,7 +111,7 @@ internal fun RequestCard(request: RideRequestSummary, incoming: Boolean, onClick
                 style = MaterialTheme.typography.bodySmall)
             CardAffordance(if (incoming) "Review" else "Details")
         }
-        if (expired && onRequestAgain != null) {
+        if ((expired || conflict != null) && onRequestAgain != null) {
             OutlinedButton(onClick = onRequestAgain, modifier = Modifier.heightIn(min = 48.dp)) { Text("Request again") }
         }
     }

@@ -31,7 +31,7 @@ class DeclineRequestTest {
     private fun withApp(test: suspend HttpClient.() -> Unit) {
         val file = Files.createTempFile("rideshare-decline-test-", ".db").toFile().apply { deleteOnExit() }
         testApplication {
-            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}") }
+            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}", testTravelTimes()) }
             startApplication()
             client.test()
         }
@@ -58,7 +58,7 @@ class DeclineRequestTest {
             )
         }
         assertEquals(HttpStatusCode.OK, created.status, created.bodyAsText())
-        val ask = json.decodeFromString<RideRequestDto>(created.bodyAsText())
+        val ask = createdRequests(created.bodyAsText()).single()
         assertTrue(inbox("demo-driver-001").any { it.requestId == ask.requestId })
 
         val declined = respond("demo-driver-001", ask.requestId, "REJECTED")
@@ -81,7 +81,7 @@ class DeclineRequestTest {
             contentType(ContentType.Application.Json)
             setBody("""{"seatsRequested":1,"applyToRecurringGroup":false}""")
         }
-        val request = json.decodeFromString<List<RideRequestDto>>(created.bodyAsText()).single()
+        val request = createdRequests(created.bodyAsText()).single()
 
         assertEquals(HttpStatusCode.Forbidden, respond("demo-driver-001", request.requestId, "REJECTED").status)
         val rejected = respond("demo-driver-002", request.requestId, "REJECTED")

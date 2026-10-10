@@ -1,5 +1,6 @@
 package com.example.ds04_monash_rideshare_application.backend.routes
 
+import com.example.ds04_monash_rideshare_application.backend.readTransaction
 import com.example.ds04_monash_rideshare_application.backend.AuthResponse
 import com.example.ds04_monash_rideshare_application.backend.ChangePasswordRequest
 import com.example.ds04_monash_rideshare_application.backend.ConflictException
@@ -72,7 +73,7 @@ fun Route.authRoutes() {
         val body = call.receive<LoginRequest>()
         val email = body.email.trim().lowercase(Locale.ROOT)
         LoginThrottle.checkAllowed(email)
-        val user = transaction { Users.selectAll().where { Users.emailAccount eq email }.firstOrNull() }
+        val user = readTransaction { Users.selectAll().where { Users.emailAccount eq email }.firstOrNull() }
         val hash = user?.get(Users.passwordHash)
         // Same message whether the email or the password was wrong, so the API can't be used
         // to find out which Monash emails have accounts.
@@ -128,7 +129,7 @@ private fun requireValidNewPassword(password: String) {
 // For actions that re-confirm the signed-in user's password. A 400 rather than a 401, so the app
 // shows it as a wrong-password message instead of treating it as being signed out.
 private fun requireCurrentPassword(userId: String, password: String) {
-    val hash = transaction { Users.selectAll().where { Users.userId eq userId }.first()[Users.passwordHash] }
+    val hash = readTransaction { Users.selectAll().where { Users.userId eq userId }.first()[Users.passwordHash] }
     if (hash == null || !verifyPassword(password, hash)) {
         throw ValidationException("Your current password is incorrect")
     }

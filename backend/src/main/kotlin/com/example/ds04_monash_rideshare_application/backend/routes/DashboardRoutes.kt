@@ -1,5 +1,6 @@
 package com.example.ds04_monash_rideshare_application.backend.routes
 
+import com.example.ds04_monash_rideshare_application.backend.readTransaction
 import com.example.ds04_monash_rideshare_application.backend.AnalyticsDto
 import com.example.ds04_monash_rideshare_application.backend.DashboardDto
 import com.example.ds04_monash_rideshare_application.backend.Emissions
@@ -28,7 +29,6 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.greaterEq
 import org.jetbrains.exposed.sql.and
 import org.jetbrains.exposed.sql.or
 import org.jetbrains.exposed.sql.selectAll
-import org.jetbrains.exposed.sql.transactions.transaction
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.TextStyle
@@ -41,7 +41,7 @@ fun Route.dashboardRoutes() {
     // ACCEPTED/COMPLETED passenger where the ride itself is COMPLETED (item 7/8).
     get("/users/me/trip-history") {
         val userId = call.requireUserId()
-        val rides = transaction {
+        val rides = readTransaction {
             val driverRows = Rides.selectAll()
                 .where { (Rides.driverId eq userId) and (Rides.status eq RideStatus.COMPLETED) }.toList()
 
@@ -66,7 +66,7 @@ fun Route.dashboardRoutes() {
 
     get("/users/me/dashboard") {
         val userId = call.requireUserId()
-        val trips = transaction { completedTripsDrivenBy(userId) }
+        val trips = readTransaction { completedTripsDrivenBy(userId) }
 
         val totalCo2AvoidedKg = trips.sumOf { Emissions.co2AvoidedKgForTrip(it.distanceMeters, it.fuelType, it.seatsFilled) }
         val totalFuelSavedLitres = trips.sumOf { Emissions.fuelSavedLitresForTrip(it.distanceMeters, it.fuelType, it.seatsFilled) }
@@ -98,7 +98,7 @@ fun Route.dashboardRoutes() {
         val userId = call.requireUserId()
         val limit = call.request.queryParameters["limit"]?.toIntOrNull()?.coerceIn(1, 100) ?: 10
 
-        val response = transaction {
+        val response = readTransaction {
             // Deleted accounts (AccountAdmin.kt) drop off the leaderboard.
             val allUserIds = Users.selectAll()
                 .filter { it[Users.accountStatus] != ACCOUNT_STATUS_DELETED }
@@ -121,7 +121,7 @@ fun Route.dashboardRoutes() {
     // already exist, no ML/training, same spirit as MatchingEngine.kt.
     get("/users/me/analytics") {
         val userId = call.requireUserId()
-        val response = transaction {
+        val response = readTransaction {
             val ownRideIds = Rides.selectAll().where { Rides.driverId eq userId }.map { it[Rides.rideId] }.toSet()
 
             val passengerFunnel = funnelCounts(
@@ -220,7 +220,8 @@ private fun funnelCounts(rows: List<ResultRow>): RequestFunnelCounts {
         rejected = byStatus[RideRequestStatus.REJECTED] ?: 0,
         cancelled = byStatus[RideRequestStatus.CANCELLED] ?: 0,
         completed = byStatus[RideRequestStatus.COMPLETED] ?: 0,
-        expired = byStatus[RideRequestStatus.EXPIRED] ?: 0
+        expired = byStatus[RideRequestStatus.EXPIRED] ?: 0,
+        conflicted = byStatus[RideRequestStatus.CONFLICTED] ?: 0
     )
 }
 

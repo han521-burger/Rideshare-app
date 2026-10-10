@@ -33,7 +33,7 @@ class RideCancellationPropagationTest {
     private fun withRide(vararg states: Pair<String, Int>, test: suspend HttpClient.() -> Unit) {
         val file = Files.createTempFile("rideshare-whole-cancellation-", ".db").toFile().apply { deleteOnExit() }
         testApplication {
-            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}") }
+            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}", testTravelTimes()) }
             startApplication()
             transaction {
                 val consumed = states.filter { it.first in listOf(RideRequestStatus.ACCEPTED, RideRequestStatus.COMPLETED) }

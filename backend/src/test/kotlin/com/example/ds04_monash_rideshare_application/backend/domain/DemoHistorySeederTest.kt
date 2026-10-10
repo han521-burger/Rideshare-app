@@ -1,5 +1,6 @@
 package com.example.ds04_monash_rideshare_application.backend.domain
 
+import com.example.ds04_monash_rideshare_application.backend.testTravelTimes
 import com.example.ds04_monash_rideshare_application.backend.AnalyticsDto
 import com.example.ds04_monash_rideshare_application.backend.DEMO_HISTORY_PREFIX
 import com.example.ds04_monash_rideshare_application.backend.DashboardDto
@@ -181,7 +182,7 @@ class DemoHistorySeederTest {
     private fun withApp(test: suspend HttpClient.() -> Unit) {
         val url = tempDatabaseUrl()
         testApplication {
-            application { module(url) }
+            application { module(url, testTravelTimes()) }
             startApplication()
             targetWithVehicle(fuel = "HYBRID")
             transaction { seedDemoHistory(email) }

@@ -20,7 +20,7 @@ class AnalyticsCorrectnessTest {
     private fun withApp(test: suspend HttpClient.() -> Unit) {
         val file = Files.createTempFile("analytics-correctness-", ".db").toFile().apply { deleteOnExit() }
         testApplication {
-            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}") }
+            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}", testTravelTimes()) }
             startApplication()
             fixture()
             client.test()
@@ -70,7 +70,7 @@ class AnalyticsCorrectnessTest {
         val decision = accept()
         val expected = (decision - requestRow()[RideRequests.createdAt]) / 60_000.0
         assertEquals(expected, analytics().averageDriverResponseMinutes)
-        change("/rides/analytics-ride", driver, "COMPLETED")
+        serverClockAfterDeparture("analytics-ride").use { change("/rides/analytics-ride", driver, "COMPLETED") }
         assertEquals(decision, requestRow()[RideRequests.driverDecisionAt])
         assertNull(requestRow("unanswered-request")[RideRequests.driverDecisionAt])
         assertEquals(expected, analytics().averageDriverResponseMinutes)
@@ -94,10 +94,17 @@ class AnalyticsCorrectnessTest {
         assertEquals(decision, requestRow()[RideRequests.driverDecisionAt])
         assertNull(requestRow("unanswered-request")[RideRequests.driverDecisionAt])
     }
-    @Test fun `individual completion preserves driver decision`() = withApp {
+    // Stage 9.1: a single seat cannot be completed while its ride is live; the refusal changes nothing, decision included. (The
+    // ride-level completion that does complete seats is covered by `accept records decision...` above.)
+    @Test fun `refused individual completion leaves the driver decision and status alone`() = withApp {
         val decision = accept()
-        change("/requests/analytics-request", passenger, "COMPLETED")
+        val result = put("/requests/analytics-request") {
+            header(HttpHeaders.Authorization, "Bearer $passenger")
+            contentType(ContentType.Application.Json); setBody("""{"status":"COMPLETED"}""")
+        }
+        assertEquals(HttpStatusCode.Conflict, result.status)
         assertEquals(decision, requestRow()[RideRequests.driverDecisionAt])
+        assertEquals("ACCEPTED", requestRow()[RideRequests.status])
     }
     @Test fun `undo and reaccept preserve first decision while respondedAt keeps undo semantics`() = withApp {
         accept()

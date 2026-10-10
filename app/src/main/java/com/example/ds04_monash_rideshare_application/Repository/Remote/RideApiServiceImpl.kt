@@ -5,6 +5,46 @@ import retrofit2.Call
 import retrofit2.Callback as RetrofitCallback
 import retrofit2.Response
 
+// Hands a finished HTTP response to the caller. Only a problem with the HTTP result itself - a
+// refusal, an empty body, a body that cannot be mapped - is a failed request.
+//
+// Once the backend has answered successfully the request IS saved, so anything the app's own
+// success handling then throws (a refresh, a navigation, a bug in a screen) must never be reported
+// as "Something went wrong": the passenger would retry something that already went through. It is
+// logged and contained instead. Internal so it can be tested without a network.
+internal fun <T, R> deliverResponse(
+    response: Response<T>,
+    callback: RideApiService.Callback<R>,
+    mapper: (T) -> R,
+    onSuccessHandlerError: (Throwable) -> Unit = ::logSuccessHandlerError
+) {
+    if (!response.isSuccessful) {
+        callback.onFailure(NetworkErrorMapper.fromErrorBody(response.code(), response.errorBody()))
+        return
+    }
+    val body = response.body()
+    if (body == null) {
+        callback.onFailure(BackendException("Empty response from server"))
+        return
+    }
+    val mapped = try {
+        mapper(body)
+    } catch (e: Exception) {
+        callback.onFailure(NetworkErrorMapper.fromThrowable(e))
+        return
+    }
+    try {
+        callback.onSuccess(mapped)
+    } catch (e: Exception) {
+        onSuccessHandlerError(e)
+    }
+}
+
+private fun logSuccessHandlerError(error: Throwable) {
+    // android.util.Log is not available in plain JVM unit tests; never let logging itself throw.
+    runCatching { android.util.Log.e("RideApi", "Success handler threw after the request succeeded", error) }
+}
+
 // Real backend-backed implementation of RideApiService (see docs/BACKEND.md). Every method maps
 // the backend's wire DTOs onto the domain models in RideModels.kt, and funnels every failure
 // through NetworkErrorMapper so the UI only ever sees a friendly message.
@@ -12,22 +52,7 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
 
     private fun <T, R> Call<T>.dispatch(callback: RideApiService.Callback<R>, mapper: (T) -> R) {
         enqueue(object : RetrofitCallback<T> {
-            override fun onResponse(call: Call<T>, response: Response<T>) {
-                if (!response.isSuccessful) {
-                    callback.onFailure(NetworkErrorMapper.fromErrorBody(response.code(), response.errorBody()))
-                    return
-                }
-                val body = response.body()
-                if (body == null) {
-                    callback.onFailure(BackendException("Empty response from server"))
-                    return
-                }
-                try {
-                    callback.onSuccess(mapper(body))
-                } catch (e: Exception) {
-                    callback.onFailure(NetworkErrorMapper.fromThrowable(e))
-                }
-            }
+            override fun onResponse(call: Call<T>, response: Response<T>) = deliverResponse(response, callback, mapper)
 
             override fun onFailure(call: Call<T>, t: Throwable) {
                 callback.onFailure(NetworkErrorMapper.fromThrowable(t))
@@ -123,21 +148,24 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         seats: Int,
         note: String?,
         applyToRecurringGroup: Boolean,
-        callback: RideApiService.Callback<List<RideRequestSummary>>
+        clientRequestId: String?,
+        journeyIntentId: String?,
+        callback: RideApiService.Callback<RequestSubmissionResult>
     ) {
-        api.requestSeat(rideId, CreateSeatRequestBody(seats, note, applyToRecurringGroup))
-            .dispatch(callback) { it.map(::toRideRequestSummary) }
+        api.requestSeat(rideId, CreateSeatRequestBody(seats, note, applyToRecurringGroup, clientRequestId, journeyIntentId))
+            .dispatch(callback, ::toSubmissionResult)
     }
 
-    override fun createStandaloneRequest(draft: StandaloneRequestDraft, callback: RideApiService.Callback<RideRequestSummary>) {
+    override fun createStandaloneRequest(draft: StandaloneRequestDraft, callback: RideApiService.Callback<RequestSubmissionResult>) {
         val body = CreateStandaloneRequestBody(
             originLat = draft.originLat, originLng = draft.originLng,
             destinationLat = draft.destinationLat, destinationLng = draft.destinationLng,
             isAsap = draft.isAsap, desiredDepartureTime = draft.desiredDepartureTime,
             seatsRequested = draft.seatsRequested, note = draft.note,
-            repeatDaysOfWeek = draft.repeatDaysOfWeek, repeatWeeks = draft.repeatWeeks
+            repeatDaysOfWeek = draft.repeatDaysOfWeek, repeatWeeks = draft.repeatWeeks,
+            clientRequestId = draft.clientRequestId
         )
-        api.createStandaloneRequest(body).dispatch(callback, ::toRideRequestSummary)
+        api.createStandaloneRequest(body).dispatch(callback, ::toSubmissionResult)
     }
 
     override fun fetchIncomingRequests(callback: RideApiService.Callback<List<RideRequestSummary>>) {
@@ -164,6 +192,10 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
 
     override fun undoAccept(requestId: String, callback: RideApiService.Callback<RideRequestSummary>) {
         api.undoAccept(requestId).dispatch(callback, ::toRideRequestSummary)
+    }
+
+    override fun fetchScheduleWarnings(callback: RideApiService.Callback<List<ScheduleWarning>>) {
+        api.getScheduleWarnings().dispatch(callback) { warnings -> warnings.mapNotNull(::toScheduleWarning) }
     }
 
     override fun fetchMessages(rideId: String, callback: RideApiService.Callback<List<MessageSummary>>) {
@@ -311,8 +343,22 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         stops = dto.stops.map(::toRideStop),
         driver = dto.driver?.let(::toUserSummary),
         vehicle = dto.vehicle?.let(::toVehicleSummary),
-        matchScoreTotal = dto.matchScore?.total
+        matchScoreTotal = dto.matchScore?.total,
+        completedAt = dto.completedAt
     )
+
+    // A warning with no details cannot be explained, so it is dropped rather than shown as an empty banner.
+    private fun toScheduleWarning(dto: ScheduleWarningDto): ScheduleWarning? {
+        val details = dto.details ?: return null
+        return ScheduleWarning(
+            warningId = dto.warningId, type = dto.type, subjectKind = dto.subjectKind, subjectId = dto.subjectId,
+            createdAt = dto.createdAt, previousRideId = details.previousRideId.orEmpty(),
+            previousCompletedAt = details.previousCompletedAt, previousPlannedArrivalTime = details.previousPlannedArrivalTime,
+            fromPointName = details.fromPointName, toPointName = details.toPointName,
+            repositioningSeconds = details.repositioningSeconds, transferBufferSeconds = details.transferBufferSeconds,
+            earliestFeasibleDeparture = details.earliestFeasibleDeparture, nextDepartureTime = details.nextDepartureTime
+        )
+    }
 
     private fun toRideRequestSummary(dto: RideRequestDto) = RideRequestSummary(
         requestId = dto.requestId,
@@ -333,7 +379,21 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
         repeatWeeks = dto.repeatWeeks,
         ride = dto.ride?.let(::toRideSummary),
         passenger = dto.passenger?.let(::toUserSummary),
-        matchScoreTotal = dto.matchScore?.total
+        matchScoreTotal = dto.matchScore?.total,
+        scheduleConflict = dto.conflict
+    )
+
+    private fun toSubmissionResult(dto: CreateRequestsResultDto) = RequestSubmissionResult(
+        requested = dto.requested,
+        created = dto.created,
+        rejected = dto.rejected,
+        requests = dto.requests.orEmpty().map(::toRideRequestSummary),
+        occurrences = dto.occurrences.orEmpty().map {
+            OccurrenceOutcome(
+                departureTime = it.departureTime, created = it.outcome == "CREATED", rideId = it.rideId, requestId = it.requestId,
+                code = it.code, message = it.message, existingRequestId = it.existingRequestId, scheduleConflict = it.conflict
+            )
+        }
     )
 
     private fun toMessageSummary(dto: MessageDto) = MessageSummary(dto.messageId, dto.rideId, dto.senderId, dto.body, dto.sentAt, dto.senderName)
@@ -348,7 +408,7 @@ class RideApiServiceImpl(private val api: BackendApi = RetrofitClient.backendApi
     private fun toLeaderboardEntry(dto: LeaderboardEntryDto) = LeaderboardEntry(dto.userId, dto.displayName, dto.totalCo2AvoidedKg, dto.rank)
 
     private fun toFunnelCounts(dto: RequestFunnelCountsDto) =
-        RequestFunnelCounts(dto.pending, dto.accepted, dto.rejected, dto.cancelled, dto.completed, dto.expired)
+        RequestFunnelCounts(dto.pending, dto.accepted, dto.rejected, dto.cancelled, dto.completed, dto.expired, dto.conflicted)
 
     private fun toAnalyticsSummary(dto: AnalyticsResponseDto) = AnalyticsSummary(
         passengerFunnel = toFunnelCounts(dto.passengerFunnel),

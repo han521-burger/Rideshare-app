@@ -67,12 +67,17 @@ fun ResultRow.toRideDto(
     destinationLng = this[Rides.destinationLng],
     distanceMeters = this[Rides.distanceMeters],
     estimatedDurationSeconds = this[Rides.estimatedDurationSeconds],
+    originPointId = this[Rides.originPointId],
+    destinationPointId = this[Rides.destinationPointId],
+    plannedDurationSeconds = this[Rides.plannedDurationSeconds],
+    plannedArrivalTime = this[Rides.plannedArrivalTime],
     departureTime = this[Rides.departureTime],
     seatsTotal = this[Rides.seatsTotal],
     seatsAvailable = this[Rides.seatsAvailable],
     notes = this[Rides.notes],
     status = this[Rides.status],
     createdAt = this[Rides.createdAt],
+    completedAt = this[Rides.completedAt],
     driverEnRoute = this[Rides.driverEnRoute],
     recurringGroupId = this[Rides.recurringGroupId],
     stops = stops,
@@ -97,8 +102,18 @@ fun ResultRow.toRideRequestDto() = RideRequestDto(
     isAsap = this[RideRequests.isAsap],
     desiredDepartureTime = this[RideRequests.desiredDepartureTime],
     repeatDaysOfWeek = this[RideRequests.repeatDaysOfWeek]?.split(",")?.mapNotNull { it.toIntOrNull() } ?: emptyList(),
-    repeatWeeks = this[RideRequests.repeatWeeks]
+    repeatWeeks = this[RideRequests.repeatWeeks],
+    plannedDurationSeconds = this[RideRequests.plannedDurationSeconds],
+    plannedArrivalTime = this[RideRequests.plannedArrivalTime],
+    journeyIntentId = this[RideRequests.journeyIntentId],
+    conflict = this[RideRequests.conflictDetails]?.let { runCatching { conflictJson.decodeFromString(ScheduleConflictDetails.serializer(), it) }.getOrNull() }
 )
+
+// The conflict explanation describes the PASSENGER's other trips, so only the passenger sees it: everyone else (a
+// driver reviewing their ride's requests) gets the request without it.
+fun RideRequestDto.visibleTo(viewerId: String): RideRequestDto = if (passengerId == viewerId) this else copy(conflict = null)
+
+private val conflictJson = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
 
 fun ResultRow.toMessageDto(senderName: String? = null) = MessageDto(
     messageId = this[Messages.messageId],

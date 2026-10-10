@@ -29,7 +29,7 @@ class RideRequestApprovalTest {
         }
 
         testApplication {
-            application { module("jdbc:sqlite:${databaseFile.absolutePath.replace('\\', '/')}") }
+            application { module("jdbc:sqlite:${databaseFile.absolutePath.replace('\\', '/')}", testTravelTimes()) }
 
             val requestResponse = client.post("/rides/ride-open-2/requests") {
                 header(HttpHeaders.Authorization, "Bearer fake-user-001")
@@ -37,7 +37,7 @@ class RideRequestApprovalTest {
                 setBody("""{"seatsRequested":1,"note":"Near the library, please","applyToRecurringGroup":false}""")
             }
             assertEquals(HttpStatusCode.OK, requestResponse.status)
-            val created = json.decodeFromString<List<RideRequestDto>>(requestResponse.bodyAsText()).single()
+            val created = createdRequests(requestResponse.bodyAsText()).single()
             assertEquals(RideRequestStatus.PENDING, created.status)
             assertEquals(null, created.respondedAt)
 
@@ -84,14 +84,14 @@ class RideRequestApprovalTest {
         }
 
         testApplication {
-            application { module("jdbc:sqlite:${databaseFile.absolutePath.replace('\\', '/')}") }
+            application { module("jdbc:sqlite:${databaseFile.absolutePath.replace('\\', '/')}", testTravelTimes()) }
 
             val requestResponse = client.post("/rides/ride-open-1/requests") {
                 header(HttpHeaders.Authorization, "Bearer fake-user-001")
                 contentType(ContentType.Application.Json)
                 setBody("""{"seatsRequested":1,"applyToRecurringGroup":false}""")
             }
-            val created = json.decodeFromString<List<RideRequestDto>>(requestResponse.bodyAsText()).single()
+            val created = createdRequests(requestResponse.bodyAsText()).single()
 
             val wrongDriverResponse = client.put("/requests/${created.requestId}") {
                 header(HttpHeaders.Authorization, "Bearer demo-driver-002")

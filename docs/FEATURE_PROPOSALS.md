@@ -195,10 +195,10 @@ actually supports:
 
 **Needs new data collection first:**
 - **ETA estimation based on time/conditions** — `Rides.estimatedDurationSeconds` is a one-shot
-  static value from the Yandex routing call at ride-creation time; there's no logged *actual*
-  completion time to compare against, and no "conditions" signal beyond `departureTime` itself.
-  Doing this for real (not just re-displaying the static estimate) needs a small addition: record
-  actual completion time and bucket estimated-vs-actual by hour-of-day.
+  static value from the Yandex routing call at ride-creation time (display only; scheduling uses the OSRM
+  planned duration). `rides.completed_at` now records the actual completion time when the driver completes a
+  ride, so estimated-vs-actual could be compared; there is still no "conditions" signal beyond `departureTime`
+  itself. Doing this for real needs bucketing estimated-vs-actual by hour-of-day on top of that.
 - **Prediction** — cheap if paired with *patterns-over-time* (naive "same weekday/time last week"
   baseline off existing history — this is the same idea as "simple demand forecasting" above).
   Expensive if paired with *ETA*, for the same reason ETA itself needs new data.

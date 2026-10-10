@@ -3,6 +3,7 @@ package com.example.ds04_monash_rideshare_application.feature.requests
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RequestStatus
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideRequestSummary
 import com.example.ds04_monash_rideshare_application.core.state.Resource
+import com.example.ds04_monash_rideshare_application.core.state.scheduleConflictMessage
 import com.example.ds04_monash_rideshare_application.ui.describeLocation
 import com.example.ds04_monash_rideshare_application.ui.requestStatusLabel
 import java.text.SimpleDateFormat
@@ -13,6 +14,8 @@ import java.util.Date
 import java.util.Locale
 
 internal const val EXPIRED_SUPPORT = "No driver accepted in time."
+// Shown when a conflicted request arrives without the structured reason (an older backend).
+internal const val CONFLICTED_SUPPORT = "This no longer fits your schedule."
 internal val SEAT_FILTER_OPTIONS = listOf(1, 2, 3)
 
 internal enum class RequestsContent { LOADING, ERROR, CONTENT, UNAVAILABLE }
@@ -34,8 +37,14 @@ internal fun requestsState(resource: Resource<*>): RequestsState = when {
 internal fun requestsStatus(status: String, incoming: Boolean) = when (status) {
     RequestStatus.PENDING -> if (incoming) "Waiting" else "Waiting for driver"
     RequestStatus.EXPIRED -> "Expired"
+    RequestStatus.CONFLICTED -> "Schedule conflict"
     else -> requestStatusLabel(status)
 }
+
+/** Why a CONFLICTED request can no longer happen, in the viewer's own time zone; null for any other request. */
+internal fun conflictSupport(request: RideRequestSummary): String? =
+    if (request.status != RequestStatus.CONFLICTED) null
+    else request.scheduleConflict?.let { scheduleConflictMessage(it) } ?: CONFLICTED_SUPPORT
 
 internal fun seatFilterLabel(seats: Int?) = when (seats) {
     null -> "Any seats"

@@ -3,7 +3,7 @@
 Owner: Tony Doan. Tracks what's outstanding from earlier weeks. Update this whenever an item lands.
 Editor: Keng Hong. Updates what have been done for myself.
 
-Last reviewed: 2026-10-06 on `complete-app-trial`.
+Last reviewed: 2026-10-10 on `complete-app-trial`.
 
 ## Build baseline
 
@@ -60,8 +60,19 @@ Some notes above predate these (e.g. Week 2's "vehicle selection not implemented
   weekly" choice when offering or requesting.
 - **Lifecycle:** stale requests/rides expire automatically, rides with passengers auto-complete;
   expired asks show "Request again".
-- **Conflicts:** nobody can be in two overlapping trips; accepting while you have your own waiting
-  request asks "Drive them instead?"; Undo for a few seconds after accepting.
+- **Conflicts:** nobody can be in two places at once - every request, ride and acceptance is checked for whether the
+  person can physically get from one trip to the next (travel time plus a 10-minute buffer). Accepting while you
+  have your own waiting request asks "Drive them instead?"; accepting a trip that makes another waiting request
+  impossible marks that one "Schedule conflict" (with the reason); Undo for a few seconds after accepting.
+- **Scheduling model (Stages 1-9.1):** trip times come from a precomputed directional OSRM/OpenStreetMap matrix on the
+  backend (Yandex MapKit only draws maps and previews routes); requests for several rides from one search share an explicit
+  journey intent and are alternatives (accepting one cancels the rest), while separate journeys are judged by physical
+  feasibility alone; a repeating request reports every date (created / duplicate / doesn't fit) and a retry with the same
+  id replays the original answer exactly; when a driver completes a ride its real completion time becomes the
+  passenger's and driver's location/time history (`rides.completed_at`; the system's own auto-completion records none),
+  waiting requests that no longer fit become "Schedule conflict", and an already-accepted trip that is now hard to reach
+  stays accepted with a private "Schedule warning". A seat completes only when its ride does. Details: `docs/BACKEND.md`,
+  `docs/TRAVEL_TIMES.md`.
 - **Places:** 5 campuses + 25 approved stations/shopping centres with a type-to-search picker;
   campus-to-campus trips allowed. 12 of the new coordinates still need checking on a map.
 - **Fixes:** a driver never sees their own request in the banner; swiping the banner just

@@ -22,3 +22,11 @@ local.properties
 backend/build
 backend/rideshare-backend.db
 .firebase
+
+# Downloaded OSRM tools, OpenStreetMap extract and prepared road graph (tools/osrm/generate-travel-times.ps1)
+tools/osrm/work/
+
+# Local Python virtual environment and bytecode for data-science/ (not source)
+data-science/.venv/
+__pycache__/
+*.pyc

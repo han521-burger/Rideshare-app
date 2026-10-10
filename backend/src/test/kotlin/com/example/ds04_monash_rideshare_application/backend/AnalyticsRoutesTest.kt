@@ -22,7 +22,7 @@ class AnalyticsRoutesTest {
     private fun withApp(test: suspend io.ktor.client.HttpClient.() -> Unit) {
         val file = Files.createTempFile("rideshare-analytics-test-", ".db").toFile().apply { deleteOnExit() }
         testApplication {
-            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}") }
+            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}", testTravelTimes()) }
             startApplication()
             client.test()
         }

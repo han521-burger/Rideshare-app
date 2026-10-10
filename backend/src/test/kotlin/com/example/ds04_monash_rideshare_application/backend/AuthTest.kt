@@ -33,7 +33,7 @@ class AuthTest {
         val previous = System.clearProperty(TRUST_USER_ID_TOKENS_PROPERTY)
         try {
             testApplication {
-                application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}") }
+                application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}", testTravelTimes()) }
                 startApplication()
                 client.test()
             }

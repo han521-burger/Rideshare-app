@@ -39,6 +39,7 @@ import androidx.compose.ui.unit.dp
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RequestStatus
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideRequestSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
+import com.example.ds04_monash_rideshare_application.core.state.SCHEDULE_WARNING_TITLE
 import com.example.ds04_monash_rideshare_application.core.ui.CountStepper
 import com.example.ds04_monash_rideshare_application.core.ui.FieldMessage
 import com.example.ds04_monash_rideshare_application.core.ui.FormBanner
@@ -78,7 +79,9 @@ fun RequestDetailScreen(
     onNavigateBack: () -> Unit,
     modifier: Modifier = Modifier,
     // Passenger seats the driver's own car can take (capacity minus the driver); null = no vehicle.
-    maxPassengerSeats: Int? = null
+    maxPassengerSeats: Int? = null,
+    // The signed-in user's own schedule warning for this request (an earlier ride finished late), or null. Passenger only.
+    scheduleWarning: String? = null
 ) {
     var choosingHowToAccept by remember { mutableStateOf(false) }
 
@@ -138,6 +141,13 @@ fun RequestDetailScreen(
             }
 
             actionErrorMessage?.let { FormBanner(it, FormBannerKind.Error) }
+            // A request the system ended because it no longer fits: say why, so it doesn't just look like it vanished.
+            conflictSupport(request)?.let { FormBanner(it, FormBannerKind.Error, title = "Schedule conflict") }
+            // An ACCEPTED request stays accepted when the ride before it finished late; the passenger is told, not cancelled.
+            // The warning is only ever the viewer's own, and only a passenger looking at their own accepted request sees it.
+            if (isPassenger && request.status == RequestStatus.ACCEPTED) {
+                scheduleWarning?.let { FormBanner(it, FormBannerKind.Warning, title = SCHEDULE_WARNING_TITLE) }
+            }
 
             if (request.status == RequestStatus.PENDING) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {

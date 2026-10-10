@@ -26,7 +26,7 @@ class VehicleRegistrationTest {
     private fun withApp(test: suspend HttpClient.() -> Unit) {
         val file = Files.createTempFile("vehicle-test-", ".db").toFile().apply { deleteOnExit() }
         testApplication {
-            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}") }
+            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}", testTravelTimes()) }
             startApplication()
             // Bind fixture writes to this app database, not a cached thread-local manager.
             transaction(TransactionManager.defaultDatabase) {
@@ -53,7 +53,7 @@ class VehicleRegistrationTest {
         assertEquals(HttpStatusCode.OK, response.status)
         return json.decodeFromString(response.bodyAsText())
     }
-    private fun rideBody(seats: Int, recurring: Boolean = false) = """{"originLat":-37.8136,"originLng":144.9631,
+    private fun rideBody(seats: Int, recurring: Boolean = false) = """{"originLat":-37.8102,"originLng":144.9628,
         "destinationLat":-37.9105,"destinationLng":145.1362,"distanceMeters":10000.0,"estimatedDurationSeconds":1200,
         "departureTime":${System.currentTimeMillis()+86400000},"seatsTotal":$seats,
         "repeatDaysOfWeek":${if(recurring) "[1,2,3,4,5,6,7]" else "[]"},"repeatWeeks":1}"""
@@ -141,9 +141,9 @@ class VehicleRegistrationTest {
     }
     private suspend fun HttpClient.standalone(seats: Int): RideRequestDto {
         val response = post("/requests") { header(HttpHeaders.Authorization,"Bearer fake-user-001"); contentType(ContentType.Application.Json)
-            setBody("""{"originLat":-37.8,"originLng":144.9,"destinationLat":-37.911,"destinationLng":145.134,"isAsap":true,"seatsRequested":$seats}""") }
+            setBody("""{"originLat":-37.9112,"originLng":145.1029,"destinationLat":-37.9105,"destinationLng":145.1362,"isAsap":true,"seatsRequested":$seats}""") }
         assertEquals(HttpStatusCode.OK,response.status)
-        return json.decodeFromString<RideRequestDto>(response.bodyAsText())
+        return createdRequests(response.bodyAsText()).single()
     }
     @Test fun `standalone acceptance cannot create unregistered or oversized rides`() = withApp {
         val request = standalone(1)
@@ -164,9 +164,10 @@ class VehicleRegistrationTest {
         val ride = assertNotNull(offer(4))
         assertEquals(vehicle?.vehicleId,ride.vehicleId)
         val ask = post("/rides/${ride.rideId}/requests") { header(HttpHeaders.Authorization,"Bearer fake-user-001"); contentType(ContentType.Application.Json); setBody("""{"seatsRequested":2}""") }
-        val request = json.decodeFromString<List<RideRequestDto>>(ask.bodyAsText()).single()
+        val request = createdRequests(ask.bodyAsText()).single()
         assertEquals(HttpStatusCode.OK,put("/requests/${request.requestId}") { header(HttpHeaders.Authorization,"Bearer $owner"); contentType(ContentType.Application.Json); setBody("""{"status":"ACCEPTED"}""") }.status)
-        assertEquals(HttpStatusCode.OK,put("/rides/${ride.rideId}") { header(HttpHeaders.Authorization,"Bearer $owner"); contentType(ContentType.Application.Json); setBody("""{"status":"COMPLETED"}""") }.status)
+        val completion = serverClockAfterDeparture(ride.rideId).use { put("/rides/${ride.rideId}") { header(HttpHeaders.Authorization,"Bearer $owner"); contentType(ContentType.Application.Json); setBody("""{"status":"COMPLETED"}""") } }
+        assertEquals(HttpStatusCode.OK,completion.status)
         val dashboard = get("/users/me/dashboard") { header(HttpHeaders.Authorization,"Bearer $owner") }
         val value = json.parseToJsonElement(dashboard.bodyAsText()).jsonObject
         assertEquals(expected, value.getValue("totalCo2AvoidedKg").jsonPrimitive.double, 0.00001)

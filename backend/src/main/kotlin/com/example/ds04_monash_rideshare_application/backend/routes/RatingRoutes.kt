@@ -1,5 +1,6 @@
 package com.example.ds04_monash_rideshare_application.backend.routes
 
+import com.example.ds04_monash_rideshare_application.backend.readTransaction
 import com.example.ds04_monash_rideshare_application.backend.ConflictException
 import com.example.ds04_monash_rideshare_application.backend.ForbiddenException
 import com.example.ds04_monash_rideshare_application.backend.NotFoundException
@@ -76,7 +77,7 @@ fun Route.ratingRoutes() {
                 it[createdAt] = now
             }
         }
-        val dto = transaction {
+        val dto = readTransaction {
             Ratings.selectAll().where { Ratings.ratingId eq ratingId }.map { it.toRatingDto() }.first()
         }
         call.respond(dto)
@@ -85,7 +86,7 @@ fun Route.ratingRoutes() {
     get("/rides/{rideId}/ratings") {
         val userId = call.requireUserId()
         val rideId = call.parameters["rideId"] ?: throw NotFoundException()
-        val ratings = transaction {
+        val ratings = readTransaction {
             val ride = Rides.selectAll().where { Rides.rideId eq rideId }.firstOrNull()
                 ?: throw NotFoundException("Ride not found")
             val isDriver = ride[Rides.driverId] == userId

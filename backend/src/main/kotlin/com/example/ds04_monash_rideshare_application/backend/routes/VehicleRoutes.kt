@@ -1,5 +1,6 @@
 package com.example.ds04_monash_rideshare_application.backend.routes
 
+import com.example.ds04_monash_rideshare_application.backend.readTransaction
 import com.example.ds04_monash_rideshare_application.backend.ConflictException
 import com.example.ds04_monash_rideshare_application.backend.CreateVehicleRequest
 import com.example.ds04_monash_rideshare_application.backend.ForbiddenException
@@ -35,7 +36,7 @@ import org.jetbrains.exposed.exceptions.ExposedSQLException
 fun Route.vehicleRoutes() {
     get("/vehicles/mine") {
         val ownerId = call.requireUserId()
-        val vehicles = transaction {
+        val vehicles = readTransaction {
             Vehicles.selectAll().where { Vehicles.ownerId eq ownerId }.map { it.toVehicleDto() }
         }
         call.respond(vehicles)
@@ -74,7 +75,7 @@ fun Route.vehicleRoutes() {
             }
             throw error
         }
-        val dto = transaction {
+        val dto = readTransaction {
             Vehicles.selectAll().where { Vehicles.vehicleId eq vehicleId }.first().toVehicleDto()
         }
         call.respond(dto)
@@ -115,7 +116,7 @@ fun Route.vehicleRoutes() {
                 it[updatedAt] = System.currentTimeMillis()
             }
         }
-        val dto = transaction {
+        val dto = readTransaction {
             Vehicles.selectAll().where { Vehicles.vehicleId eq vehicleId }.first().toVehicleDto()
         }
         call.respond(dto)

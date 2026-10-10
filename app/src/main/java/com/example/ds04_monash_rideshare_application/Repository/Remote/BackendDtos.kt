@@ -69,12 +69,38 @@ data class RideDto(
     val notes: String?,
     val status: String,
     val createdAt: Long,
+    // Server time the driver completed the ride; absent for older rides and ones the system completed on its own.
+    val completedAt: Long? = null,
     val driverEnRoute: Boolean = false,
     val recurringGroupId: String? = null,
     val stops: List<RideStopDto> = emptyList(),
     val driver: UserSummaryDto? = null,
     val vehicle: VehicleDto? = null,
     val matchScore: MatchScoreDto?
+)
+
+// GET /schedule-warnings. Nullable where the backend may omit a field: Gson ignores Kotlin defaults.
+data class ScheduleWarningDetailsDto(
+    val previousRideId: String?,
+    val previousCompletedAt: Long,
+    val previousPlannedArrivalTime: Long? = null,
+    val fromPointId: String? = null,
+    val fromPointName: String? = null,
+    val toPointId: String? = null,
+    val toPointName: String? = null,
+    val repositioningSeconds: Long,
+    val transferBufferSeconds: Long,
+    val earliestFeasibleDeparture: Long,
+    val nextDepartureTime: Long
+)
+
+data class ScheduleWarningDto(
+    val warningId: String,
+    val type: String,
+    val subjectKind: String,
+    val subjectId: String,
+    val createdAt: Long,
+    val details: ScheduleWarningDetailsDto?
 )
 
 data class VehicleDto(
@@ -164,13 +190,41 @@ data class RideRequestDto(
     val repeatWeeks: Int? = null,
     val ride: RideDto? = null,
     val passenger: UserSummaryDto? = null,
-    val matchScore: MatchScoreDto? = null
+    val matchScore: MatchScoreDto? = null,
+    // CONFLICTED requests only (the passenger's own view): why the request can no longer happen.
+    val conflict: ScheduleConflict? = null
+)
+
+data class OccurrenceResultDto(
+    val departureTime: Long,
+    val outcome: String,
+    val rideId: String? = null,
+    val requestId: String? = null,
+    val code: String? = null,
+    val message: String? = null,
+    val existingRequestId: String? = null,
+    val conflict: ScheduleConflict? = null
+)
+
+// The answer to POST /requests and POST /rides/{id}/requests: always this, for one request or many.
+data class CreateRequestsResultDto(
+    val requested: Int,
+    val created: Int,
+    val rejected: Int,
+    // Nullable on purpose: Gson ignores Kotlin defaults, so a field a backend leaves out arrives as null.
+    val requests: List<RideRequestDto>? = null,
+    val occurrences: List<OccurrenceResultDto>? = null
 )
 
 data class CreateSeatRequestBody(
     val seatsRequested: Int,
     val note: String? = null,
-    val applyToRecurringGroup: Boolean = false
+    val applyToRecurringGroup: Boolean = false,
+    // One id per logical submission, re-sent unchanged on a retry so the backend never creates twice.
+    val clientRequestId: String? = null,
+    // One id per intended journey (per ride search): requests for several rides from the SAME search share it and
+    // are alternatives. Null for a request not made from a search.
+    val journeyIntentId: String? = null
 )
 
 data class CreateStandaloneRequestBody(
@@ -183,7 +237,9 @@ data class CreateStandaloneRequestBody(
     val seatsRequested: Int = 1,
     val note: String? = null,
     val repeatDaysOfWeek: List<Int> = emptyList(),
-    val repeatWeeks: Int? = null
+    val repeatWeeks: Int? = null,
+    // See CreateSeatRequestBody.clientRequestId.
+    val clientRequestId: String? = null
 )
 
 data class UpdateRequestStatusBody(
@@ -260,7 +316,8 @@ data class RequestFunnelCountsDto(
     val rejected: Int = 0,
     val cancelled: Int = 0,
     val completed: Int = 0,
-    val expired: Int = 0
+    val expired: Int = 0,
+    val conflicted: Int = 0
 )
 
 data class HotzoneEntryDto(val locationName: String, val count: Int)

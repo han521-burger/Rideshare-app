@@ -35,7 +35,7 @@ class DoubleBookingTest {
     private fun withApp(test: suspend HttpClient.() -> Unit) {
         val file = Files.createTempFile("rideshare-double-booking-", ".db").toFile().apply { deleteOnExit() }
         testApplication {
-            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}") }
+            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}", testTravelTimes()) }
             startApplication()
             client.test()
         }
@@ -49,7 +49,7 @@ class DoubleBookingTest {
                 "isAsap":false,"desiredDepartureTime":$at,"seatsRequested":1}""")
         }
         assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
-        return json.decodeFromString(response.bodyAsText())
+        return createdRequests(response.bodyAsText()).single()
     }
 
     private suspend fun HttpClient.offer(at: Long): RideDto {
@@ -117,8 +117,13 @@ class DoubleBookingTest {
 
         sneakyDuplicateAsk("dup-other-driver", tripTime + 10 * 60_000L)
         val refused = accept("demo-driver-001", "dup-other-driver")
+        // Machine-readable (SCHEDULE_INFEASIBLE), and told to the DRIVER without describing the passenger's other trip.
         assertEquals(HttpStatusCode.Conflict, refused.status)
-        assertTrue(refused.bodyAsText().contains("already has another trip"))
+        val error = json.decodeFromString<ErrorResponse>(refused.bodyAsText())
+        assertEquals(CODE_SCHEDULE_INFEASIBLE, error.code)
+        assertEquals(MESSAGE_PASSENGER_UNAVAILABLE, error.error)
+        assertEquals(null, error.conflict, "no details of the passenger's other trip reach the driver")
+        assertEquals(RideRequestStatus.PENDING, status("dup-other-driver"))
     }
 
     @Test
@@ -130,17 +135,28 @@ class DoubleBookingTest {
             setBody("""{"originLat":-37.9112,"originLng":145.1029,"destinationLat":-37.9105,"destinationLng":145.1362,
                 "isAsap":false,"desiredDepartureTime":${tripTime + 15 * 60_000L},"seatsRequested":1}""")
         }
+        // 15 minutes later is not the same journey (that is a duplicate) but it is impossible for the same passenger:
+        // a structured schedule conflict, not the old generic "you already have a ride request" sentence.
         assertEquals(HttpStatusCode.Conflict, again.status)
-        assertTrue(again.bodyAsText().contains("already have a ride request"))
+        assertEquals(CODE_SCHEDULE_INFEASIBLE, json.decodeFromString<ErrorResponse>(again.bodyAsText()).code)
 
-        // Another day is fine, and so is a seat request on a posted ride at the same time.
+        // Another day is fine.
         ask(tripTime + dayMs)
-        val ride = offer(tripTime)
-        val seat = post("/rides/${ride.rideId}/requests") {
-            header(HttpHeaders.Authorization, "Bearer $passenger")
-            contentType(ContentType.Application.Json)
-            setBody("""{"seatsRequested":1,"applyToRecurringGroup":false}""")
-        }
+        // A seat request on a posted ride at the same time as an open request is NOT a duplicate, but it is not
+        // free either: an open request is its own intended journey (only seat requests that share a journey intent
+        // are alternatives), so the same trip twice at once is a schedule conflict. A different day is fine.
+        val sameTime = offer(tripTime)
+        val refused = seatRequest(sameTime.rideId)
+        assertEquals(HttpStatusCode.Conflict, refused.status)
+        assertEquals(CODE_SCHEDULE_INFEASIBLE, json.decodeFromString<ErrorResponse>(refused.bodyAsText()).code)
+        val otherDay = offer(tripTime + 2 * dayMs)
+        val seat = seatRequest(otherDay.rideId)
         assertEquals(HttpStatusCode.OK, seat.status, seat.bodyAsText())
+    }
+
+    private suspend fun HttpClient.seatRequest(rideId: String) = post("/rides/$rideId/requests") {
+        header(HttpHeaders.Authorization, "Bearer $passenger")
+        contentType(ContentType.Application.Json)
+        setBody("""{"seatsRequested":1,"applyToRecurringGroup":false}""")
     }
 }

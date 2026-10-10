@@ -40,7 +40,7 @@ class LifecycleTest {
     private fun withApp(test: suspend HttpClient.() -> Unit) {
         val file = Files.createTempFile("rideshare-lifecycle-test-", ".db").toFile().apply { deleteOnExit() }
         testApplication {
-            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}") }
+            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}", testTravelTimes()) }
             startApplication()
             client.test()
         }
@@ -51,12 +51,12 @@ class LifecycleTest {
             header(HttpHeaders.Authorization, "Bearer $caller")
             contentType(ContentType.Application.Json)
             setBody(
-                """{"originLat":-37.9,"originLng":145.1,"destinationLat":-37.9105,"destinationLng":145.1362,
+                """{"originLat":-37.9112,"originLng":145.1029,"destinationLat":-37.9105,"destinationLng":145.1362,
                     |"isAsap":false,"desiredDepartureTime":$departure,"seatsRequested":1}""".trimMargin()
             )
         }
         assertEquals(HttpStatusCode.OK, response.status, response.bodyAsText())
-        return json.decodeFromString(response.bodyAsText())
+        return createdRequests(response.bodyAsText()).single()
     }
 
     private suspend fun HttpClient.accept(caller: String, requestId: String, cancelMine: Boolean = false): HttpResponse =
@@ -150,7 +150,7 @@ class LifecycleTest {
             header(HttpHeaders.Authorization, "Bearer $passenger")
             contentType(ContentType.Application.Json)
             setBody(
-                """{"originLat":-37.9,"originLng":145.1,"destinationLat":-37.9105,"destinationLng":145.1362,
+                """{"originLat":-37.9112,"originLng":145.1029,"destinationLat":-37.9105,"destinationLng":145.1362,
                     |"distanceMeters":4000.0,"estimatedDurationSeconds":600,"departureTime":${tripTime + 10 * minuteMs},
                     |"seatsTotal":1,"repeatDaysOfWeek":[],"repeatWeeks":1}""".trimMargin()
             )
@@ -162,7 +162,7 @@ class LifecycleTest {
             header(HttpHeaders.Authorization, "Bearer $passenger")
             contentType(ContentType.Application.Json)
             setBody(
-                """{"originLat":-37.9,"originLng":145.1,"destinationLat":-37.9105,"destinationLng":145.1362,
+                """{"originLat":-37.9112,"originLng":145.1029,"destinationLat":-37.9105,"destinationLng":145.1362,
                     |"isAsap":false,"desiredDepartureTime":${tripTime + 15 * minuteMs},"seatsRequested":1}""".trimMargin()
             )
         }

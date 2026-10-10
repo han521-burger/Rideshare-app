@@ -43,7 +43,7 @@ class RequestsPresentationTest {
             request("recent", status = RequestStatus.EXPIRED, responded = now - 3_600_000),
             request("old", status = RequestStatus.EXPIRED, responded = now - 172_800_000),
             request("null", status = RequestStatus.EXPIRED), request("accepted", status = RequestStatus.ACCEPTED)))
-        assertEquals(listOf("pending", "recent"), vm.myPendingAndRecentlyExpiredRequests.map { it.requestId })
+        assertEquals(listOf("pending", "recent"), vm.myPendingAndRecentlyEndedRequests.map { it.requestId })
         assertEquals(listOf("pending"), vm.myPendingRequests.map { it.requestId })
     }
 
@@ -133,7 +133,7 @@ class RequestsPresentationTest {
         val api = Api(); val vm = RideshareViewModel(api)
         vm.loadMyRequests(); api.own.last().onSuccess(listOf(request("cached")))
         vm.loadMyRequests(); api.own.last().onFailure(Exception("offline"))
-        assertEquals("cached", vm.myPendingAndRecentlyExpiredRequests.single().requestId)
+        assertEquals("cached", vm.myPendingAndRecentlyEndedRequests.single().requestId)
         vm.loadMyDriverRides(); api.offers.last().onSuccess(listOf(ride("b"), ride("confirmed", RideStatus.CONFIRMED), ride("a")))
         vm.loadMyDriverRides(); api.offers.last().onFailure(Exception("offline"))
         // This is the unchanged NavHost OPEN-only projection, not a new presentation selector.

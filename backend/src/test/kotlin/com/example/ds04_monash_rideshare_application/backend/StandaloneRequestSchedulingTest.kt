@@ -42,7 +42,7 @@ class StandaloneRequestSchedulingTest {
     private fun withApp(test: suspend HttpClient.() -> Unit) {
         val file = Files.createTempFile("rideshare-scheduling-test-", ".db").toFile().apply { deleteOnExit() }
         testApplication {
-            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}") }
+            application { module("jdbc:sqlite:${file.absolutePath.replace('\\', '/')}", testTravelTimes()) }
             startApplication()
             client.test()
         }
@@ -62,13 +62,13 @@ class StandaloneRequestSchedulingTest {
             header(HttpHeaders.Authorization, "Bearer $passenger")
             contentType(ContentType.Application.Json)
             setBody(
-                """{"originLat":-37.9,"originLng":145.1,"destinationLat":-37.9105,"destinationLng":145.1362,
+                """{"originLat":-37.9112,"originLng":145.1029,"destinationLat":-37.9105,"destinationLng":145.1362,
                     |"isAsap":false,"desiredDepartureTime":$start,"seatsRequested":1,
                     |"repeatDaysOfWeek":[1,2,3,4,5,6,7],"repeatWeeks":1}""".trimMargin()
             )
         }
         assertEquals(HttpStatusCode.OK, response.status)
-        val primary = json.decodeFromString<RideRequestDto>(response.bodyAsText())
+        val primary = createdRequests(response.bodyAsText()).first()
         assertEquals(RideRequestStatus.PENDING, primary.status)
         assertEquals(start, primary.desiredDepartureTime)
 
@@ -103,13 +103,13 @@ class StandaloneRequestSchedulingTest {
             header(HttpHeaders.Authorization, "Bearer $passenger")
             contentType(ContentType.Application.Json)
             setBody(
-                """{"originLat":-37.9,"originLng":145.1,"destinationLat":-37.9105,"destinationLng":145.1362,
+                """{"originLat":-37.9112,"originLng":145.1029,"destinationLat":-37.9105,"destinationLng":145.1362,
                     |"isAsap":true,"seatsRequested":1,
                     |"repeatDaysOfWeek":[1,2,3,4,5,6,7],"repeatWeeks":1}""".trimMargin()
             )
         }
         assertEquals(HttpStatusCode.OK, response.status)
-        val created = json.decodeFromString<RideRequestDto>(response.bodyAsText())
+        val created = createdRequests(response.bodyAsText()).single()
         assertTrue(created.isAsap)
 
         val mine = myRequests(passenger).filter { it.rideId == null }
@@ -134,7 +134,7 @@ class StandaloneRequestSchedulingTest {
                 setBody("""{"seatsRequested":1,"applyToRecurringGroup":false}""")
             }
             assertEquals(HttpStatusCode.OK, response.status)
-            return json.decodeFromString<List<RideRequestDto>>(response.bodyAsText()).single()
+            return createdRequests(response.bodyAsText()).single()
         }
 
         val first = request(passenger)

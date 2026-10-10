@@ -8,6 +8,7 @@ import com.example.ds04_monash_rideshare_application.backend.routes.messageRoute
 import com.example.ds04_monash_rideshare_application.backend.routes.ratingRoutes
 import com.example.ds04_monash_rideshare_application.backend.routes.rideRequestRoutes
 import com.example.ds04_monash_rideshare_application.backend.routes.rideRoutes
+import com.example.ds04_monash_rideshare_application.backend.routes.scheduleWarningRoutes
 import com.example.ds04_monash_rideshare_application.backend.routes.userRoutes
 import com.example.ds04_monash_rideshare_application.backend.routes.vehicleRoutes
 import io.ktor.serialization.kotlinx.json.json
@@ -28,7 +29,12 @@ fun main() {
     embeddedServer(Netty, port = 8080, host = "0.0.0.0") { module() }.start(wait = true)
 }
 
-fun Application.module(databaseUrl: String = "jdbc:sqlite:./rideshare-backend.db") {
+// travelTimes is the source of every trip-duration the backend plans with (the precomputed matrix in
+// production, a test double in tests).
+fun Application.module(
+    databaseUrl: String = "jdbc:sqlite:./rideshare-backend.db",
+    travelTimes: TravelTimeProvider = ProductionTravelTimes.load()
+) {
     initDatabase(databaseUrl)
 
     install(ContentNegotiation) {
@@ -53,8 +59,9 @@ fun Application.module(databaseUrl: String = "jdbc:sqlite:./rideshare-backend.db
         authRoutes()
         userRoutes()
         vehicleRoutes()
-        rideRoutes()
-        rideRequestRoutes()
+        rideRoutes(travelTimes)
+        rideRequestRoutes(travelTimes)
+        scheduleWarningRoutes()
         messageRoutes()
         dashboardRoutes()
         ratingRoutes()

@@ -4,7 +4,7 @@ import com.example.ds04_monash_rideshare_application.backend.DemoHistoryGenerato
 import com.example.ds04_monash_rideshare_application.backend.DemoRole
 import com.example.ds04_monash_rideshare_application.backend.MONASH_CAMPUSES
 import com.example.ds04_monash_rideshare_application.backend.NAMED_FIXED_POINTS
-import com.example.ds04_monash_rideshare_application.backend.isNearMonashCampus
+import com.example.ds04_monash_rideshare_application.backend.resolveApprovedPoint
 import com.example.ds04_monash_rideshare_application.backend.tripWindow
 import java.time.Instant
 import java.time.ZoneId
@@ -52,7 +52,7 @@ class DemoHistoryGeneratorTest {
             val hub = if (it.toMonash) it.origin else it.destination
             assertTrue(campus.name in campusNames, "${campus.name} is not a campus")
             assertTrue(hub.name in hubNames, "${hub.name} is not an approved hub")
-            assertTrue(isNearMonashCampus(campus.lat, campus.lng))
+            assertTrue(resolveApprovedPoint(campus.lat, campus.lng)?.isCampus == true)
         }
     }
 

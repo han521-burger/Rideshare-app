@@ -63,6 +63,9 @@ object RequestStatus {
     const val COMPLETED = "COMPLETED"
     // Set by the backend when nobody accepted before the departure time (Lifecycle.kt).
     const val EXPIRED = "EXPIRED"
+    // Set by the backend (never by the app) when another trip the passenger has since had accepted makes this one
+    // physically impossible. Final: it is never reactivated; the passenger can make a new request.
+    const val CONFLICTED = "CONFLICTED"
 }
 
 data class RideSummary(
@@ -86,7 +89,10 @@ data class RideSummary(
     val stops: List<RideStop>,
     val driver: UserSummary?,
     val vehicle: VehicleSummary?,
-    val matchScoreTotal: Double?
+    val matchScoreTotal: Double?,
+    // When the driver actually finished the ride (the server's clock); null until then, for older rides, and for a ride the
+    // system completed on its own - there is no observed time in those cases.
+    val completedAt: Long? = null
 )
 
 data class RideRequestSummary(
@@ -113,8 +119,37 @@ data class RideRequestSummary(
     val passenger: UserSummary?,
     // Advisory match score against the viewer's own rides - only populated for a driver viewing
     // a standalone (rideId == null) request in their incoming list.
-    val matchScoreTotal: Double?
+    val matchScoreTotal: Double?,
+    // Only for a CONFLICTED request, and only the passenger's own: what made it impossible.
+    val scheduleConflict: ScheduleConflict? = null
 )
+
+// A schedule WARNING (backend GET /schedule-warnings): a journey this person has already committed to - an ACCEPTED seat, or
+// a ride they drive - that an earlier ride of theirs, finishing later than planned, may leave them too little time to
+// reach. The journey itself is unchanged (still ACCEPTED / still scheduled); this is information, not a status. It is the
+// signed-in person's own, never anyone else's. Times are epoch milliseconds, durations seconds.
+data class ScheduleWarning(
+    val warningId: String,
+    val type: String,
+    // WarningSubject.REQUEST (subjectId = request id) or WarningSubject.RIDE (subjectId = ride id).
+    val subjectKind: String,
+    val subjectId: String,
+    val createdAt: Long,
+    val previousRideId: String,
+    val previousCompletedAt: Long,
+    val previousPlannedArrivalTime: Long?,
+    val fromPointName: String?,
+    val toPointName: String?,
+    val repositioningSeconds: Long,
+    val transferBufferSeconds: Long,
+    val earliestFeasibleDeparture: Long,
+    val nextDepartureTime: Long
+)
+
+object WarningSubject {
+    const val REQUEST = "REQUEST"
+    const val RIDE = "RIDE"
+}
 
 // Everything a passenger fills in on the standalone Request-a-Ride flow - a route + time with no
 // driver picked yet (POST /requests). Distinct from CreateRideDraft (a driver's Offer-a-Ride) and
@@ -130,7 +165,9 @@ data class StandaloneRequestDraft(
     val seatsRequested: Int,
     val note: String?,
     val repeatDaysOfWeek: List<Int> = emptyList(),
-    val repeatWeeks: Int? = null
+    val repeatWeeks: Int? = null,
+    // Set by the ViewModel (not the form) so a retry of the same submission reuses the same id.
+    val clientRequestId: String? = null
 )
 
 data class MessageSummary(
@@ -185,15 +222,41 @@ data class DashboardSummary(
     val monthlyTripSummary: List<MonthlyTripSummary>
 )
 
+// What ONE date of a creation call came to (a repeating request, or a seat request across a recurring group, has one per
+// date). created = a request was made; otherwise [code] says why not - never shown to the user as is.
+data class OccurrenceOutcome(
+    val departureTime: Long,
+    val created: Boolean,
+    val rideId: String?,
+    val requestId: String?,
+    val code: String?,
+    val message: String?,
+    val existingRequestId: String?,
+    val scheduleConflict: ScheduleConflict?
+)
+
+// What a request-creation call came to. A one-off request is requested = created = 1; a repeating one has a line per date,
+// including the ones that could not be made.
+data class RequestSubmissionResult(
+    val requested: Int,
+    val created: Int,
+    val rejected: Int,
+    val requests: List<RideRequestSummary>,
+    val occurrences: List<OccurrenceOutcome>
+) {
+    val isBatch: Boolean get() = requested > 1
+}
+
 data class RequestFunnelCounts(
     val pending: Int,
     val accepted: Int,
     val rejected: Int,
     val cancelled: Int,
     val completed: Int,
-    val expired: Int = 0
+    val expired: Int = 0,
+    val conflicted: Int = 0
 ) {
-    val total: Int get() = pending + accepted + rejected + cancelled + completed + expired
+    val total: Int get() = pending + accepted + rejected + cancelled + completed + expired + conflicted
 }
 
 data class HotzoneEntry(val locationName: String, val count: Int)

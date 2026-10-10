@@ -43,6 +43,17 @@ class CompleteRideActionTest {
         }
     }
 
+    @Test fun beforeDepartureTheButtonIsHeldBackWithAHint() {
+        // Completing stamps the real arrival time, so the backend refuses a ride that has not started (RIDE_NOT_STARTED).
+        var calls = 0
+        compose.setContent { MaterialTheme { CompleteRideAction("ride", "owner", "owner", "CONFIRMED", false, departureTime = Long.MAX_VALUE) { calls++ } } }
+        compose.onNodeWithText("Complete ride").assertIsNotEnabled()
+        compose.onNodeWithText("You can complete this ride once it has started.").assertIsDisplayed()
+        compose.onNodeWithText("Complete ride").performClick()
+        compose.onNodeWithText("Complete this ride?").assertDoesNotExist()
+        compose.runOnIdle { assertEquals(0, calls) }
+    }
+
     @Test fun inFlightDisablesConfirmationAndCompletion() {
         val busy = mutableStateOf(false)
         var calls = 0

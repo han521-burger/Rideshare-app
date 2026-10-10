@@ -1,5 +1,6 @@
 package com.example.ds04_monash_rideshare_application.backend.routes
 
+import com.example.ds04_monash_rideshare_application.backend.readTransaction
 import com.example.ds04_monash_rideshare_application.backend.ForbiddenException
 import com.example.ds04_monash_rideshare_application.backend.Messages
 import com.example.ds04_monash_rideshare_application.backend.NotFoundException
@@ -29,10 +30,10 @@ import java.util.UUID
 // Messaging tied to confirmed rides (item 7): only the driver and passengers with an
 // ACCEPTED/COMPLETED request for this ride may read or post to its thread.
 private fun requireRideParticipant(userId: String, rideId: String) {
-    transaction {
+    readTransaction {
         val ride = Rides.selectAll().where { Rides.rideId eq rideId }.firstOrNull()
             ?: throw NotFoundException("Ride not found")
-        if (ride[Rides.driverId] == userId) return@transaction
+        if (ride[Rides.driverId] == userId) return@readTransaction
 
         val isAcceptedPassenger = RideRequests.selectAll()
             .where {
@@ -50,7 +51,7 @@ fun Route.messageRoutes() {
         val rideId = call.parameters["rideId"] ?: throw NotFoundException()
         requireRideParticipant(userId, rideId)
 
-        val messages = transaction {
+        val messages = readTransaction {
             val rows = Messages.selectAll().where { Messages.rideId eq rideId }.orderBy(Messages.sentAt).toList()
             val senderIds = rows.map { it[Messages.senderId] }.toSet()
             val names = if (senderIds.isEmpty()) emptyMap() else Users.selectAll()
@@ -78,7 +79,7 @@ fun Route.messageRoutes() {
                 it[sentAt] = now
             }
         }
-        val dto = transaction {
+        val dto = readTransaction {
             val name = Users.selectAll().where { Users.userId eq userId }.firstOrNull()?.get(Users.displayName)
             Messages.selectAll().where { Messages.messageId eq messageId }.map { it.toMessageDto(name) }.first()
         }

@@ -22,5 +22,6 @@ fun requestStatusLabel(status: String): String = when (status) {
     RequestStatus.CANCELLED -> "Cancelled"
     RequestStatus.COMPLETED -> "Completed"
     RequestStatus.EXPIRED -> "Expired - no driver accepted in time"
+    RequestStatus.CONFLICTED -> "Schedule conflict"
     else -> status
 }
