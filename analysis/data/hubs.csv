@@ -1,0 +1,31 @@
+hub,role,cluster_factor,latitude,longitude,is_campus
+Huntingdale Station,STATION,1.0,-37.9112,145.1029,false
+Clayton Station,STATION,1.0,-37.9246,145.1203,false
+Oakleigh Station,STATION,1.0,-37.9002,145.0886,false
+Chadstone Shopping Centre,SHOPPING,1.0,-37.8866,145.0829,false
+Brandon Park Shopping Centre,SHOPPING,1.0,-37.9006,145.164,false
+Waverley Gardens Shopping Centre,SHOPPING,1.0,-37.9318,145.1907,false
+Glen Waverley Station,STATION,1.0,-37.8795,145.1621,false
+Springvale Station,STATION,1.0,-37.9497,145.153,false
+Westall Station,STATION,1.0,-37.9384,145.1385,false
+Caulfield Station,STATION,0.6,-37.8775,145.0425,false
+Carnegie Station,STATION,0.6,-37.8875,145.0583,false
+Malvern Central,SHOPPING,0.6,-37.8581,145.029,false
+South Yarra Station,STATION,0.6,-37.8384,144.9922,false
+IKEA Richmond,SHOPPING,0.6,-37.8283,144.9978,false
+Royal Park Station,STATION,0.4,-37.781,144.952,false
+Parkville Station,STATION,0.4,-37.799,144.959,false
+Barkly Square,SHOPPING,0.4,-37.7713,144.9606,false
+Melbourne Central,STATION,0.6,-37.8102,144.9628,false
+Southern Cross Station,STATION,0.6,-37.8184,144.9525,false
+The District Docklands,SHOPPING,0.6,-37.8126,144.9373,false
+Footscray Station,STATION,0.6,-37.8011,144.9031,false
+Frankston Station,STATION,0.3,-38.1428,145.1258,false
+Leawarra Station,STATION,0.3,-38.1522,145.1389,false
+Bayside Shopping Centre,SHOPPING,0.3,-38.142,145.124,false
+Karingal Hub,SHOPPING,0.3,-38.1517,145.1608,false
+Monash Clayton,CAMPUS,1.0,-37.9105,145.1362,true
+Monash Caulfield,CAMPUS,0.6,-37.8774,145.0449,true
+Monash Parkville,CAMPUS,0.4,-37.7834,144.9587,true
+Monash Peninsula,CAMPUS,0.3,-38.1525,145.1335,true
+Monash Melbourne City – 750 Collins St,CAMPUS,0.6,-37.8216,144.9471,true

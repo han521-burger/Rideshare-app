@@ -68,6 +68,10 @@ period/hour, weekday/weekend split) from the data; `SyntheticDemandTest` prints 
    and the disclosure disappears automatically (`disclosure` is null unless the source is synthetic).
 3. Keep driver offers out of it; if supply is wanted later, aggregate rides separately.
 
+## Forecast
+
+The card also shows **predicted** demand from a trained model; see [DEMAND_FORECAST.md](DEMAND_FORECAST.md).
+
 ## Tests
 
 Pure JVM (`app/src/test/.../domain/`): `DemandAggregationTest`, `SyntheticDemandTest`,

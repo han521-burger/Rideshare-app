@@ -9,6 +9,7 @@ class DemandModel(private val source: DemandDataSource) {
 
     val disclosure: String? get() = source.disclosure
     val isSynthetic: Boolean get() = source.provenance == DemandProvenance.SYNTHETIC
+    val isForecast: Boolean get() = source.provenance == DemandProvenance.FORECAST
 
     @Synchronized
     fun pointsFor(period: DemandPeriod): List<DemandPoint> =
@@ -19,7 +20,10 @@ class DemandModel(private val source: DemandDataSource) {
 
 // The prototype default. Replace `source` with a backend-fed DemandDataSource later.
 object DemandProvider {
+    // Past demand.
     val model: DemandModel by lazy { DemandModel(SyntheticDemandDataSource()) }
+    // Predicted demand; null if the forecast file is missing or unreadable (the card then shows past demand only).
+    val forecast: DemandModel? by lazy { DemandForecast.fromResource()?.let { DemandModel(ForecastDemandDataSource(it)) } }
 }
 
 // A short, computed description of a dataset for demos and notes - never typed in by hand.

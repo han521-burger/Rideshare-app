@@ -1,0 +1,1462 @@
+{
+ "model": "Boosted trees (Poisson)",
+ "target": "expected ride requests per hub in one time-of-day block on one day",
+ "trainedOn": {
+  "from": "2026-07-18",
+  "to": "2026-09-30",
+  "days": 75,
+  "requests": 2516
+ },
+ "dataProvenance": "synthetic",
+ "evaluation": {
+  "testDays": 15,
+  "poissonDeviance": 0.2204,
+  "baseline": "Mean by hub, weekday/weekend, hour",
+  "baselinePoissonDeviance": 0.2952,
+  "improvementOverBaseline": 0.2533,
+  "top3HitRate": 0.5417,
+  "rankCorrelation": 0.5816
+ },
+ "forecasts": [
+  {
+   "hub": "Barkly Square",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.1931
+  },
+  {
+   "hub": "Barkly Square",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.1744
+  },
+  {
+   "hub": "Barkly Square",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.1539
+  },
+  {
+   "hub": "Barkly Square",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.0244
+  },
+  {
+   "hub": "Barkly Square",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.1038
+  },
+  {
+   "hub": "Barkly Square",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.044
+  },
+  {
+   "hub": "Barkly Square",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.1605
+  },
+  {
+   "hub": "Barkly Square",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0159
+  },
+  {
+   "hub": "Bayside Shopping Centre",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2252
+  },
+  {
+   "hub": "Bayside Shopping Centre",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.0953
+  },
+  {
+   "hub": "Bayside Shopping Centre",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.1123
+  },
+  {
+   "hub": "Bayside Shopping Centre",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.032
+  },
+  {
+   "hub": "Bayside Shopping Centre",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.1336
+  },
+  {
+   "hub": "Bayside Shopping Centre",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0379
+  },
+  {
+   "hub": "Bayside Shopping Centre",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.0913
+  },
+  {
+   "hub": "Bayside Shopping Centre",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0175
+  },
+  {
+   "hub": "Brandon Park Shopping Centre",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.5381
+  },
+  {
+   "hub": "Brandon Park Shopping Centre",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.2927
+  },
+  {
+   "hub": "Brandon Park Shopping Centre",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.1512
+  },
+  {
+   "hub": "Brandon Park Shopping Centre",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.0494
+  },
+  {
+   "hub": "Brandon Park Shopping Centre",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2532
+  },
+  {
+   "hub": "Brandon Park Shopping Centre",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0702
+  },
+  {
+   "hub": "Brandon Park Shopping Centre",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.3151
+  },
+  {
+   "hub": "Brandon Park Shopping Centre",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0312
+  },
+  {
+   "hub": "Carnegie Station",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.5994
+  },
+  {
+   "hub": "Carnegie Station",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.2025
+  },
+  {
+   "hub": "Carnegie Station",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.2442
+  },
+  {
+   "hub": "Carnegie Station",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.1973
+  },
+  {
+   "hub": "Carnegie Station",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2474
+  },
+  {
+   "hub": "Carnegie Station",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.211
+  },
+  {
+   "hub": "Carnegie Station",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.1961
+  },
+  {
+   "hub": "Carnegie Station",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0608
+  },
+  {
+   "hub": "Caulfield Station",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.8165
+  },
+  {
+   "hub": "Caulfield Station",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.4303
+  },
+  {
+   "hub": "Caulfield Station",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.4604
+  },
+  {
+   "hub": "Caulfield Station",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.3378
+  },
+  {
+   "hub": "Caulfield Station",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2878
+  },
+  {
+   "hub": "Caulfield Station",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0762
+  },
+  {
+   "hub": "Caulfield Station",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.4089
+  },
+  {
+   "hub": "Caulfield Station",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0963
+  },
+  {
+   "hub": "Chadstone Shopping Centre",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 1.0266
+  },
+  {
+   "hub": "Chadstone Shopping Centre",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.5335
+  },
+  {
+   "hub": "Chadstone Shopping Centre",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.5304
+  },
+  {
+   "hub": "Chadstone Shopping Centre",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.1589
+  },
+  {
+   "hub": "Chadstone Shopping Centre",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.6132
+  },
+  {
+   "hub": "Chadstone Shopping Centre",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.1824
+  },
+  {
+   "hub": "Chadstone Shopping Centre",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.8338
+  },
+  {
+   "hub": "Chadstone Shopping Centre",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0813
+  },
+  {
+   "hub": "Clayton Station",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 1.0927
+  },
+  {
+   "hub": "Clayton Station",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.374
+  },
+  {
+   "hub": "Clayton Station",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.4256
+  },
+  {
+   "hub": "Clayton Station",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.4418
+  },
+  {
+   "hub": "Clayton Station",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.3932
+  },
+  {
+   "hub": "Clayton Station",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.1279
+  },
+  {
+   "hub": "Clayton Station",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.5377
+  },
+  {
+   "hub": "Clayton Station",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.1738
+  },
+  {
+   "hub": "Footscray Station",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2639
+  },
+  {
+   "hub": "Footscray Station",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.1062
+  },
+  {
+   "hub": "Footscray Station",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.0964
+  },
+  {
+   "hub": "Footscray Station",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.0619
+  },
+  {
+   "hub": "Footscray Station",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.1199
+  },
+  {
+   "hub": "Footscray Station",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0986
+  },
+  {
+   "hub": "Footscray Station",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.0905
+  },
+  {
+   "hub": "Footscray Station",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0291
+  },
+  {
+   "hub": "Frankston Station",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.4171
+  },
+  {
+   "hub": "Frankston Station",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.166
+  },
+  {
+   "hub": "Frankston Station",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.1812
+  },
+  {
+   "hub": "Frankston Station",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.1214
+  },
+  {
+   "hub": "Frankston Station",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2321
+  },
+  {
+   "hub": "Frankston Station",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0729
+  },
+  {
+   "hub": "Frankston Station",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.177
+  },
+  {
+   "hub": "Frankston Station",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0474
+  },
+  {
+   "hub": "Glen Waverley Station",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 1.2253
+  },
+  {
+   "hub": "Glen Waverley Station",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.4
+  },
+  {
+   "hub": "Glen Waverley Station",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.2918
+  },
+  {
+   "hub": "Glen Waverley Station",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.4036
+  },
+  {
+   "hub": "Glen Waverley Station",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2876
+  },
+  {
+   "hub": "Glen Waverley Station",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.1977
+  },
+  {
+   "hub": "Glen Waverley Station",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.2745
+  },
+  {
+   "hub": "Glen Waverley Station",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.1217
+  },
+  {
+   "hub": "Huntingdale Station",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.5715
+  },
+  {
+   "hub": "Huntingdale Station",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.3388
+  },
+  {
+   "hub": "Huntingdale Station",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.2826
+  },
+  {
+   "hub": "Huntingdale Station",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.2968
+  },
+  {
+   "hub": "Huntingdale Station",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.3979
+  },
+  {
+   "hub": "Huntingdale Station",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.1612
+  },
+  {
+   "hub": "Huntingdale Station",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.4905
+  },
+  {
+   "hub": "Huntingdale Station",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0617
+  },
+  {
+   "hub": "IKEA Richmond",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2378
+  },
+  {
+   "hub": "IKEA Richmond",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.1435
+  },
+  {
+   "hub": "IKEA Richmond",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.2137
+  },
+  {
+   "hub": "IKEA Richmond",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.0339
+  },
+  {
+   "hub": "IKEA Richmond",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.1789
+  },
+  {
+   "hub": "IKEA Richmond",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0887
+  },
+  {
+   "hub": "IKEA Richmond",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.2352
+  },
+  {
+   "hub": "IKEA Richmond",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0206
+  },
+  {
+   "hub": "Karingal Hub",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.1826
+  },
+  {
+   "hub": "Karingal Hub",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.0944
+  },
+  {
+   "hub": "Karingal Hub",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.0865
+  },
+  {
+   "hub": "Karingal Hub",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.0251
+  },
+  {
+   "hub": "Karingal Hub",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.1252
+  },
+  {
+   "hub": "Karingal Hub",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0365
+  },
+  {
+   "hub": "Karingal Hub",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.0784
+  },
+  {
+   "hub": "Karingal Hub",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0178
+  },
+  {
+   "hub": "Leawarra Station",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.1653
+  },
+  {
+   "hub": "Leawarra Station",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.0971
+  },
+  {
+   "hub": "Leawarra Station",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.0895
+  },
+  {
+   "hub": "Leawarra Station",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.0738
+  },
+  {
+   "hub": "Leawarra Station",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.0724
+  },
+  {
+   "hub": "Leawarra Station",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0352
+  },
+  {
+   "hub": "Leawarra Station",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.061
+  },
+  {
+   "hub": "Leawarra Station",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0237
+  },
+  {
+   "hub": "Malvern Central",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2305
+  },
+  {
+   "hub": "Malvern Central",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.0487
+  },
+  {
+   "hub": "Malvern Central",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.1957
+  },
+  {
+   "hub": "Malvern Central",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.0372
+  },
+  {
+   "hub": "Malvern Central",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2224
+  },
+  {
+   "hub": "Malvern Central",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0456
+  },
+  {
+   "hub": "Malvern Central",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.2452
+  },
+  {
+   "hub": "Malvern Central",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0302
+  },
+  {
+   "hub": "Melbourne Central",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.8824
+  },
+  {
+   "hub": "Melbourne Central",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.357
+  },
+  {
+   "hub": "Melbourne Central",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.2759
+  },
+  {
+   "hub": "Melbourne Central",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.2902
+  },
+  {
+   "hub": "Melbourne Central",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.4719
+  },
+  {
+   "hub": "Melbourne Central",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.2083
+  },
+  {
+   "hub": "Melbourne Central",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.4519
+  },
+  {
+   "hub": "Melbourne Central",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.1083
+  },
+  {
+   "hub": "Monash Caulfield",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.3832
+  },
+  {
+   "hub": "Monash Caulfield",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.0703
+  },
+  {
+   "hub": "Monash Caulfield",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.6048
+  },
+  {
+   "hub": "Monash Caulfield",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.6244
+  },
+  {
+   "hub": "Monash Caulfield",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.1319
+  },
+  {
+   "hub": "Monash Caulfield",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0246
+  },
+  {
+   "hub": "Monash Caulfield",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.2099
+  },
+  {
+   "hub": "Monash Caulfield",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0426
+  },
+  {
+   "hub": "Monash Clayton",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.7181
+  },
+  {
+   "hub": "Monash Clayton",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.1347
+  },
+  {
+   "hub": "Monash Clayton",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 1.112
+  },
+  {
+   "hub": "Monash Clayton",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 1.4823
+  },
+  {
+   "hub": "Monash Clayton",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2167
+  },
+  {
+   "hub": "Monash Clayton",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0501
+  },
+  {
+   "hub": "Monash Clayton",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.2843
+  },
+  {
+   "hub": "Monash Clayton",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0983
+  },
+  {
+   "hub": "Monash Melbourne City – 750 Collins St",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.3676
+  },
+  {
+   "hub": "Monash Melbourne City – 750 Collins St",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.04
+  },
+  {
+   "hub": "Monash Melbourne City – 750 Collins St",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.6333
+  },
+  {
+   "hub": "Monash Melbourne City – 750 Collins St",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.6258
+  },
+  {
+   "hub": "Monash Melbourne City – 750 Collins St",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.127
+  },
+  {
+   "hub": "Monash Melbourne City – 750 Collins St",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0207
+  },
+  {
+   "hub": "Monash Melbourne City – 750 Collins St",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.2076
+  },
+  {
+   "hub": "Monash Melbourne City – 750 Collins St",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.042
+  },
+  {
+   "hub": "Monash Parkville",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.243
+  },
+  {
+   "hub": "Monash Parkville",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.0433
+  },
+  {
+   "hub": "Monash Parkville",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.454
+  },
+  {
+   "hub": "Monash Parkville",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.373
+  },
+  {
+   "hub": "Monash Parkville",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.0679
+  },
+  {
+   "hub": "Monash Parkville",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0176
+  },
+  {
+   "hub": "Monash Parkville",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.0748
+  },
+  {
+   "hub": "Monash Parkville",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0287
+  },
+  {
+   "hub": "Monash Peninsula",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2426
+  },
+  {
+   "hub": "Monash Peninsula",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.051
+  },
+  {
+   "hub": "Monash Peninsula",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.4015
+  },
+  {
+   "hub": "Monash Peninsula",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.3354
+  },
+  {
+   "hub": "Monash Peninsula",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.0885
+  },
+  {
+   "hub": "Monash Peninsula",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0205
+  },
+  {
+   "hub": "Monash Peninsula",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.065
+  },
+  {
+   "hub": "Monash Peninsula",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0255
+  },
+  {
+   "hub": "Oakleigh Station",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 1.178
+  },
+  {
+   "hub": "Oakleigh Station",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.531
+  },
+  {
+   "hub": "Oakleigh Station",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.5415
+  },
+  {
+   "hub": "Oakleigh Station",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.4852
+  },
+  {
+   "hub": "Oakleigh Station",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2733
+  },
+  {
+   "hub": "Oakleigh Station",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.1212
+  },
+  {
+   "hub": "Oakleigh Station",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.3461
+  },
+  {
+   "hub": "Oakleigh Station",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0844
+  },
+  {
+   "hub": "Parkville Station",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2606
+  },
+  {
+   "hub": "Parkville Station",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.1702
+  },
+  {
+   "hub": "Parkville Station",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.224
+  },
+  {
+   "hub": "Parkville Station",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.1711
+  },
+  {
+   "hub": "Parkville Station",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.1777
+  },
+  {
+   "hub": "Parkville Station",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0757
+  },
+  {
+   "hub": "Parkville Station",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.1789
+  },
+  {
+   "hub": "Parkville Station",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0755
+  },
+  {
+   "hub": "Royal Park Station",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.3839
+  },
+  {
+   "hub": "Royal Park Station",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.0805
+  },
+  {
+   "hub": "Royal Park Station",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.1156
+  },
+  {
+   "hub": "Royal Park Station",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.08
+  },
+  {
+   "hub": "Royal Park Station",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.0907
+  },
+  {
+   "hub": "Royal Park Station",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0403
+  },
+  {
+   "hub": "Royal Park Station",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.1025
+  },
+  {
+   "hub": "Royal Park Station",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0269
+  },
+  {
+   "hub": "South Yarra Station",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.4544
+  },
+  {
+   "hub": "South Yarra Station",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.1279
+  },
+  {
+   "hub": "South Yarra Station",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.1662
+  },
+  {
+   "hub": "South Yarra Station",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.113
+  },
+  {
+   "hub": "South Yarra Station",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.1279
+  },
+  {
+   "hub": "South Yarra Station",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0299
+  },
+  {
+   "hub": "South Yarra Station",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.1339
+  },
+  {
+   "hub": "South Yarra Station",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0457
+  },
+  {
+   "hub": "Southern Cross Station",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 1.1218
+  },
+  {
+   "hub": "Southern Cross Station",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.3779
+  },
+  {
+   "hub": "Southern Cross Station",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.4597
+  },
+  {
+   "hub": "Southern Cross Station",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.3424
+  },
+  {
+   "hub": "Southern Cross Station",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2349
+  },
+  {
+   "hub": "Southern Cross Station",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0571
+  },
+  {
+   "hub": "Southern Cross Station",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.3505
+  },
+  {
+   "hub": "Southern Cross Station",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0569
+  },
+  {
+   "hub": "Springvale Station",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.3441
+  },
+  {
+   "hub": "Springvale Station",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.1241
+  },
+  {
+   "hub": "Springvale Station",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.168
+  },
+  {
+   "hub": "Springvale Station",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.1568
+  },
+  {
+   "hub": "Springvale Station",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.1482
+  },
+  {
+   "hub": "Springvale Station",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0911
+  },
+  {
+   "hub": "Springvale Station",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.1723
+  },
+  {
+   "hub": "Springvale Station",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0458
+  },
+  {
+   "hub": "The District Docklands",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.4537
+  },
+  {
+   "hub": "The District Docklands",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.2557
+  },
+  {
+   "hub": "The District Docklands",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.213
+  },
+  {
+   "hub": "The District Docklands",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.0492
+  },
+  {
+   "hub": "The District Docklands",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.217
+  },
+  {
+   "hub": "The District Docklands",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0661
+  },
+  {
+   "hub": "The District Docklands",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.207
+  },
+  {
+   "hub": "The District Docklands",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0224
+  },
+  {
+   "hub": "Waverley Gardens Shopping Centre",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.4146
+  },
+  {
+   "hub": "Waverley Gardens Shopping Centre",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.1946
+  },
+  {
+   "hub": "Waverley Gardens Shopping Centre",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.2082
+  },
+  {
+   "hub": "Waverley Gardens Shopping Centre",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.0335
+  },
+  {
+   "hub": "Waverley Gardens Shopping Centre",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.2108
+  },
+  {
+   "hub": "Waverley Gardens Shopping Centre",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.0897
+  },
+  {
+   "hub": "Waverley Gardens Shopping Centre",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.2232
+  },
+  {
+   "hub": "Waverley Gardens Shopping Centre",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0192
+  },
+  {
+   "hub": "Westall Station",
+   "weekend": false,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.857
+  },
+  {
+   "hub": "Westall Station",
+   "weekend": false,
+   "block": "EVENING",
+   "expectedRequests": 0.4024
+  },
+  {
+   "hub": "Westall Station",
+   "weekend": false,
+   "block": "MIDDAY",
+   "expectedRequests": 0.3761
+  },
+  {
+   "hub": "Westall Station",
+   "weekend": false,
+   "block": "MORNING",
+   "expectedRequests": 0.4017
+  },
+  {
+   "hub": "Westall Station",
+   "weekend": true,
+   "block": "AFTERNOON",
+   "expectedRequests": 0.1948
+  },
+  {
+   "hub": "Westall Station",
+   "weekend": true,
+   "block": "EVENING",
+   "expectedRequests": 0.07
+  },
+  {
+   "hub": "Westall Station",
+   "weekend": true,
+   "block": "MIDDAY",
+   "expectedRequests": 0.2404
+  },
+  {
+   "hub": "Westall Station",
+   "weekend": true,
+   "block": "MORNING",
+   "expectedRequests": 0.0814
+  }
+ ]
+}

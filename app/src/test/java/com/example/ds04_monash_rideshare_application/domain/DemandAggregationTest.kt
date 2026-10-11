@@ -8,7 +8,6 @@ import com.example.ds04_monash_rideshare_application.core.demand.DemandEvent
 import com.example.ds04_monash_rideshare_application.core.demand.DemandModel
 import com.example.ds04_monash_rideshare_application.core.demand.DemandPeriod
 import com.example.ds04_monash_rideshare_application.core.demand.DemandProvenance
-import com.example.ds04_monash_rideshare_application.core.demand.disclosure
 import com.example.ds04_monash_rideshare_application.ui.APPROVED_POINTS
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse

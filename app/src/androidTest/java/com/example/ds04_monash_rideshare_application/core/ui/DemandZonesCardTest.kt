@@ -50,13 +50,14 @@ class DemandZonesCardTest {
 
     private fun show(
         model: DemandModel, scale: Float = 1f,
-        markers: List<com.example.ds04_monash_rideshare_application.ui.NamedLocation> = emptyList()
+        markers: List<com.example.ds04_monash_rideshare_application.ui.NamedLocation> = emptyList(),
+        forecast: DemandModel? = null
     ) {
         compose.setContent {
             MaterialTheme {
                 CompositionLocalProvider(LocalDensity provides Density(LocalDensity.current.density, scale)) {
                     Column(androidx.compose.ui.Modifier.verticalScroll(rememberScrollState())) {
-                        DemandZonesCard(campus = clayton, markers = markers, model = model, nowMillis = monday830) { points, showZones, campus, pins ->
+                        DemandZonesCard(campus = clayton, markers = markers, model = model, forecastModel = forecast, nowMillis = monday830) { points, showZones, campus, pins ->
                             val zones = DemandPalette.visibleZones(points).size
                             Text(
                                 "zones=${if (showZones) zones else 0} markers=${pins.map { it.name }} campus=${campus?.name}",
@@ -136,5 +137,38 @@ class DemandZonesCardTest {
         val height = compose.onNodeWithTag("demand-toggle").fetchSemanticsNode().size.height
         val density = androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext.resources.displayMetrics.density
         assertTrue("toggle is ${height / density} dp", height / density >= 47.5f)
+    }
+
+    // Predicted demand: one weighted event per hub in the bucket, as ForecastDemandDataSource produces.
+    private val predicted = object : DemandDataSource {
+        override val provenance = DemandProvenance.FORECAST
+        override val disclosure = "Forecast · Test model · trained on synthetic history"
+        override fun events() = listOf(
+            DemandEvent("Huntingdale Station", monday830, 4.25), DemandEvent("Monash Clayton", monday830, 2.0),
+            DemandEvent("Clayton Station", monday830, 0.5)
+        )
+    }
+
+    @Test fun opensOnThePredictedViewWhenAForecastIsAvailable() {
+        show(DemandModel(busy), forecast = DemandModel(predicted))
+        compose.onNodeWithTag("demand-view").assertIsDisplayed()
+        compose.onNodeWithText("Expected busiest: 1. Huntingdale Station (~4.3) · 2. Monash Clayton (~2.0) · 3. Clayton Station (~0.5)").assertIsDisplayed()
+        compose.onNodeWithText("Forecast · Test model · trained on synthetic history").assertIsDisplayed()
+        compose.onNodeWithTag("map-slot").assertTextEquals("zones=3 markers=[] campus=Monash Clayton")
+    }
+
+    @Test fun pastRequestsAreOneTapAwayAndBack() {
+        show(DemandModel(busy), forecast = DemandModel(predicted))
+        compose.onNodeWithText("Past requests").performClick()
+        compose.onNodeWithText("Busiest now: 1. Monash Clayton · 2. Huntingdale Station").assertIsDisplayed()
+        compose.onNodeWithText("Prototype demand · synthetic data").assertIsDisplayed()
+        compose.onNodeWithTag("map-slot").assertTextEquals("zones=2 markers=[] campus=Monash Clayton")
+        compose.onNodeWithText("Predicted").performClick()
+        compose.onNodeWithTag("map-slot").assertTextEquals("zones=3 markers=[] campus=Monash Clayton")
+    }
+
+    @Test fun withoutAForecastThereIsNoViewChoice() {
+        show(DemandModel(busy))
+        compose.onNodeWithTag("demand-view").assertDoesNotExist()
     }
 }

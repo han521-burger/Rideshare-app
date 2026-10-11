@@ -57,15 +57,17 @@ data class DemandPoint(
     val rank: Int
 )
 
-enum class DemandProvenance { SYNTHETIC, OBSERVED }
+// FORECAST = what a model expects (ForecastDemand.kt), not what was observed.
+enum class DemandProvenance { SYNTHETIC, OBSERVED, FORECAST }
 
-// The seam between the UI and wherever the history comes from. Today: SyntheticDemandDataSource.
-// Later: a source built from persisted passenger requests/searches (docs/DEMAND.md).
+// The seam between the UI and wherever the history comes from. Today: SyntheticDemandDataSource
+// (past demand) and ForecastDemandDataSource (predicted demand). Later: a source built from persisted
+// passenger requests/searches (docs/DEMAND.md).
 interface DemandDataSource {
     val provenance: DemandProvenance
     fun events(): List<DemandEvent>
-}
 
-// Short label for the UI; null when the data is genuine.
-val DemandDataSource.disclosure: String?
-    get() = if (provenance == DemandProvenance.SYNTHETIC) "Prototype demand · synthetic data" else null
+    // Short label for the UI; null when the data is genuine.
+    val disclosure: String?
+        get() = if (provenance == DemandProvenance.SYNTHETIC) "Prototype demand · synthetic data" else null
+}

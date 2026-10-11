@@ -72,21 +72,34 @@ fun DemandZonesCard(
     campus: NamedLocation? = null,
     markers: List<NamedLocation> = emptyList(),
     model: DemandModel = DemandProvider.model,
+    // Predicted demand (ForecastDemand.kt). When present the card opens on it and offers past requests as the other view.
+    forecastModel: DemandModel? = DemandProvider.forecast,
     nowMillis: Long = remember { System.currentTimeMillis() },
     map: @Composable (points: List<DemandPoint>, showZones: Boolean, campus: NamedLocation?, markers: List<NamedLocation>) -> Unit =
         { points, show, c, m -> DemandZonesMap(points, show, c, m) }
 ) {
     var showZones by rememberSaveable { mutableStateOf(true) }
+    var showForecast by rememberSaveable { mutableStateOf(true) }
+    val active = if (showForecast && forecastModel != null) forecastModel else model
     // Recomputed only when the bucket changes (the model also caches per bucket).
     val period = remember(nowMillis) { DemandPeriod.of(nowMillis) }
-    val points = remember(model, period) { model.pointsFor(period) }
+    val points = remember(active, period) { active.pointsFor(period) }
     val busiest = remember(points) { points.filter { it.rawDemand > 0.0 }.take(TOP_ZONES) }
 
     FormSectionCard(
         "Demand zones", modifier.testTag("demand-zones-card"),
-        supporting = "Demand zones show where passengers have historically requested rides.",
+        supporting = if (active.isForecast) "Where passengers are expected to request rides at this time of day, predicted by a demand-forecasting model."
+            else "Demand zones show where passengers have historically requested rides.",
         trailing = { FormStatusPill(period.label, Modifier.testTag("demand-period")) }
     ) {
+        if (forecastModel != null) {
+            ChoiceChipGroup(
+                options = listOf(true, false), selected = showForecast,
+                label = { if (it) "Predicted" else "Past requests" },
+                onSelect = { showForecast = it }, groupDescription = "Demand view",
+                modifier = Modifier.testTag("demand-view")
+            )
+        }
         Row(
             Modifier.fillMaxWidth().heightIn(min = 48.dp).testTag("demand-toggle")
                 .toggleable(value = showZones, role = Role.Switch, onValueChange = { showZones = it }),
@@ -101,12 +114,23 @@ fun DemandZonesCard(
         if (showZones) {
             DemandLegend()
             Text(
-                if (busiest.isEmpty()) "No demand recorded for this time of day yet."
-                else "Busiest now: " + busiest.joinToString(" · ") { "${it.rank}. ${it.hubName}" },
+                when {
+                    busiest.isEmpty() && active.isForecast -> "No demand expected for this time of day."
+                    busiest.isEmpty() -> "No demand recorded for this time of day yet."
+                    // The forecast is requests expected in this block on one day.
+                    active.isForecast -> "Expected busiest: " + busiest.joinToString(" · ") { "${it.rank}. ${it.hubName} (~${"%.1f".format(it.rawDemand)})" }
+                    else -> "Busiest now: " + busiest.joinToString(" · ") { "${it.rank}. ${it.hubName}" }
+                },
                 Modifier.testTag("demand-top"), style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurface
             )
+            if (active.isForecast) {
+                Text(
+                    "Numbers are expected requests per day in this time block.",
+                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
         }
-        model.disclosure?.let {
+        active.disclosure?.let {
             Text(it, Modifier.testTag("demand-disclosure"), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
