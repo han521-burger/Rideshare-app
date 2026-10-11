@@ -43,6 +43,12 @@ fun occurrenceStatusText(outcome: OccurrenceOutcome): String = if (outcome.creat
     else -> "Couldn’t be requested"
 }
 
+// The request a one-off submission made, to open straight after it. A batch has several (and a summary of them),
+// so it has none; the occurrence list is preferred, the request list covers a backend that leaves it out.
+fun createdOneOffRequestId(result: RequestSubmissionResult): String? =
+    if (result.isBatch || result.created == 0) null
+    else result.occurrences.firstOrNull { it.created }?.requestId ?: result.requests.firstOrNull()?.requestId
+
 fun summariseSubmission(
     result: RequestSubmissionResult,
     zone: ZoneId = ZoneId.systemDefault(),

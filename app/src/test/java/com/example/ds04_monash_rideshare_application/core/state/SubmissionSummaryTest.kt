@@ -151,6 +151,21 @@ class SubmissionSummaryTest {
         assertNull(vm.submissionSummary)
     }
 
+    @Test fun aOneOffRequestIsRememberedSoTheAppCanOpenIt() {
+        api.answer = result(made(3))
+        send()
+        assertEquals("req-3", vm.lastCreatedRequestId)
+    }
+
+    @Test fun aBatchOrANothingMadeResultHasNoSingleRequestToOpen() {
+        api.answer = result(made(3))
+        send()
+        api.answer = result(made(3), made(10))
+        send()
+        assertNull("a batch lands on the Requests list instead", vm.lastCreatedRequestId)
+        assertNull(createdOneOffRequestId(result(refused(3, DUPLICATE_OPEN_REQUEST))))
+    }
+
     @Test fun aProcessedBatchEndsTheSubmissionSoTheNextTapIsANewOne() {
         api.answer = result(refused(3, DUPLICATE_OPEN_REQUEST), refused(10, DUPLICATE_OPEN_REQUEST))
         send(); send()

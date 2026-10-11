@@ -115,6 +115,15 @@ fun RideshareNavHost(
         openRequest(requestId)
     }
 
+    // After a request is sent, leave the form for good (Back must not lead to it and a second Confirm):
+    // a one-off opens the new request over the Requests tab; a repeating one lands on the Requests tab,
+    // where every date it made is listed and the summary dialog shows over it.
+    fun showSubmittedRequest() {
+        val requestId = viewModel.lastCreatedRequestId
+        switchTab(AppDestination.Requests)
+        requestId?.let(::openRequest)
+    }
+
     BackHandler(enabled = backStack.size > 1) {
         navigateUp()
     }
@@ -506,7 +515,7 @@ fun RideshareNavHost(
             onSubmit = { draft, onDone ->
                 viewModel.createStandaloneRequest(draft) { success, error ->
                     onDone(error)
-                    if (success) navigateUp()
+                    if (success) showSubmittedRequest()
                 }
             },
             onExit = ::navigateUp,
@@ -537,7 +546,7 @@ fun RideshareNavHost(
                 } else {
                     viewModel.requestSeat(rideId, seats, note, applyToRecurringGroup) { success, error ->
                         onDone(error)
-                        if (success) navigateUp()
+                        if (success) showSubmittedRequest()
                     }
                 }
             },

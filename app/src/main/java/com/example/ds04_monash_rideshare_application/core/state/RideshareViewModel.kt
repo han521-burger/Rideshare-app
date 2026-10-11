@@ -131,6 +131,10 @@ class RideshareViewModel(
         private set
     var lastCreatedRide by mutableStateOf<RideSummary?>(null)
         private set
+    // The request a one-off submission just made, so the app can open it instead of leaving the passenger
+    // on the form (or back where they started) wondering whether it went through. Null after a batch.
+    var lastCreatedRequestId by mutableStateOf<String?>(null)
+        private set
     private var incomingRequestRefresh = RequestRefreshGate()
     private var rideDetailsVersion = 0
     private var myRequestsVersion = 0
@@ -309,7 +313,7 @@ class RideshareViewModel(
         vehicles = Resource()
         selectedRideId = null; selectedRequestId = null; requestActionError = null
         acceptConflict = null; undoableAcceptRequestId = null; dismissedBannerRequestIds = emptySet()
-        actionInFlight = false; incomingRequestRefresh = RequestRefreshGate(); lastCreatedRide = null
+        actionInFlight = false; incomingRequestRefresh = RequestRefreshGate(); lastCreatedRide = null; lastCreatedRequestId = null
         standaloneSubmissionKeys.reset(); seatSubmissionKeys.reset()
         rideDetailsVersion++; myRequestsVersion++; driverRidesVersion++
         scheduleWarningsVersion++; scheduleWarnings = Resource()
@@ -602,6 +606,7 @@ class RideshareViewModel(
     // could be made the passenger stays on the form (nothing was created) with that summary in front of them.
     private fun finishSubmission(result: RequestSubmissionResult, onDone: (Boolean, RequestSubmitError?) -> Unit) {
         if (result.isBatch) submissionSummary = summariseSubmission(result)
+        lastCreatedRequestId = createdOneOffRequestId(result)
         onDone(result.created > 0, null)
     }
 

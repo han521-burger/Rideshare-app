@@ -57,6 +57,9 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -76,6 +79,7 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.example.ds04_monash_rideshare_application.feature.activity.activityColorScheme
+import kotlinx.coroutines.launch
 
 // Building blocks for the Request Ride / Offer Ride wizards (Phase 8A design). They extend the form
 // language in FormKit.kt (cards, chips, banners, action bar) and only use MaterialTheme tokens.
@@ -235,6 +239,8 @@ fun RideFlowActionBar(
 ) {
     val colors = MaterialTheme.colorScheme
     val stacked = rememberLargeText()
+    val primaryHeld = remember { booleanArrayOf(false) }
+    val scope = rememberCoroutineScope()
     Surface(modifier.navigationBarsPadding().imePadding(), color = colors.surface) {
         Column {
             HorizontalDivider(color = colors.outlineVariant)
@@ -250,7 +256,15 @@ fun RideFlowActionBar(
                 }
                 val primary: @Composable (Modifier) -> Unit = { m ->
                     Button(
-                        onClick = { if (!busy) onPrimary() },
+                        // `busy` only flips on the next frame, so two taps inside one frame would both pass it;
+                        // hold the primary until that frame (also stops a double tap on Next skipping a step).
+                        onClick = {
+                            if (!busy && !primaryHeld[0]) {
+                                primaryHeld[0] = true
+                                onPrimary()
+                                scope.launch { withFrameNanos { }; primaryHeld[0] = false }
+                            }
+                        },
                         enabled = enabled,
                         modifier = m.heightIn(min = 52.dp).semantics {
                             if (busy) { disabled(); stateDescription = busyLabel }
