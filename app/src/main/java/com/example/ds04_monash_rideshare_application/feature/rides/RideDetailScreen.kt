@@ -44,6 +44,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -60,6 +61,7 @@ import com.example.ds04_monash_rideshare_application.Repository.Remote.RequestSt
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideRequestSummary
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideStatus
 import com.example.ds04_monash_rideshare_application.Repository.Remote.RideSummary
+import com.example.ds04_monash_rideshare_application.core.location.requestDrivingRoute
 import com.example.ds04_monash_rideshare_application.core.state.Resource
 import com.example.ds04_monash_rideshare_application.core.state.SCHEDULE_WARNING_TITLE
 import com.example.ds04_monash_rideshare_application.core.ui.DetailCard
@@ -76,6 +78,8 @@ import com.example.ds04_monash_rideshare_application.core.ui.RouteTimeline
 import com.example.ds04_monash_rideshare_application.ui.describeLocation
 import com.example.ds04_monash_rideshare_application.ui.requestStatusLabel
 import com.example.ds04_monash_rideshare_application.ui.rideStatusLabel
+import com.yandex.mapkit.geometry.Point
+import kotlinx.coroutines.CancellationException
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -134,6 +138,14 @@ fun RideDetailScreen(
             else -> {
                 val ride = rideDetails.data ?: return@RideshareScaffold
                 val isDriver = ride.driverId == currentUserId
+                val stopPoints = ride.stops.sortedBy { it.sequence }.map { Point(it.lat, it.lng) }
+                // The road route for the map line; if it can't be fetched the map just shows the pins.
+                val routePoints by produceState(emptyList<Point>(), ride.originLat, ride.originLng, ride.destinationLat, ride.destinationLng, stopPoints) {
+                    value = try {
+                        requestDrivingRoute(context, Point(ride.originLat, ride.originLng), Point(ride.destinationLat, ride.destinationLng), stopPoints).geometry
+                    } catch (cancelled: CancellationException) { throw cancelled }
+                    catch (error: Exception) { emptyList() }
+                }
 
                 LazyColumn(
                     modifier = Modifier.padding(contentPadding).fillMaxSize(),
@@ -143,7 +155,8 @@ fun RideDetailScreen(
                     item {
                         RouteMiniMap(
                             originLat = ride.originLat, originLng = ride.originLng,
-                            destinationLat = ride.destinationLat, destinationLng = ride.destinationLng
+                            destinationLat = ride.destinationLat, destinationLng = ride.destinationLng,
+                            routePoints = routePoints
                         )
                     }
 

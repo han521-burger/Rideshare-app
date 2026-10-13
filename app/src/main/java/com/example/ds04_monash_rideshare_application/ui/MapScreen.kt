@@ -10,6 +10,7 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -23,6 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -30,6 +32,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.example.ds04_monash_rideshare_application.BuildConfig
+import com.example.ds04_monash_rideshare_application.core.ui.styleRouteLine
 import com.yandex.mapkit.RequestPoint
 import com.yandex.mapkit.RequestPointType
 import com.yandex.mapkit.directions.DirectionsFactory
@@ -108,6 +111,7 @@ fun MapScreen(
         }
     }
 
+    val routeLineColor = MaterialTheme.colorScheme.primary.toArgb()
     var originMarker by remember { mutableStateOf<PlacemarkMapObject?>(null) }
     var destinationMarker by remember { mutableStateOf<PlacemarkMapObject?>(null) }
     var routeLine by remember { mutableStateOf<PolylineMapObject?>(null) }
@@ -150,7 +154,7 @@ fun MapScreen(
                         return
                     }
                     routeLine?.let { mapView.map.mapObjects.remove(it) }
-                    routeLine = mapView.map.mapObjects.addPolyline(route.geometry)
+                    routeLine = mapView.map.mapObjects.addPolyline(route.geometry).also { styleRouteLine(it, routeLineColor) }
 
                     val weight = route.metadata.weight
                     val distanceMeters = weight.distance.value

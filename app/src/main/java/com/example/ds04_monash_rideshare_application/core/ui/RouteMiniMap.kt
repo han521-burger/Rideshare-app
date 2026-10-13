@@ -12,6 +12,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -28,6 +30,7 @@ import com.example.ds04_monash_rideshare_application.ui.haversineMeters
 import com.yandex.mapkit.geometry.Point
 import com.yandex.mapkit.geometry.Polyline
 import com.yandex.mapkit.map.CameraPosition
+import com.yandex.mapkit.map.PolylineMapObject
 import com.yandex.mapkit.mapview.MapView
 
 // A small, read-only map for "where actually is this ride" - not tap-to-select like MapScreen,
@@ -75,49 +78,62 @@ fun RouteMiniMap(
 
     val lineColor = MaterialTheme.colorScheme.primary.toArgb()
 
-    val mapView = remember(originLat, originLng, destinationLat, destinationLng, routePoints, lineColor) {
-        val origin = Point(originLat, originLng)
-        val destination = Point(destinationLat, destinationLng)
-        val midpoint = Point((originLat + destinationLat) / 2.0, (originLng + destinationLng) / 2.0)
-        val distanceKm = haversineMeters(originLat, originLng, destinationLat, destinationLng) / 1000.0
-        val zoom = when {
-            distanceKm < 2 -> 14.0f
-            distanceKm < 5 -> 13.0f
-            distanceKm < 10 -> 12.0f
-            distanceKm < 20 -> 11.0f
-            else -> 9.5f
-        }
-        MapView(context).apply {
-            map.move(CameraPosition(midpoint, zoom, 0.0f, 0.0f))
-            if (routePoints.size >= 2) {
-                map.mapObjects.addPolyline(Polyline(routePoints)).apply {
-                    setStrokeColor(lineColor)
-                    strokeWidth = 5f
-                    outlineColor = Color.WHITE
-                    outlineWidth = 1.5f
+    // New endpoints mean a new map: AndroidView only calls its factory once, so the key swaps the whole view.
+    key(originLat, originLng, destinationLat, destinationLng) {
+        val mapView = remember {
+            val origin = Point(originLat, originLng)
+            val destination = Point(destinationLat, destinationLng)
+            val midpoint = Point((originLat + destinationLat) / 2.0, (originLng + destinationLng) / 2.0)
+            val distanceKm = haversineMeters(originLat, originLng, destinationLat, destinationLng) / 1000.0
+            val zoom = when {
+                distanceKm < 2 -> 14.0f
+                distanceKm < 5 -> 13.0f
+                distanceKm < 10 -> 12.0f
+                distanceKm < 20 -> 11.0f
+                else -> 9.5f
+            }
+            MapView(context).apply {
+                map.move(CameraPosition(midpoint, zoom, 0.0f, 0.0f))
+                // Pins in their own layer above the route line, which can arrive after the map is shown.
+                map.mapObjects.addCollection().apply {
+                    zIndex = 10f
+                    addPlacemark(origin)
+                    addPlacemark(destination)
                 }
             }
-            map.mapObjects.addPlacemark(origin)
-            map.mapObjects.addPlacemark(destination)
         }
-    }
+        val routeLayer = remember(mapView) { mapView.map.mapObjects.addCollection().apply { zIndex = 0f } }
 
-    DisposableEffect(lifecycleOwner, mapView) {
-        var started = false
-        fun stopMap() { if (started) { mapView.onStop(); started = false } }
-        val observer = LifecycleEventObserver { _, event ->
-            when (event) {
-                Lifecycle.Event.ON_START -> if (!started) { mapView.onStart(); started = true }
-                Lifecycle.Event.ON_STOP -> stopMap()
-                else -> Unit
+        LaunchedEffect(routePoints, lineColor) {
+            routeLayer.clear()
+            if (routePoints.size >= 2) styleRouteLine(routeLayer.addPolyline(Polyline(routePoints)), lineColor)
+        }
+
+        DisposableEffect(lifecycleOwner, mapView) {
+            var started = false
+            fun stopMap() { if (started) { mapView.onStop(); started = false } }
+            val observer = LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_START -> if (!started) { mapView.onStart(); started = true }
+                    Lifecycle.Event.ON_STOP -> stopMap()
+                    else -> Unit
+                }
             }
+            lifecycleOwner.lifecycle.addObserver(observer)
+            onDispose { lifecycleOwner.lifecycle.removeObserver(observer); stopMap() }
         }
-        lifecycleOwner.lifecycle.addObserver(observer)
-        onDispose { lifecycleOwner.lifecycle.removeObserver(observer); stopMap() }
-    }
 
-    AndroidView(
-        modifier = modifier.fillMaxWidth().height(200.dp),
-        factory = { mapView }
-    )
+        AndroidView(
+            modifier = modifier.fillMaxWidth().height(200.dp),
+            factory = { mapView }
+        )
+    }
+}
+
+// The one look for a driving route on any map: a thin line in the theme colour with a faint white edge.
+fun styleRouteLine(line: PolylineMapObject, color: Int) {
+    line.setStrokeColor(color)
+    line.strokeWidth = 3f
+    line.outlineColor = Color.WHITE
+    line.outlineWidth = 1f
 }

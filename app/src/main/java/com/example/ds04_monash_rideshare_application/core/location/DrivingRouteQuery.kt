@@ -19,13 +19,14 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 // Activity owns MapKit startup, including headless requests made before any map is displayed.
+// `via` are stops visited in order between origin and destination.
 @Suppress("UNUSED_PARAMETER")
-suspend fun requestDrivingRoute(context: Context, origin: Point, destination: Point): RouteQueryResult {
+suspend fun requestDrivingRoute(context: Context, origin: Point, destination: Point, via: List<Point> = emptyList()): RouteQueryResult {
     if (BuildConfig.YANDEX_MAPKIT_API_KEY.isBlank()) throw IOException("Route service is currently unavailable. Please try again.")
     try {
         return withTimeout(30_000L) {
             suspendCancellableCoroutine { continuation ->
-                val request = DrivingRequest(origin, destination, continuation)
+                val request = DrivingRequest(origin, destination, via, continuation)
                 continuation.invokeOnCancellation { request.cancel() }
                 request.start()
             }
@@ -35,7 +36,7 @@ suspend fun requestDrivingRoute(context: Context, origin: Point, destination: Po
     }
 }
 
-private class DrivingRequest(private val origin: Point, private val destination: Point,
+private class DrivingRequest(private val origin: Point, private val destination: Point, private val via: List<Point>,
     private val continuation: CancellableContinuation<RouteQueryResult>) {
     private val router = DirectionsFactory.getInstance().createDrivingRouter(DrivingRouterType.COMBINED)
     private var session: DrivingSession? = null
@@ -58,9 +59,8 @@ private class DrivingRequest(private val origin: Point, private val destination:
         }
     }
     fun start() {
-        session = router.requestRoutes(listOf(
-            RequestPoint(origin, RequestPointType.WAYPOINT, null, null, null),
-            RequestPoint(destination, RequestPointType.WAYPOINT, null, null, null)), DrivingOptions(), VehicleOptions(), listener)
+        val points = (listOf(origin) + via + destination).map { RequestPoint(it, RequestPointType.WAYPOINT, null, null, null) }
+        session = router.requestRoutes(points, DrivingOptions(), VehicleOptions(), listener)
     }
     fun cancel() { session?.cancel() }
 }
