@@ -271,8 +271,11 @@ for ax, hub in zip(axes, ["Monash Clayton", "Southern Cross Station"]):
     daily_hub = test[test.hub == hub].groupby("date")[["requests", column]].sum()
     ax.plot(daily_hub.index, daily_hub.requests, "o-", label="Actual", color="#2d5f7c")
     ax.plot(daily_hub.index, daily_hub[column], "s--", label=f"Predicted ({best})", color="#c96b2c")
-    ax.set_title(hub); ax.set_ylabel("Requests per day"); ax.tick_params(axis="x", rotation=45); ax.legend()
-fig.suptitle("Test period: predicted vs actual"); fig.tight_layout(); fig.savefig(FIGURES / "predicted_vs_actual.png"); plt.show()
+    ax.set_title(hub); ax.set_ylabel("Requests per day"); ax.tick_params(axis="x", rotation=45)
+# One shared legend under the title, so it never sits on top of the lines.
+fig.suptitle("Test period: predicted vs actual", y=0.99)
+fig.legend(*axes[0].get_legend_handles_labels(), loc="upper center", bbox_to_anchor=(0.5, 0.93), ncol=2, frameon=False)
+fig.tight_layout(rect=(0, 0, 1, 0.86)); fig.savefig(FIGURES / "predicted_vs_actual.png"); plt.show()
 
 ax = block_level.plot.scatter("requests", column, alpha=0.25, figsize=(5, 5), color="#2d5f7c")
 lim = block_level[["requests", column]].max().max(); ax.plot([0, lim], [0, lim], color="#999", lw=1)
