@@ -64,7 +64,9 @@ data class RouteQueryResult(
     val destinationLat: Double,
     val destinationLng: Double,
     val distanceMeters: Double,
-    val estimatedDurationSeconds: Long
+    val estimatedDurationSeconds: Long,
+    // Road geometry of the route, for drawing it on a map. Empty when not known.
+    val geometry: List<Point> = emptyList()
 )
 
 @Composable

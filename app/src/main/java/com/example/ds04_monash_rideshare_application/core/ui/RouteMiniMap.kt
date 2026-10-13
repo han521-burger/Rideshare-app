@@ -1,5 +1,6 @@
 package com.example.ds04_monash_rideshare_application.core.ui
 
+import android.graphics.Color
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -14,6 +15,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.unit.dp
@@ -24,11 +26,13 @@ import com.example.ds04_monash_rideshare_application.BuildConfig
 import com.example.ds04_monash_rideshare_application.ui.describeLocation
 import com.example.ds04_monash_rideshare_application.ui.haversineMeters
 import com.yandex.mapkit.geometry.Point
+import com.yandex.mapkit.geometry.Polyline
 import com.yandex.mapkit.map.CameraPosition
 import com.yandex.mapkit.mapview.MapView
 
 // A small, read-only map for "where actually is this ride" - not tap-to-select like MapScreen,
-// just origin/destination pins with the camera framed to show both. Still a real MapView, so it
+// just origin/destination pins (and the road route between them, when known) with the camera framed
+// to show both. Still a real MapView, so it
 // supports normal pinch-zoom/pan to look around.
 @Composable
 fun RouteMiniMap(
@@ -36,7 +40,9 @@ fun RouteMiniMap(
     originLng: Double,
     destinationLat: Double,
     destinationLng: Double,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    // Road geometry from pickup to drop-off; when given, it is drawn as a line between the pins.
+    routePoints: List<Point> = emptyList()
 ) {
     // MapKit throws an AssertionError when it is initialized without an API key. The map-based
     // ride editor already handles that setup state, and read-only ride details must do the same so
@@ -67,7 +73,9 @@ fun RouteMiniMap(
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
 
-    val mapView = remember(originLat, originLng, destinationLat, destinationLng) {
+    val lineColor = MaterialTheme.colorScheme.primary.toArgb()
+
+    val mapView = remember(originLat, originLng, destinationLat, destinationLng, routePoints, lineColor) {
         val origin = Point(originLat, originLng)
         val destination = Point(destinationLat, destinationLng)
         val midpoint = Point((originLat + destinationLat) / 2.0, (originLng + destinationLng) / 2.0)
@@ -81,6 +89,14 @@ fun RouteMiniMap(
         }
         MapView(context).apply {
             map.move(CameraPosition(midpoint, zoom, 0.0f, 0.0f))
+            if (routePoints.size >= 2) {
+                map.mapObjects.addPolyline(Polyline(routePoints)).apply {
+                    setStrokeColor(lineColor)
+                    strokeWidth = 5f
+                    outlineColor = Color.WHITE
+                    outlineWidth = 1.5f
+                }
+            }
             map.mapObjects.addPlacemark(origin)
             map.mapObjects.addPlacemark(destination)
         }

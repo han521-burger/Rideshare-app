@@ -47,7 +47,7 @@ private class DrivingRequest(private val origin: Point, private val destination:
             else {
                 val weight = route.metadata.weight
                 continuation.resume(RouteQueryResult(origin.latitude, origin.longitude, destination.latitude,
-                    destination.longitude, weight.distance.value, weight.time.value.toLong()))
+                    destination.longitude, weight.distance.value, weight.time.value.toLong(), route.geometry.points))
             }
         }
         override fun onDrivingRoutesError(error: com.yandex.runtime.Error) {

@@ -262,6 +262,7 @@ fun CampusRoutePicker(onResult: (RoutePickerResult?) -> Unit, modifier: Modifier
                     RouteMiniMap(
                         originLat = endpoints.first.point.latitude, originLng = endpoints.first.point.longitude,
                         destinationLat = endpoints.second.point.latitude, destinationLng = endpoints.second.point.longitude,
+                        routePoints = route.geometry,
                         modifier = Modifier.clip(RoundedCornerShape(16.dp))
                     )
                 }
