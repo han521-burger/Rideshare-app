@@ -255,7 +255,7 @@ object RequestSubmissions : Table("request_submissions") {
 // is unaffected. It is PRIVATE to userId - it describes that person's own previous trip - and is only ever returned by the
 // caller-scoped GET /schedule-warnings; no ride or request DTO another person can read carries it.
 //
-// The warning is a record of what the completion event found, not a live computation, and Stage 9 deliberately has no
+// The warning is a record of what the completion event found, not a live computation, and there is deliberately no
 // recovery engine: it is simply not shown once its subject is no longer live (a cancelled, completed or expired
 // request; a cancelled or completed ride). One row per (person, journey, ride that caused it).
 object ScheduleWarnings : Table("schedule_warnings") {

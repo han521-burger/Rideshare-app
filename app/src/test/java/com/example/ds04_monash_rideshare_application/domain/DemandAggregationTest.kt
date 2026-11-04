@@ -24,7 +24,7 @@ class DemandAggregationTest {
     private val huntingdale = "Huntingdale Station"
     private val chadstone = "Chadstone Shopping Centre"
 
-    // A Monday (2026-09-28) and a Saturday (2026-09-26), in Melbourne time.
+    // A Monday and a Saturday, in Melbourne time.
     private fun at(date: LocalDate, hour: Int, minute: Int = 0) =
         LocalDateTime.of(date, java.time.LocalTime.of(hour, minute)).atZone(DEMAND_ZONE).toInstant().toEpochMilli()
     private val monday = LocalDate.of(2026, 9, 28)

@@ -175,7 +175,7 @@ class FakeTravelTimeProvider(private val seconds: Map<Pair<String, String>, Long
     }
 }
 
-// Stage 9: a ride cannot be completed before it has started (RIDE_NOT_STARTED), judged by the SERVER clock (ServerClock).
+// A ride cannot be completed before it has started (RIDE_NOT_STARTED), judged by the SERVER clock (ServerClock).
 // These tests build rides in the future (so the lazy expiry leaves their pending requests alone) and still need to
 // complete them, so the server clock is pinned to just after the ride's departure while the block runs.
 // Close the result (use { }) to put the real clock back.

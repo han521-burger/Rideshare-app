@@ -94,7 +94,7 @@ class AnalyticsCorrectnessTest {
         assertEquals(decision, requestRow()[RideRequests.driverDecisionAt])
         assertNull(requestRow("unanswered-request")[RideRequests.driverDecisionAt])
     }
-    // Stage 9.1: a single seat cannot be completed while its ride is live; the refusal changes nothing, decision included. (The
+    // A single seat cannot be completed while its ride is live; the refusal changes nothing, decision included. (The
     // ride-level completion that does complete seats is covered by `accept records decision...` above.)
     @Test fun `refused individual completion leaves the driver decision and status alone`() = withApp {
         val decision = accept()

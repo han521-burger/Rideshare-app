@@ -16,7 +16,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-// Stage 9 races. A ride's completion (which stamps the real time and revalidates its people) is decided under the same
+// Completion races. A ride's completion (which stamps the real time and revalidates its people) is decided under the same
 // scheduling locks as creating, accepting and cancelling, so each race has exactly the outcomes of the two orders and nothing
 // in between. The tests do not assert which order happened to win; they run the race repeatedly and assert that the FINAL
 // state is one of the coherent outcomes, and that the actual completion time was honoured in every one.

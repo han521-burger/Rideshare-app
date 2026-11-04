@@ -784,7 +784,7 @@ class RideFlowComponentsTest {
         compose.onNodeWithText("21.4 km").assertExists()
     }
 
-    // Stage 10.1: this test used to assert the pre-redesign request-seat wizard ("Step 1 of 4: Ride" as visible text, final step
+    // This test used to assert the pre-redesign request-seat wizard ("Step 1 of 4: Ride" as visible text, final step
     // "Confirm", and NO combined accessibility description). The screen has since been migrated, deliberately, to the shared
     // RideFlowScaffold / WizardProgress shell (commits "Redesign Request Ride and Offer Ride flows" and "Restyle remaining
     // screens"), which exposes ONE combined TalkBack node ("Step 1 of 4: Ride", its children cleared), and a final

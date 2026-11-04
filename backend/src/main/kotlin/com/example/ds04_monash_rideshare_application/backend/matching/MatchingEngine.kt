@@ -7,7 +7,7 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.sqrt
 
-// Rule-based matching pipeline (RTM FR-04 / weekly plan Week 5: "rule-based matching only, no
+// Rule-based matching pipeline (RTM FR-04: "rule-based matching only, no
 // ML"). The driver always makes the final call on a request - this only ranks candidate rides
 // for a passenger's search, it never auto-books anything.
 data class RideCandidate(

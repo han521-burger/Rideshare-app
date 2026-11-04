@@ -69,7 +69,7 @@ class RideCompletionLifecycleTest {
                     }
                 }
             }
-            // Completing needs the ride to have started (RIDE_NOT_STARTED, Stage 9). The fixture ride leaves tomorrow, and its
+            // Completing needs the ride to have started (RIDE_NOT_STARTED). The fixture ride leaves tomorrow, and its
             // pending requests must not be expired by the real clock, so the SERVER clock is pinned to just after departure.
             serverClockAfterDeparture(rideId).use { client.test() }
         }
@@ -99,7 +99,7 @@ class RideCompletionLifecycleTest {
     private suspend fun HttpClient.complete() {
         val beforeRide = ride()
         val before = requests()
-        // Stage 9: the server clock is pinned (withRide), so the completion time is exact: the ride records it as completedAt
+        // The server clock is pinned (withRide), so the completion time is exact: the ride records it as completedAt
         // and the requests it completes or cancels carry it as respondedAt.
         val completionTime = ServerClock.now()
         val response = updateRide()

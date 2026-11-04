@@ -178,7 +178,7 @@ class RequestCancellationTest {
         val request = create()
         transition(request, RideRequestStatus.ACCEPTED, driver)
         capacity(1)
-        // Stage 9.1: a seat is completed by its RIDE completing (a request cannot complete itself while the ride is live).
+        // A seat is completed by its RIDE completing (a request cannot complete itself while the ride is live).
         val ride = serverClockAfterDeparture(rideId).use {
             put("/rides/$rideId") {
                 header(HttpHeaders.Authorization, "Bearer $driver"); contentType(ContentType.Application.Json); setBody("""{"status":"COMPLETED"}""")
@@ -275,7 +275,7 @@ class RequestCancellationTest {
         val cancelledState = transition(cancelled, RideRequestStatus.CANCELLED, secondPassenger)
         val completed = create(caller = secondPassenger)
         transition(completed, RideRequestStatus.ACCEPTED, driver)
-        // Stage 9.1: one seat can no longer be completed through the API while the ride is live (RIDE_NOT_COMPLETED), and
+        // One seat can no longer be completed through the API while the ride is live (RIDE_NOT_COMPLETED), and
         // completing the ride would complete `active` too. This test is about how a COMPLETED row is counted for capacity,
         // so the row is written directly.
         setStatus(completed.requestId, RideRequestStatus.COMPLETED)

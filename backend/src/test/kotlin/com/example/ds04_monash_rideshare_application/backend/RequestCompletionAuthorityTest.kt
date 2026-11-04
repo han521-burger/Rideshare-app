@@ -18,7 +18,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-// Stage 9.1: THE RIDE OWNS JOURNEY COMPLETION. A passenger's seat becomes COMPLETED only when its ride does; completing one
+// THE RIDE OWNS JOURNEY COMPLETION. A passenger's seat becomes COMPLETED only when its ride does; completing one
 // seat by hand while the ride is still travelling is refused (409 RIDE_NOT_COMPLETED), because a COMPLETED journey is now
 // physical history and must not be fabricated.
 //

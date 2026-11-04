@@ -1,6 +1,6 @@
 # Feature Proposals
 
-## Where these stand (2026-10-06)
+## Where these stand
 
 Most of this list has since been built on `complete-app-trial`. The original proposals below are
 kept as written, for the reasoning behind each.
@@ -167,7 +167,7 @@ explainable, no training infra — see `docs/BACKEND.md`):
 All five read directly off tables that already exist (`Rides`, `RideRequests`, `Vehicles`,
 completed trips) — none need new data collection to get a first version working.
 
-### Latest brainstorm (2026-09-20)
+### Latest brainstorm
 
 Raw list from the team: visualisation, prediction, informative dashboard/board (estimates from
 known values, no real data needed), data analysis of patterns over time, matching funnel

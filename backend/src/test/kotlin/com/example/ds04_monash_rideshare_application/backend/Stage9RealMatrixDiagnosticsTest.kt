@@ -10,7 +10,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 
-// DIAGNOSTICS, not unit tests: Stage 9 scenarios run end to end (ride posted, seat requested, accepted, completed over HTTP) against
+// DIAGNOSTICS, not unit tests: completion scenarios run end to end (ride posted, seat requested, accepted, completed over HTTP) against
 // the PRODUCTION travel-time matrix (OSRM over OpenStreetMap, src/main/resources/travel-times.json), with the server clock pinned
 // to the instant the driver "pressed Complete". Every figure is read from the matrix, not typed in. Lines starting with DIAG are
 // the report (run with `gradlew :backend:test --tests '*Stage9RealMatrixDiagnosticsTest' -i`); the assertions make it self-checking.

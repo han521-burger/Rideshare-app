@@ -8,7 +8,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-// Stage 10: database invariants that must hold after ANY sequence of the scheduling operations, checked against the stored rows
+// Database invariants that must hold after ANY sequence of the scheduling operations, checked against the stored rows
 // (not against what an endpoint said). Each scenario ends with auditInvariants(); a violation names the rows involved.
 //
 // Rows deliberately written by a test to look like an old version's data (legacy duplicates, a seat COMPLETED on a live ride) are

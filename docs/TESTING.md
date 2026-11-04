@@ -29,11 +29,11 @@ beside each new validation or state transition.
 Per the weekly build plan, any PR/MR touching validation or state-transition logic needs
 tests covering both the valid and invalid paths.
 
-## What's covered today (2026-10-06)
+## What's covered today
 
 Run everything with `./gradlew :backend:test :app:testDebugUnitTest` (JVM, no emulator) and
 `./gradlew :app:connectedDebugAndroidTest` (needs a running emulator/device). At last run:
-565 backend tests and 314 app unit tests, all passing (Stage 9.1).
+565 backend tests and 314 app unit tests, all passing.
 
 **Backend (`backend/src/test/...`)** — each test boots the real Ktor app on a temporary SQLite
 file. The Gradle test task sets `rideshare.test.trustUserIdTokens`, letting tests call as a

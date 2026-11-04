@@ -32,7 +32,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 // What an open request records about its OWN trip when it is created: canonical endpoints, the planned
-// duration (from the travel-time matrix) and the planned arrival. Stage 5 builds on these; nothing here
+// duration (from the travel-time matrix) and the planned arrival. Later scheduling checks build on these; nothing here
 // looks at the passenger's other journeys.
 class OpenRequestPlanningTest {
     private val t = futureDeparture()

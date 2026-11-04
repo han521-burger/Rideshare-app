@@ -2,7 +2,7 @@
 
 Owner: Tony Doan. This a copy of `RTM Week 9.xlsm`.
 
-Last updated: 2026-10-06 on `complete-app-trial` (Dev/Test Status columns unchanged where nothing
+Status on `complete-app-trial` (Dev/Test Status columns unchanged where nothing
 new was verified - see "How to update").
 
 | Req ID | Requirement | Type | Category | Source | Data Collected | Priority | Dev Status | Test Status | Notes |

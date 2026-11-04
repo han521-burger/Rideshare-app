@@ -13,7 +13,7 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
-// Stage 10 migration check against a COPY of a real development database. It only runs when STAGE10_DB_COPY names a copy
+// Migration check against a COPY of a real development database. It only runs when STAGE10_DB_COPY names a copy
 // (never the original: the file is opened read/write and migrated in place), so ordinary test runs skip it:
 //   $env:STAGE10_DB_COPY = "C:\path\to\copy.db"; ./gradlew :backend:test --tests '*RealDatabaseCopyMigrationTest' -i
 // It records every table's row count before and after the application starts on it, checks that every column the later stages

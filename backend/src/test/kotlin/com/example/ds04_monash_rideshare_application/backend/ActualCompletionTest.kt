@@ -23,7 +23,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
-// Stage 9: a journey's REAL completion time replaces its planned arrival for what comes next, and completing a ride
+// A journey's REAL completion time replaces its planned arrival for what comes next, and completing a ride
 // revalidates the schedules of the people on it. Every scenario is in minutes from `base`; the server clock is pinned to the
 // instant the driver "pressed Complete".
 //
@@ -521,7 +521,7 @@ class ActualCompletionTest {
         }
     }
 
-    // ================================================================================ repeating requests and the Stage 8 snapshot
+    // ================================================================================ repeating requests and the stored snapshot
     @Test
     fun `an occurrence of a repeating request can become conflicted without touching its creation snapshot`() = withScheduling(matrix) {
         rideAWithPassenger()

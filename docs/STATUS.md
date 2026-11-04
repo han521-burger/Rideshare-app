@@ -3,14 +3,12 @@
 Owner: Tony Doan. Tracks what's outstanding from earlier weeks. Update this whenever an item lands.
 Editor: Keng Hong. Updates what have been done for myself.
 
-Last reviewed: 2026-10-10 on `complete-app-trial`.
-
 ## Build baseline
 
 - Android and backend are both included in the Gradle build.
 - The version catalog currently uses AGP 8.13.2 and Gradle 9.5.0; the old 9.3.1 note is obsolete.
-- The complete Gradle `check`, debug APK build, and Week 4 emulator flow passed locally on
-  2026-08-21. Repeat these checks before merging later changes.
+- The complete Gradle `check`, debug APK build, and Week 4 emulator flow passed locally.
+  Repeat these checks before merging later changes.
 
 ## Keng Hong's progress through Week 4
 
@@ -45,7 +43,7 @@ passenger count, ranked match results, ride details, seat-request confirmation a
 Drivers can review and accept/reject pending requests; acceptance is the point at which capacity is
 decremented.
 
-## Since Week 4 — landed on `complete-app-trial` (2026-09 to 2026-10-06)
+## Since Week 4 — landed on `complete-app-trial`
 
 Some notes above predate these (e.g. Week 2's "vehicle selection not implemented").
 

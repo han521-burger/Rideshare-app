@@ -413,7 +413,7 @@ carry no completion timestamp of their own; a passenger's journey is the ride's,
 `completed_at` null: the moment a cleanup happened to run is not when anyone arrived. It also revalidates nothing - it
 learns nothing the planned arrival had not already said.
 
-**The ride owns journey completion (Stage 9.1).** A seat attached to a ride becomes `COMPLETED` only when its ride does - in
+**The ride owns journey completion .** A seat attached to a ride becomes `COMPLETED` only when its ride does - in
 the same transaction as the driver's Complete, or through the system's auto-completion - never on its own.
 `PUT /requests/{id}` `COMPLETED` (by the passenger or the driver) on a seat whose ride is not `COMPLETED` is refused:
 `409`, code `RIDE_NOT_COMPLETED`, "This trip is completed when the driver completes the ride.", nothing changes (the seat
@@ -505,7 +505,7 @@ replace polling with an authenticated realtime channel or platform push notifica
 
 ## Matching (FR-04)
 
-Rule-based only, no ML, per the weekly plan (Week 5). `matching/MatchingEngine.kt`:
+Rule-based only, no ML, per the weekly plan. `matching/MatchingEngine.kt`:
 1. Hard gates: enough seats, same day, within a 45-minute window, same rough direction, pickup
    within 3 km.
 2. Survivors get a weighted score: route similarity 40%, time compatibility 30%, pickup proximity

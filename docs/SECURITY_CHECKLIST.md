@@ -15,7 +15,7 @@ Owner: Tony Doan. Run this pass every sprint
 - [ ] Error messages returned to the client do not reveal server internals
 - [ ] Logs never contain tokens, passwords, or full session identifiers
 
-### Review notes — 2026-10-06 (`complete-app-trial`, code review, not yet a sprint sign-off)
+### Review notes (`complete-app-trial`, code review, not yet a sprint sign-off)
 
 Boxes above are left for the sprint review to tick; this is what the code currently shows.
 

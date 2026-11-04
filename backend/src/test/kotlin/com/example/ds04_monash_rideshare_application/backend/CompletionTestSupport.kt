@@ -22,7 +22,7 @@ import org.jetbrains.exposed.sql.transactions.transaction
 import org.jetbrains.exposed.sql.update
 import kotlin.test.assertEquals
 
-// Shared plumbing for the Stage 9 tests (actual completion time, completed-location history, completion-time revalidation).
+// Shared plumbing for the completion tests (actual completion time, completed-location history, completion-time revalidation).
 //
 // Every scenario is written in minutes from a base departure ten days away, so the real clock - which drives the lazy expiry
 // of stale records - never touches it, while the SERVER clock (ServerClock) is pinned to the instant the test says the driver
